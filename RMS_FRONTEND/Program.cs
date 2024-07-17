@@ -5,6 +5,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+//To add Response caching to the application
+//check: https://docs.microsoft.com/en-us/aspnet/core/performance/caching/response?view=aspnetcore-8.0 for more details
+builder.Services.AddResponseCaching();
+
 //Add authentication scheme to the application
 //check: https://docs.microsoft.com/en-us/aspnet/core/security/authentication/cookie?view=aspnetcore-8.0 for more details
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -28,6 +32,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+//To add Response caching middleware
+app.UseResponseCaching();
 
 app.UseAuthorization();
 

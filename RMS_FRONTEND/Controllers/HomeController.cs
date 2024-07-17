@@ -13,12 +13,8 @@ namespace RMS_FRONTEND.Controllers
             _logger = logger;
         }
 
+        //[ResponseCache(Duration =1000,Location =ResponseCacheLocation.Client, NoStore = false)]
         public IActionResult Index()
-        {
-            return View();
-        }
-
-        public IActionResult Privacy()
         {
             return View();
         }
