@@ -4,7 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 #for bower components in frontend
-/RMS_FRONTEND/wwwroot/files/bower_components
+/RMS_FRONTEND/wwwroot/lib/
 # User-specific files
 *.rsuser
 *.suo

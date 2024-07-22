@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [{
+  "provider": "cdnjs",
+  "library": "select2@4.0.13",
+  "destination": "wwwroot/lib/select2/",
+  "files": [
+    "js/select2.min.js",
+    "js/select2.full.js",
+    "js/select2.full.min.js",
+    "js/select2.js",
+    "css/select2.min.css",
+    "css/select2.css"
+  ]
+}
+,
+{
+  "provider": "jsdelivr",
+  "library": "@pnotify/core@5.2.0",
+  "destination": "wwwroot/lib/pnotify/core/",
+  "files": [
+    "dist/Angeler.css",
+    "dist/Angeler.min.css",
+    "dist/BrightTheme.css",
+    "dist/BrightTheme.min.css",
+    "dist/Material.css",
+    "dist/Material.min.css",
+    "dist/PNotify.css",
+    "dist/PNotify.js",
+    "dist/PNotify.min.css",
+    "dist/PNotify.min.js"
+  ]
+}
+,
+    {
+      "provider": "jsdelivr",
+      "library": "@pnotify/confirm@5.2.0",
+      "destination": "wwwroot/lib/pnotify/confirm/",
+      "files": [
+        "dist/PNotifyConfirm.min.css",
+        "dist/PNotifyConfirm.min.js"
+      ]
+    }
+]
+}
