@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using RMS_API.CustomClass;
+using RMS_API.Models;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,26 +16,67 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add authentication
-builder.Services.AddAuthentication(options =>
-{
+// Configure JWT settings
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>
+// Inject JwtSettings using IOptions
+builder.Services.AddSingleton<IJwtAuth>(serviceProvider =>
 {
-   options.TokenValidationParameters= new TokenValidationParameters
-   {
-       ValidIssuer = builder.Configuration["Jwt:Issuer"],
-       ValidAudience = builder.Configuration["Jwt:Audience"],
-       IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:AesKey"])), // Use AES key
-       ValidateIssuer = true,
-       ValidateAudience = true,
-       ValidateLifetime = true,
-       ValidateIssuerSigningKey = true
-   };
+    var jwtSettings = serviceProvider.GetRequiredService<IOptions<JwtSettings>>();
+    return new JwtAuth(jwtSettings);
 });
+
+// Configure JWT authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var serviceProvider = builder.Services.BuildServiceProvider();
+        var jwtSettings = serviceProvider.GetRequiredService<IOptions<JwtSettings>>().Value;
+        var key = Encoding.ASCII.GetBytes(jwtSettings.SecretKey);
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true, // Validates token expiry
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(key)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                var claimsIdentity = context.Principal.Identity as ClaimsIdentity;
+                var userIdClaim = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier);
+                var usernameClaim = claimsIdentity?.FindFirst(ClaimTypes.Name);
+
+                if (userIdClaim != null && usernameClaim != null)
+                {
+                    var user = new AuthenticatedUser
+                    {
+                        UserId = userIdClaim.Value,
+                        Username = usernameClaim.Value
+                    };
+
+                    // Add the user object to the HttpContext items
+                    context.HttpContext.Items["User"] = user;
+                }
+
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                // Log the exception
+                context.NoResult();
+                context.Response.StatusCode = 500;
+                context.Response.ContentType = "text/plain";
+                return context.Response.WriteAsync(context.Exception.ToString());
+            }
+        };
+    });
 
 var app = builder.Build();
 

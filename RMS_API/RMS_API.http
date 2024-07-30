@@ -3,4 +3,5 @@
 GET {{RMS_API_HostAddress}}/weatherforecast/
 Accept: application/json
 
-###
+//For User login
+POST {{RMS_API_HostAddress}}/api/User/Login
