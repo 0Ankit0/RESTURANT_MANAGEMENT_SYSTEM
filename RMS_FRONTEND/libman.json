@@ -1,46 +1,106 @@
 {
   "version": "1.0",
   "defaultProvider": "cdnjs",
-  "libraries": [{
-  "provider": "cdnjs",
-  "library": "select2@4.0.13",
-  "destination": "wwwroot/lib/select2/",
-  "files": [
-    "js/select2.min.js",
-    "js/select2.full.js",
-    "js/select2.full.min.js",
-    "js/select2.js",
-    "css/select2.min.css",
-    "css/select2.css"
-  ]
-}
-,
-{
-  "provider": "jsdelivr",
-  "library": "@pnotify/core@5.2.0",
-  "destination": "wwwroot/lib/pnotify/core/",
-  "files": [
-    "dist/Angeler.css",
-    "dist/Angeler.min.css",
-    "dist/BrightTheme.css",
-    "dist/BrightTheme.min.css",
-    "dist/Material.css",
-    "dist/Material.min.css",
-    "dist/PNotify.css",
-    "dist/PNotify.js",
-    "dist/PNotify.min.css",
-    "dist/PNotify.min.js"
-  ]
-}
-,
+  "libraries": [
+    {
+      "provider": "cdnjs",
+      "library": "moment.js@2.30.1",
+      "destination": "wwwroot/lib/moment.js/",
+      "files": [
+        "moment.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "aspnet-signalr@1.0.27",
+      "destination": "wwwroot/lib/aspnet-signalr/",
+      "files": [
+        "signalr.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "Chart.js@4.4.1",
+      "destination": "wwwroot/lib/Chart.js/",
+      "files": [
+        "chart.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "datatables.net@2.1.2",
+      "destination": "wwwroot/lib/datatables.net/",
+      "files": [
+        "dataTables.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs", //Its creation aims to provide an easier way to increase the input field’s readability by formatting the typed data.
+      "library": "cleave.js@1.6.0",
+      "destination": "wwwroot/lib/cleave.js/",
+      "files": [
+        "cleave.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "leaflet@1.9.4",
+      "destination": "wwwroot/lib/leaflet/",
+      "files": [
+        "leaflet.min.js",
+        "leaflet.min.css"
+      ]
+    },
+    {
+      "provider": "cdnjs", //This library helps you place your grid elements in suitable positions based on how much vertical space is available.
+      "library": "masonry@4.2.2",
+      "destination": "wwwroot/lib/masonry/",
+      "files": [
+        "masonry.pkgd.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs", // It is an easy yet powerful JS library that you can use to validate forms.
+      "library": "parsley.js@2.9.2",
+      "destination": "wwwroot/lib/parsley.js/",
+      "files": [
+        "parsley.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs", //make it easier to position popovers, dropdowns, tooltips, and other contextual elements that appear close to a button or other similar elements.
+      "library": "popper.js@2.11.8",
+      "destination": "wwwroot/lib/popper.js/",
+      "files": [
+        "umd/popper.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "select2@4.0.13",
+      "destination": "wwwroot/lib/select2/",
+      "files": [
+        "js/select2.min.js",
+        "css/select2.min.css"
+      ]
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "@pnotify/core@5.2.0",
+      "destination": "wwwroot/lib/pnotify/core/",
+      "files": [
+        "dist/PNotify.min.css",
+        "dist/PNotify.min.js"
+      ]
+    },
     {
       "provider": "jsdelivr",
       "library": "@pnotify/confirm@5.2.0",
       "destination": "wwwroot/lib/pnotify/confirm/",
       "files": [
-        "dist/PNotifyConfirm.min.css",
-        "dist/PNotifyConfirm.min.js"
+        "dist/PNotifyConfirm.min.js",
+        "dist/PNotifyConfirm.min.css"
       ]
     }
-]
+  ]
 }

@@ -38,8 +38,5 @@ namespace RMS_API.Models
         [Phone(ErrorMessage = "Please enter a valid phone number")]
         public string PhoneNumber { get; set; }
 
-        [Range(1, 100, ErrorMessage = "Age must be between 1 and 100")]
-        public int Age { get; set; }
-
     }
 }
