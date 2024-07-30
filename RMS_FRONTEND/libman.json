@@ -101,6 +101,37 @@
         "dist/PNotifyConfirm.min.js",
         "dist/PNotifyConfirm.min.css"
       ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "jsbarcode@3.11.6",
+      "destination": "wwwroot/lib/jsbarcode/",
+      "files": [
+        "JsBarcode.all.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "jquery@3.7.1",
+      "destination": "wwwroot/lib/jquery/",
+      "files": [
+        "jquery.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "bootstrap@5.3.3",
+      "destination": "wwwroot/lib/bootstrap/",
+      "files": [
+        "js/bootstrap.min.js",
+        "css/bootstrap.min.css"
+      ]
     }
-  ]
+  ,
+{
+  "provider": "cdnjs",
+  "library": "bootstrap@5.3.3",
+  "destination": "wwwroot/lib/bootstrap/"
+}
+]
 }

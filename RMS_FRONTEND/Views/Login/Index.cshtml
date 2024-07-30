@@ -2,9 +2,9 @@
 @{
     ViewData["Title"] = "Index"; Layout = null;
 }
-<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<link href="~/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
 
-<section class="vh-100" style="background-color: #9a616d">
+<section >
   <div class="container py-5 h-100">
     <div class="row d-flex justify-content-center align-items-center h-100">
       <div class="col col-xl-10">
@@ -33,10 +33,10 @@
                                 {
                                     @Html.AntiForgeryToken()
                         <div data-mdb-input-init class="form-outline mb-4">
-                                        @Html.ValidationMessageFor(m => m.Email, "", new { @class = "text-danger" })
-                            <!-- @Html.EditorFor(m => m.Email, new { htmlAttributes = new { @class = "form-control form-control-lg", @id = "Email" } }) -->
-                            <input type="email" name="Email" id="Email" class="form-control form-control-lg" />
-                            <label class="form-label" for="Email">Email address</label>
+                                        @Html.ValidationMessageFor(m => m.UsernameOrEmail, "", new { @class = "text-danger" })
+                                        <!-- @Html.EditorFor(m => m.UsernameOrEmail, new { htmlAttributes = new { @class = "form-control form-control-lg", @id = "Email" } }) -->
+                                        <input type="email" name="UsernameOrEmail" id="UsernameOrEmail" class="form-control form-control-lg" />
+                                        <label class="form-label" for="UsernameOrEmail">Username Or Email</label>
                         </div>
 
                         <div data-mdb-input-init class="form-outline mb-4">
@@ -59,8 +59,5 @@
   </div>
 </section>
 
-<script src="~/lib/jquery/dist/jquery.min.js"></script>
-<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-<script src="~/js/site.js" asp-append-version="true"></script>
-
-
+<script src="~/lib/jquery/jquery.min.js"></script>
+<script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>

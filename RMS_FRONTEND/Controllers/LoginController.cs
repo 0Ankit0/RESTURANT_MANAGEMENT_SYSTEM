@@ -51,12 +51,12 @@ namespace RMS_FRONTEND.Controllers
             {
                 if (ModelState.IsValid)
                 {
-                    if (model.Email == "admin@gmail.com" && model.Password == "admin")
+                    if (model.UsernameOrEmail == "admin@gmail.com" && model.Password == "admin")
                     {
                        
                         var claims = new List<Claim>
                         {
-                            new Claim(ClaimTypes.Name, model.Email),
+                            new Claim(ClaimTypes.Name, model.UsernameOrEmail),
                             new Claim(ClaimTypes.Role, "Admin")
                         };
 
@@ -78,7 +78,7 @@ namespace RMS_FRONTEND.Controllers
                     }
                     else
                     {
-                        ModelState.AddModelError("Email", "Invalid email or password.");
+                        ModelState.AddModelError("UsernameOrEmail", "Invalid email or password.");
                         return View("Index", model);
                     }
                 }
