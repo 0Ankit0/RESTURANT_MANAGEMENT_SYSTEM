@@ -35,14 +35,6 @@
       ]
     },
     {
-      "provider": "cdnjs", //Its creation aims to provide an easier way to increase the input field’s readability by formatting the typed data.
-      "library": "cleave.js@1.6.0",
-      "destination": "wwwroot/lib/cleave.js/",
-      "files": [
-        "cleave.min.js"
-      ]
-    },
-    {
       "provider": "cdnjs",
       "library": "leaflet@1.9.4",
       "destination": "wwwroot/lib/leaflet/",
@@ -65,14 +57,6 @@
       "destination": "wwwroot/lib/parsley.js/",
       "files": [
         "parsley.min.js"
-      ]
-    },
-    {
-      "provider": "cdnjs", //make it easier to position popovers, dropdowns, tooltips, and other contextual elements that appear close to a button or other similar elements.
-      "library": "popper.js@2.11.8",
-      "destination": "wwwroot/lib/popper.js/",
-      "files": [
-        "umd/popper.min.js"
       ]
     },
     {
@@ -126,12 +110,32 @@
         "js/bootstrap.min.js",
         "css/bootstrap.min.css"
       ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "bootstrap@5.3.3",
+      "destination": "wwwroot/lib/bootstrap/"
+    },
+    {
+      "provider": "cdnjs",
+      "library": "jquery-validate@1.21.0",
+      "destination": "wwwroot/lib/jquery-validate/",
+      "files": [
+        "jquery.validate.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "jquery-validation-unobtrusive@4.0.0",
+      "destination": "wwwroot/lib/jquery-validation-unobtrusive/"
+    },
+    {
+      "provider": "cdnjs",
+      "library": "popper.js@2.11.8",
+      "destination": "wwwroot/lib/popper.js/",
+      "files": [
+        "umd/popper.min.js"
+      ]
     }
-  ,
-{
-  "provider": "cdnjs",
-  "library": "bootstrap@5.3.3",
-  "destination": "wwwroot/lib/bootstrap/"
-}
-]
+  ]
 }

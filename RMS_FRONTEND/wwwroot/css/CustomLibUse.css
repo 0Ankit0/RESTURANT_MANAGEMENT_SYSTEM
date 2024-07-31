@@ -1,0 +1,97 @@
+﻿
+
+
+
+
+
+button {
+    font: 500 20px lato !important;
+    color: #ffffff;
+    border: none;
+    background: purple;
+    padding: 1em 2em;
+}
+
+    button:hover {
+        cursor: pointer;
+    }
+
+#popper-popup {
+    display: none;
+    background: #333;
+    color: white;
+    font-weight: bold;
+    padding: 20px;
+    font-size: 13px;
+    border-radius: 4px;
+    display: none;
+    width: 100%;
+    max-width: 400px;
+}
+
+    #popper-popup a {
+        display: block;
+        color: #ffffff;
+        text-align: center;
+        text-decoration: none;
+    }
+
+        #popper-popup a:hover {
+            background: #444444;
+        }
+
+    #popper-popup[data-popper-reference-hidden] {
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    #popper-popup[show-popper] {
+        display: block;
+        z-index: 9999;
+    }
+
+/*keep popper visible in the Divi Builder for editing*/
+#et-fb-app #popper-popup {
+    display: block;
+}
+
+/*build the arrow targeting the divider with class 'popper-arrow'*/
+#popper-arrow,
+#popper-arrow::before {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #333333;
+}
+
+#popper-arrow {
+    visibility: hidden;
+}
+
+    #popper-arrow::before {
+        visibility: visible;
+        content: "";
+        transform: rotate(45deg);
+    }
+
+/*position arrow using popper.js data-popper-placement attribute*/
+#popper-popup[data-popper-placement^="top"] #popper-arrow {
+    bottom: -4px;
+}
+
+#popper-popup[data-popper-placement^="bottom"] #popper-arrow {
+    top: -4px;
+}
+
+#popper-popup[data-popper-placement^="left"] #popper-arrow {
+    right: -4px;
+}
+
+#popper-popup[data-popper-placement^="right"] #popper-arrow {
+    left: -4px;
+}
+
+/*hide arrow when reference outside of viewport*/
+#popper-popup[data-popper-reference-hidden] #popper-arrow::before {
+    visibility: hidden;
+}

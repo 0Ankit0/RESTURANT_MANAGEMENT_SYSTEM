@@ -1,17 +1,21 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
-}
+﻿@{ ViewData["Title"] = "Home Page"; }
 
-<section class="py-8 overflow-hidden " id="home">
-    <div class="container">
-        <div class="row flex-center text-white">
-               <h1>Welcome</h1>
-            <div class="col-md-7 col-lg-6 py-8 text-md-start text-center">
+<link href="~/css/customlibuse.css" rel="stylesheet" />
+<section class="py-8 overflow-hidden" id="home">
+  <div class="container">
+       
+            <button id="popper-button">Toggle Popover</button>
+            <div id="popper-popup">
+                <a href="#">menu item</a>
+                <a href="#">menu item</a>
+                <a href="#">menu item</a>
+                <a href="#">menu item</a>
+                <div id="popper-arrow"></div>
             </div>
-        </div>
-    </div>
+
+  </div>
 </section>
 
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script src="~/js/customlibraryuse.js"></script>
 }
