@@ -136,6 +136,50 @@
       "files": [
         "umd/popper.min.js"
       ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "tether@1.4.7",
+      "destination": "wwwroot/lib/tether/",
+      "files": [
+        "js/tether.min.js",
+        "css/tether.min.css"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "font-awesome@6.6.0",
+      "destination": "wwwroot/lib/font-awesome/",
+      "files": [
+        "css/all.min.css",
+        "js/all.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "sweetalert2@11.12.3",
+      "destination": "wwwroot/lib/sweetalert2/",
+      "files": [
+        "sweetalert2.min.js",
+        "sweetalert2.min.css"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "Swiper@11.0.5",
+      "destination": "wwwroot/lib/Swiper/",
+      "files": [
+        "swiper-bundle.min.js",
+        "swiper-bundle.min.css"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "Sortable@1.15.2",
+      "destination": "wwwroot/lib/Sortable/",
+      "files": [
+        "Sortable.min.js"
+      ]
     }
   ]
 }
