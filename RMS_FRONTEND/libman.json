@@ -3,6 +3,7 @@
   "defaultProvider": "cdnjs",
   "libraries": [
     {
+      "provider": "cdnjs",
       "library": "moment.js@2.30.1",
       "destination": "wwwroot/lib/moment.js/",
       "files": [
@@ -10,6 +11,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "aspnet-signalr@1.0.27",
       "destination": "wwwroot/lib/aspnet-signalr/",
       "files": [
@@ -17,6 +19,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "Chart.js@4.4.1",
       "destination": "wwwroot/lib/Chart.js/",
       "files": [
@@ -24,6 +27,15 @@
       ]
     },
     {
+      "provider": "cdnjs",
+      "library": "datatables.net@2.1.2",
+      "destination": "wwwroot/lib/datatables.net/",
+      "files": [
+        "dataTables.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
       "library": "leaflet@1.9.4",
       "destination": "wwwroot/lib/leaflet/",
       "files": [
@@ -32,6 +44,7 @@
       ]
     },
     {
+      "provider": "cdnjs", //This library helps you place your grid elements in suitable positions based on how much vertical space is available.
       "library": "masonry@4.2.2",
       "destination": "wwwroot/lib/masonry/",
       "files": [
@@ -39,6 +52,7 @@
       ]
     },
     {
+      "provider": "cdnjs", // It is an easy yet powerful JS library that you can use to validate forms.
       "library": "parsley.js@2.9.2",
       "destination": "wwwroot/lib/parsley.js/",
       "files": [
@@ -46,6 +60,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "select2@4.0.13",
       "destination": "wwwroot/lib/select2/",
       "files": [
@@ -72,6 +87,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "jsbarcode@3.11.6",
       "destination": "wwwroot/lib/jsbarcode/",
       "files": [
@@ -79,6 +95,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "jquery@3.7.1",
       "destination": "wwwroot/lib/jquery/",
       "files": [
@@ -86,10 +103,21 @@
       ]
     },
     {
+      "provider": "cdnjs",
+      "library": "bootstrap@5.3.3",
+      "destination": "wwwroot/lib/bootstrap/",
+      "files": [
+        "js/bootstrap.min.js",
+        "css/bootstrap.min.css"
+      ]
+    },
+    {
+      "provider": "cdnjs",
       "library": "bootstrap@5.3.3",
       "destination": "wwwroot/lib/bootstrap/"
     },
     {
+      "provider": "cdnjs",
       "library": "jquery-validate@1.21.0",
       "destination": "wwwroot/lib/jquery-validate/",
       "files": [
@@ -97,10 +125,12 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "jquery-validation-unobtrusive@4.0.0",
       "destination": "wwwroot/lib/jquery-validation-unobtrusive/"
     },
     {
+      "provider": "cdnjs",
       "library": "popper.js@2.11.8",
       "destination": "wwwroot/lib/popper.js/",
       "files": [
@@ -108,6 +138,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "tether@1.4.7",
       "destination": "wwwroot/lib/tether/",
       "files": [
@@ -116,6 +147,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "font-awesome@6.6.0",
       "destination": "wwwroot/lib/font-awesome/",
       "files": [
@@ -124,6 +156,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "sweetalert2@11.12.3",
       "destination": "wwwroot/lib/sweetalert2/",
       "files": [
@@ -132,6 +165,7 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "Swiper@11.0.5",
       "destination": "wwwroot/lib/Swiper/",
       "files": [
@@ -140,44 +174,11 @@
       ]
     },
     {
+      "provider": "cdnjs",
       "library": "Sortable@1.15.2",
       "destination": "wwwroot/lib/Sortable/",
       "files": [
         "Sortable.min.js"
-      ]
-    },
-    {
-      "provider": "cdnjs",
-      "library": "datatables.net@2.1.2",
-      "destination": "wwwroot/lib/datatables.net/",
-      "files": [
-        "dataTables.min.js"
-      ]
-    },
-    {
-      "provider": "cdnjs",
-      "library": "datatables.net-bs5@2.1.2",
-      "destination": "wwwroot/lib/datatables.net-bs5/",
-      "files": [
-        "dataTables.bootstrap5.min.js",
-        "dataTables.bootstrap5.min.css"
-      ]
-    },
-    {
-      "provider": "cdnjs",
-      "library": "datatables.net-responsive@3.0.2",
-      "destination": "wwwroot/lib/datatables.net-responsive/",
-      "files": [
-        "dataTables.responsive.min.js"
-      ]
-    },
-    {
-      "provider": "cdnjs",
-      "library": "datatables.net-responsive-bs5@3.0.2",
-      "destination": "wwwroot/lib/datatables.net-responsive-bs5/",
-      "files": [
-        "responsive.bootstrap5.min.js",
-        "responsive.bootstrap5.min.css"
       ]
     }
   ]

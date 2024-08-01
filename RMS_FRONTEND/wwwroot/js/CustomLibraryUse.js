@@ -62,33 +62,3 @@ popperButton.addEventListener("click", function (e) {
     e.preventDefault();
     togglePopper();
 });
-
-
-//Datatable
-
-$("#dt-column-search").DataTable({
-    initComplete: function () {
-        this.api()
-            .columns() 
-            .every(function (index) {
-                let column = this;
-                let header = column.header();
-                let title = header.textContent;
-
-                // Create input element
-                let input = document.createElement('input');
-                input.placeholder = title;
-
-                // Replace the content of the header with the input element
-                header.replaceChildren(input);
-
-                // Event listener for user input
-                input.addEventListener('keyup', () => {
-                    if (column.search() !== input.value) {
-                        column.search(input.value).draw();
-                    }
-                });
-
-            });
-    }
-})
