@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RMS_API.CustomClass;
 using RMS_API.Models;
+using ServiceApp_backend.Classes;
 using System.Security.Claims;
 using System.Text;
 
@@ -15,6 +16,20 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Read the connection string
+var BaseAddress = builder.Configuration.GetConnectionString("BaseAddress");
+
+//Add imemoryCache 
+builder.Services.AddScoped<ICustomMemoryCache, MemoryCache>();
+
+//Add datahandler as transient
+builder.Services.AddTransient<IDataHandler>(ServiceProvider =>
+{
+    // Read the connection string
+    var connectionString = builder.Configuration.GetConnectionString("BaseAddress");
+    return new DatabaseHelper(connectionString);
+});
 
 // Configure JWT settings
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
@@ -77,6 +92,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
         };
     });
+
+
 
 var app = builder.Build();
 
