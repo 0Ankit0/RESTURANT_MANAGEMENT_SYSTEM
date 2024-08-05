@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 using Microsoft.AspNetCore.Mvc;
 using RMS_API.Models;
 
-namespace ServiceApp_backend.Classes
+namespace Template.CustomClass
 {
     public interface IDataHandler
     {

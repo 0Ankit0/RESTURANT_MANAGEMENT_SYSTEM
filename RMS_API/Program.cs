@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RMS_API.CustomClass;
 using RMS_API.Models;
-using ServiceApp_backend.Classes;
+using Template.Classes;
 using System.Security.Claims;
 using System.Text;
 

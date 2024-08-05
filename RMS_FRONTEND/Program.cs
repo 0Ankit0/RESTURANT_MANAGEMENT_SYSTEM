@@ -1,6 +1,11 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
+
+//Add data protection to the application
+//check: https://docs.microsoft.com/en-us/aspnet/core/security/data-protection/introduction?view=aspnetcore-8.0 for more details
+builder.Services.AddDataProtection();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -17,6 +22,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.LoginPath = "/Login/Index";
         options.AccessDeniedPath = "/Login/Index?accessDenied=true";
     });
+
+//Add authorization policy to the application
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy", policy =>
+    {
+        policy.RequireClaim(ClaimTypes.Role, "Admin");
+    });
+});
 
 var app = builder.Build();
 

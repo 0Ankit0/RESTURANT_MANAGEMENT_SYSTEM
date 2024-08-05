@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using RMS_FRONTEND.Models;
 using System.Reflection;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RMS_FRONTEND.Controllers
 {
@@ -93,6 +94,10 @@ namespace RMS_FRONTEND.Controllers
             }
         }
 
+        [AutoValidateAntiforgeryToken]
+        //[Authorize(Roles ="Admin")]
+        [Authorize(Policy ="AdminPolicy")]
+        [HttpGet]
         // GET: LoginController/Edit/5
         public ActionResult Edit(int id)
         {
