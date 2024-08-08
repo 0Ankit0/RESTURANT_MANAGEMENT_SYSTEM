@@ -4,17 +4,40 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using RMS_API.CustomClass;
 using RMS_API.Models;
+using RMS_API.Services;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
+
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddSignalR();
+
+//To Add Cors policy
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(
+        builder =>
+        {
+            builder
+                    .WithOrigins("http://127.0.0.1:5500")
+                   .AllowAnyHeader()
+                   .AllowAnyMethod()
+                   .AllowCredentials();
+        });
+});
+
+//Add a dictionary as a singleton to map the connection id with the token
+builder.Services.AddSingleton(new ConcurrentDictionary<string, string>());
+
 
 // Read the connection string
 var BaseAddress = builder.Configuration.GetConnectionString("BaseAddress");
@@ -110,6 +133,10 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
+app.UseCors();
+
 app.MapControllers();
+
+app.MapHub<MessageHub>("/messagehub");
 
 app.Run();
