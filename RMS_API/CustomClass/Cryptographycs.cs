@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace RMS_API.CustomClass
 {
@@ -107,6 +108,9 @@ namespace RMS_API.CustomClass
 
     public class AssymetricCryptography : ICryptography
     {
+        //Provide a default filepath for storing key pairs
+        private string _filePath = "keyPairs.json";
+
         // Encrypts the provided data using RSA asymmetric cryptography with the specified public key.
         public string Encrypt(string dataToEncrypt, string publicKey)
         {
@@ -134,8 +138,11 @@ namespace RMS_API.CustomClass
         }
 
         // Decrypts the provided data using RSA asymmetric cryptography with the specified private key.
-        public string Decrypt(string dataToDecrypt, string privateKey)
+        public string Decrypt(string dataToDecrypt, string publicKey)
         {
+            // Retrieve the private key based on the provided public key.
+            string privateKey = GetPrivateKeyFromPublicKey(publicKey);
+
             // Convert the encrypted data from a base64 string back to bytes.
             byte[] dataBytes = Convert.FromBase64String(dataToDecrypt);
 
@@ -175,5 +182,49 @@ namespace RMS_API.CustomClass
                 privateKey = Convert.ToBase64String(rsa.ExportCspBlob(true));
             }
         }
+
+        // Generates a pair of RSA keys (public and private) and stores them in a JSON file.
+        public void GenerateAndStoreKeys()
+        {
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            {
+                rsa.PersistKeyInCsp = false;
+
+                string publicKey = Convert.ToBase64String(rsa.ExportCspBlob(false));
+                string privateKey = Convert.ToBase64String(rsa.ExportCspBlob(true));
+
+                // Load existing keys from file or create a new dictionary if the file doesn't exist.
+                Dictionary<string, string> keyPairs = new Dictionary<string, string>();
+                if (File.Exists(_filePath))
+                {
+                    string existingData = File.ReadAllText(_filePath);
+                    keyPairs = JsonSerializer.Deserialize<Dictionary<string, string>>(existingData);
+                }
+
+                // Add the new key pair to the dictionary.
+                keyPairs[publicKey] = privateKey;
+
+                // Serialize the dictionary back to the file.
+                string jsonData = JsonSerializer.Serialize(keyPairs, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_filePath, jsonData);
+            }
+        }
+
+        // Retrieves the private key based on the provided public key.
+        public string GetPrivateKeyFromPublicKey(string publicKey)
+        {
+            if (File.Exists(_filePath))
+            {
+                string existingData = File.ReadAllText(_filePath);
+                var keyPairs = JsonSerializer.Deserialize<Dictionary<string, string>>(existingData);
+
+                if (keyPairs != null && keyPairs.ContainsKey(publicKey))
+                {
+                    return keyPairs[publicKey];
+                }
+            }
+            throw new Exception("Public key not found.");
+        }
+
     }
 }
