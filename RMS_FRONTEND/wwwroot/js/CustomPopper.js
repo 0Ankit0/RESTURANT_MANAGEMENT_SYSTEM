@@ -1,6 +1,7 @@
-﻿const popperButton = document.querySelector("#popper-button");
+﻿
+//Popper.js Initialization
+const popperButton = document.querySelector("#popper-button");
 const popperPopup = document.querySelector("#popper-popup");
-const popperSection = document.querySelector("#popper-section");
 const popperArrow = document.querySelector("#popper-arrow");
 
 let popperInstance = null;
@@ -62,3 +63,5 @@ popperButton.addEventListener("click", function (e) {
     e.preventDefault();
     togglePopper();
 });
+
+

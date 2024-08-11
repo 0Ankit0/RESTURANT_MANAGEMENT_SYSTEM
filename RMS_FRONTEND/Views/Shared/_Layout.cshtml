@@ -4,18 +4,35 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - RMS_FRONTEND</title>
-    <link href="~/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @* Bootstrap *@
+    <link href="~/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
+    @* Datatables *@
+	<link href="~/lib/datatables.net-bs5/datatables.bootstrap5.min.css" rel="stylesheet" />
+	<link href="~/lib/datatables.net-responsive-bs5/responsive.bootstrap5.min.css" rel="stylesheet" />
+    @* Font-Awesome *@
+	<link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
+    @* pnotify.js *@
+	<link href="~/lib/pnotify/confirm/dist/pnotifyconfirm.min.css" rel="stylesheet" />
+	<link href="~/lib/pnotify/core/dist/pnotify.min.css" rel="stylesheet" />
+	@* select2 *@
+	<link href="~/lib/select2/css/select2.min.css" rel="stylesheet" />
+	@* sweetalert2 *@
+	<link href="~/lib/sweetalert2/sweetalert2.min.css" rel="stylesheet" />
+	@* swiper *@
+	<link href="~/lib/swiper/swiper-bundle.min.css" rel="stylesheet" />
+    @* tether *@
+	<link href="~/lib/tether/css/tether.min.css" rel="stylesheet" />
 </head>
 <body >
     <header>
-        <nav class="navbar bg-primary navbar-expand-lg navbar-light  fixed-top" data-navbar-on-scroll="data-navbar-on-scroll">
+        <nav class="navbar navbar-expand-lg bg-white navbar-light border-bottom border-2 fixed-top" data-navbar-on-scroll="data-navbar-on-scroll">
 			<div class="container">
-                <a class="navbar-brand d-inline-flex" href="index.html"><img class="d-inline-block" width="100" src="~/assets/images/logo.jpg" alt="logo" /><span class="text-1000 fs-3 fw-bold ms-2 text-gradient">Logo</span></a>
+                <a class="navbar-brand d-inline-flex" href="index.html"><img class="d-inline-block" width="60" src="~/assets/images/logo.png" alt="logo" /></a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"> </span></button>
-                <div class="collapse navbar-collapse border-top border-lg-0 my-2 mt-lg-0" id="navbarSupportedContent">
+                <div class="collapse navbar-collapse border-lg-0 my-2 mt-lg-0" id="navbarSupportedContent">
                     <div class="mx-auto pt-3 pt-lg-0 d-block d-lg-none d-xl-block">
-                        @* <p class="mb-0 fw-bold text-lg-center">Deliver to: <i class="fas fa-map-marker-alt text-warning mx-2"></i><span class="fw-normal">Current Location </span><span>Mirpur 1 Bus Stand, Dhaka</span></p> *@
+                       Home
                     </div>
                     <form class="d-flex mt-2 mt-lg-0 ms-lg-auto ms-xl-0">
                        
@@ -45,11 +62,44 @@
         </section>
     </footer>
     </div>
-    
-    <script src="~/lib/popper.js/umd/popper.min.js"></script>
-    <script src="~/lib/jquery/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+
+    @* Popper *@
+    <script src="~/lib/popper.js/umd/popper.min.js"></script>
+    @* Jquery *@
+    <script src="~/lib/jquery/jquery.min.js"></script>
+    @* Bootstrap *@
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    @* Datatables *@
+	<script src="~/lib/datatables.net/datatables.min.js"></script>
+	<script src="~/lib/datatables.net-bs5/datatables.bootstrap5.min.js"></script>
+	<script src="~/lib/datatables.net-responsive/datatables.responsive.min.js"></script>
+	<script src="~/lib/datatables.net-responsive-bs5/responsive.bootstrap5.min.js"></script>
+    @* Cleave.js*@
+	<script src="~/lib/cleave.js/cleave.min.js"></script>
+    @* Font-awesome *@
+	<script src="~/lib/font-awesome/js/all.min.js"></script>
+    @* JsBarCode *@
+	<script src="~/lib/jsbarcode/jsbarcode.all.min.js"></script>
+    @* masonry *@
+	<script src="~/lib/masonry/masonry.pkgd.min.js"></script>
+	@* moment.js *@
+	<script src="~/lib/moment.js/moment.min.js"></script>
+	@* parsley.js *@
+	<script src="~/lib/parsley.js/parsley.min.js"></script>
+    @* pnotify *@
+	<script src="~/lib/pnotify/confirm/dist/pnotifyconfirm.min.js"></script>
+	<script src="~/lib/pnotify/core/dist/pnotify.min.js"></script>
+	@* Select2 *@
+	<script src="~/lib/select2/js/select2.min.js"></script>
+	@* Sortable *@
+	<script src="~/lib/sortable/sortable.min.js"></script>
+	@* Sweetalert2 *@
+	<script src="~/lib/sweetalert2/sweetalert2.min.js"></script>
+	@* Swiper *@
+	<script src="~/lib/swiper/swiper-bundle.min.js"></script>
+	@* tether *@
+	<script src="~/lib/tether/js/tether.min.js"></script>
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
