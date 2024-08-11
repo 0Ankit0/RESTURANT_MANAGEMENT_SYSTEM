@@ -1,15 +1,21 @@
 ﻿
+.tooltip-content {
+    background-color: #333;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+    z-index: 1000;
+}
 
-
-
-
-
-button {
+button.popper-button {
     font: 500 20px lato !important;
     color: #ffffff;
     border: none;
     background: purple;
-    padding: 1em 2em;
+    padding: 0.5rem 1rem;
 }
 
     button:hover {
@@ -25,7 +31,8 @@ button {
     font-size: 13px;
     border-radius: 4px;
     display: none;
-    width: 100%;
+    /*width: 100%;*/
+    width: auto;
     max-width: 400px;
 }
 
