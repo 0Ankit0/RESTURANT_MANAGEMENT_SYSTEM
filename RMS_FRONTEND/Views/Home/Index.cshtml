@@ -3,13 +3,21 @@
 <link href="~/css/customPopper.css" rel="stylesheet" />
 <section class="py-8 overflow-hidden" id="home">
   <div class="container">
-        <button id="popper-btnClick" class="popper-button">Toggle Popover</button>
-            <div id="popper-popup">
+        <button id="popper-btnClick" data-event="click" class="popper-button">Click Popover</button>
+        <div  class="popper-popup">
                 <a href="#">menu item</a>
                 <a href="#">menu item</a>
                 <a href="#">menu item</a>
                 <a href="#">menu item</a>
-                <div id="popper-arrow"></div>
+            <div class="popper-arrow"></div>
+         </div>
+            <button id="popper-btnHover" data-event="hover" class="popper-button">Hover Popover</button>
+            <div  class="popper-popup">
+                <a href="#">menu item</a>
+                <a href="#">menu item</a>
+                <a href="#">menu item</a>
+                <a href="#">menu item</a>
+                <div  class="popper-arrow"></div>
             </div>
   </div>
     <div class="dt-responsive table-responsive">
