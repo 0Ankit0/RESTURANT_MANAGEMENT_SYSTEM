@@ -27,17 +27,18 @@ button.popper-button {
     background: #333;
     color: white;
     font-weight: bold;
-    padding: 20px;
+    padding-block: 10px;
     font-size: 13px;
     border-radius: 4px;
     display: none;
-    /*width: 100%;*/
-    width: auto;
-    max-width: 400px;
+    width: 100%;
+    /*width: auto;*/
+    max-width: 200px;
 }
 
     .popper-popup a {
         display: block;
+        padding-inline:20px;
         color: #ffffff;
         text-align: center;
         text-decoration: none;

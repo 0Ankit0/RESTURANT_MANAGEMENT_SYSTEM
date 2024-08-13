@@ -10,6 +10,7 @@
     @* Datatables *@
 	<link href="~/lib/datatables.net-bs5/datatables.bootstrap5.min.css" rel="stylesheet" />
 	<link href="~/lib/datatables.net-responsive-bs5/responsive.bootstrap5.min.css" rel="stylesheet" />
+    <link href="~/lib/datatables.net-buttons-bs5/buttons.bootstrap5.min.css" rel="stylesheet" />
     @* Font-Awesome *@
 	<link href="~/lib/font-awesome/css/all.min.css" rel="stylesheet" />
     @* pnotify.js *@
@@ -63,7 +64,7 @@
     </footer>
     </div>
     <script src="~/js/site.js" asp-append-version="true"></script>
-
+    @* make sure the order in which the script is loaded is correct because is many cases the script depends on other plugins *@
     @* Popper *@
     <script src="~/lib/popper.js/umd/popper.min.js"></script>
     @* Jquery *@
@@ -72,9 +73,11 @@
     <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     @* Datatables *@
 	<script src="~/lib/datatables.net/datatables.min.js"></script>
-	<script src="~/lib/datatables.net-bs5/datatables.bootstrap5.min.js"></script>
+    <script src="~/lib/datatables.net-bs5/datatables.bootstrap5.min.js"></script>
 	<script src="~/lib/datatables.net-responsive/datatables.responsive.min.js"></script>
 	<script src="~/lib/datatables.net-responsive-bs5/responsive.bootstrap5.min.js"></script>
+    <script src="~/lib/datatables.net-buttons/js/datatables.buttons.min.js"></script>
+    <script src="~/lib/datatables.net-buttons-bs5/buttons.bootstrap5.min.js"></script>
     @* Cleave.js*@
 	<script src="~/lib/cleave.js/cleave.min.js"></script>
     @* Font-awesome *@
