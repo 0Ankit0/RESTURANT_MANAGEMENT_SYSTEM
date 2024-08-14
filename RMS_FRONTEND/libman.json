@@ -209,14 +209,6 @@
     },
     {
       "provider": "cdnjs",
-      "library": "cleave.js@1.6.0",
-      "destination": "wwwroot/lib/cleave.js/",
-      "files": [
-        "cleave.min.js"
-      ]
-    },
-    {
-      "provider": "cdnjs",
       "library": "datatables.net-buttons-bs5@3.1.1",
       "destination": "wwwroot/lib/datatables.net-buttons-bs5/",
       "files": [
@@ -276,6 +268,11 @@
         "pdfmake.min.js",
         "vfs_fonts.min.js"
       ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "cleave.js@1.6.0",
+      "destination": "wwwroot/lib/cleave.js/"
     }
   ]
 }
