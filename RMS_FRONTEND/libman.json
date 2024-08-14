@@ -248,6 +248,34 @@
         "webfonts/fa-v4compatibility.ttf",
         "webfonts/fa-v4compatibility.woff2"
       ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "datatables.net-buttons@3.1.1",
+      "destination": "wwwroot/lib/datatables.net-buttons/",
+      "files": [
+        "js/dataTables.buttons.min.js",
+        "js/buttons.print.min.js",
+        "js/buttons.html5.min.js",
+        "js/buttons.colVis.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "jszip@3.10.1",
+      "destination": "wwwroot/lib/jszip/",
+      "files": [
+        "jszip.min.js"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "pdfmake@0.2.11",
+      "destination": "wwwroot/lib/pdfmake/",
+      "files": [
+        "pdfmake.min.js",
+        "vfs_fonts.min.js"
+      ]
     }
   ]
 }
