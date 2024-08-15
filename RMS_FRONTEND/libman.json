@@ -272,7 +272,11 @@
     {
       "provider": "cdnjs",
       "library": "cleave.js@1.6.0",
-      "destination": "wwwroot/lib/cleave.js/"
+      "destination": "wwwroot/lib/cleave.js/",
+      "files": [
+        "cleave.min.js",
+        "addons/cleave-phone.np.js"
+      ]
     }
   ]
 }
