@@ -1,31 +1,42 @@
 ﻿//https://www.cssscript.com/toast-simple-notify/
-$(".pnotify-success").on("click", function () {
-    PNotify.success({
+$(".notify-success").on("click", function () {
+    new Notify({
         title: $(this).attr('data-title'),
         text: $(this).attr('data-message'),
-        styling: 'bootstrap5',
-        icon: 'fa-solid fa-check f-20 mx-2 mt-2',
-        className: 'bg-success text-white'
-    });
+        status: 'success',
+        autoclose: true,
+        autotimeout: 3000
+    })
 });
-$(".pnotify-error").on("click", function () {
-    PNotify.error({
+$(".notify-error").on("click", function () {
+    new Notify({
         title: $(this).attr('data-title'),
         text: $(this).attr('data-message'),
-        styling: 'bootstrap5',
-        icon: 'fa-solid fa-xmark f-20 mx-2 mt-2',
-        className: 'bg-success text-white'
-    });
+        status: 'error'
+    })
 });
-$(".pnotify-info").on("click", function () {
-    PNotify.info({
+$(".notify-info").on("click", function () {
+    new Notify({
         title: $(this).attr('data-title'),
         text: $(this).attr('data-message'),
-        styling: 'bootstrap5',
-        icon: 'fa-solid fa-info f-20 mx-2 mt-2',
-        className: 'bg-success text-white'
-    });
+        status: 'info'
+    })
 });
+$(".notify-warning").on("click", function () {
+    new Notify({
+        title: $(this).attr('data-title'),
+        text: $(this).attr('data-message'),
+        status: 'warning'
+    })
+});
+
+function notify(type, message) {
+    new Notify({
+        title: type,
+        text: message,
+        status: type
+    })
+}
 
 
 

@@ -12,8 +12,7 @@ new Cleave('.cleaveDate', {
 });
 
 new Cleave('.cleaveMoney', {
-    prefix: 'RS',
-    delimiter: '.',
+    delimiter: ',',
     numeral: true,
     numeralThousandsGroupStyle: 'lakh'
 });

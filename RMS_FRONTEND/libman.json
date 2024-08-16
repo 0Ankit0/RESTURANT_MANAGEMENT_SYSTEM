@@ -69,24 +69,6 @@
       ]
     },
     {
-      "provider": "jsdelivr",
-      "library": "@pnotify/core@5.2.0",
-      "destination": "wwwroot/lib/pnotify/core/",
-      "files": [
-        "dist/PNotify.min.css",
-        "dist/PNotify.min.js"
-      ]
-    },
-    {
-      "provider": "jsdelivr",
-      "library": "@pnotify/confirm@5.2.0",
-      "destination": "wwwroot/lib/pnotify/confirm/",
-      "files": [
-        "dist/PNotifyConfirm.min.js",
-        "dist/PNotifyConfirm.min.css"
-      ]
-    },
-    {
       "provider": "cdnjs",
       "library": "jsbarcode@3.11.6",
       "destination": "wwwroot/lib/jsbarcode/",
@@ -276,6 +258,15 @@
       "files": [
         "cleave.min.js",
         "addons/cleave-phone.np.js"
+      ]
+    },
+    {
+      "provider": "unpkg",
+      "library": "simple-notify@1.0.4",
+      "destination": "wwwroot/lib/simple-notify/",
+      "files": [
+        "dist/simple-notify.min.js",
+        "dist/simple-notify.css"
       ]
     }
   ]

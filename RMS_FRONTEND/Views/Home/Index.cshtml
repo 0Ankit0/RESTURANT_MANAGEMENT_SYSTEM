@@ -242,9 +242,37 @@
 	<button class="sweetalert-ajaxRequest btn btn-info">Ajax Request</button>
 	<button class="sweetalert-customHtml btn btn-success">Custom HTML</button>
 	<h3>Toast Message</h3>
-	<button class="pnotify-success btn btn-success" data-title="Success" data-message="This is success message">Success</button>
-	<button class="pnotify-error btn btn-danger" data-title="error" data-message="This is error message">error</button>
-	<button class="pnotify-info btn btn-info" data-title="info" data-message="This is info message">info</button>
+	<button class="notify-success btn btn-success" data-title="Success" data-message="This is success message">Success</button>
+	<button class="notify-error btn btn-danger" data-title="error" data-message="This is error message">error</button>
+	<button class="notify-info btn btn-info" data-title="info" data-message="This is info message">info</button>
+	<button class="notify-warning btn btn-warning" data-title="warning" data-message="This is warning message">warning</button>
+	<h3>Slider</h3>
+	<div class="swiper BasicSlider">
+		<div class="swiper-wrapper">
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			
+		</div>
+		<div class="swiper-button-next"></div>
+		<div class="swiper-button-prev"></div>
+		<div class="swiper-pagination"></div>
+	</div>
+	<div class="swiper mySwiper">
+		<div class="swiper-wrapper">
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			<div class="swiper-slide"><img src="~/assets/images/logo.png"/></div>
+			
+		</div>
+		<div class="swiper-pagination"></div>
+	</div>
 </section>
 
 @section Scripts {
@@ -253,5 +281,6 @@
 	<script src="~/js/Customcleave.js"></script>
     <script src="~/js/customjsbarcode.js"></script>
 	<script src="~/js/customsweetalert.js"></script>
-	<script src="~/js/custompnotify.js"></script>
+	<script src="~/js/customsimplenotify.js"></script>
+	<script src="~/js/customswiper.js"></script>
 }
