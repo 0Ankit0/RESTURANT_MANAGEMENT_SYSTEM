@@ -1,4 +1,5 @@
 ﻿@{
+	Layout = "_Layout";
 	ViewData["Title"] = "Home Page";
 }
 
@@ -240,6 +241,10 @@
 	<button class="sweetalert-confirmPrompt btn btn-danger">Confirm Delete</button>
 	<button class="sweetalert-ajaxRequest btn btn-info">Ajax Request</button>
 	<button class="sweetalert-customHtml btn btn-success">Custom HTML</button>
+	<h3>Toast Message</h3>
+	<button class="pnotify-success btn btn-success" data-title="Success" data-message="This is success message">Success</button>
+	<button class="pnotify-error btn btn-danger" data-title="error" data-message="This is error message">error</button>
+	<button class="pnotify-info btn btn-info" data-title="info" data-message="This is info message">info</button>
 </section>
 
 @section Scripts {
@@ -248,4 +253,5 @@
 	<script src="~/js/Customcleave.js"></script>
     <script src="~/js/customjsbarcode.js"></script>
 	<script src="~/js/customsweetalert.js"></script>
+	<script src="~/js/custompnotify.js"></script>
 }
