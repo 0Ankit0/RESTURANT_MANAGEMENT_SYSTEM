@@ -10,14 +10,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Views\Shared\_Dashboard.cshtml" />
     <Content Remove="wwwroot\js\CustomCleave.js" />
   </ItemGroup>
 
   <ItemGroup>
+    <_ContentIncludedByDefault Remove="Views\Shared\_Dashboard.cshtml" />
     <_ContentIncludedByDefault Remove="wwwroot\js\CustomCleave.js" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Views\Shared\_Dashboard.cshtml" />
     <None Include="wwwroot\js\CustomCleave.js" />
   </ItemGroup>
 
@@ -26,6 +29,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.7" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.20.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <UpToDateCheckInput Remove="Views\Shared\_Dashboard.cshtml" />
   </ItemGroup>
 
 </Project>
