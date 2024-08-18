@@ -1,13 +1,111 @@
 ﻿<!DOCTYPE html>
-
+@* https://www.jqueryscript.net/menu/dashboard-sidebar-nav.html *@
 <html>
 <head>
     <meta name="viewport" content="width=device-width" />
     <title>@ViewBag.Title</title>
+
+    <link href="~/dashnav/assets/css/style.min.css" rel="stylesheet" />
+    <script src="~/lib/feather-icons/feather.min.js"></script>
+
 </head>
-<body>
-    <div>
-        @RenderBody()
+<body class="skin-base animate">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="sidebar-logo"><span></span></a>
+            <a href="#" class="sidebar-logo-text">dash<span>nav</span></a>
+        </div><!-- sidebar-header -->
+        <div class="sidebar-search">
+            <div class="search-body">
+                <i data-feather="search"></i>
+                <input type="text" class="form-control" placeholder="Search...">
+            </div><!-- search-body -->
+        </div><!-- sidebar-search -->
+        <div class="sidebar-body pt-20">
+            <div class="nav-group show">
+                <div class="nav-group-label">Management</div>
+                <ul class="nav-sidebar">
+                    <li class="nav-item active">
+                        <a href="" class="nav-link with-sub"><i data-feather="package"></i><span>Dashboard</span></a>
+                        <nav class="nav-sub">
+                            <a href="" class="sub-link">Overview</a>
+                            <a href="" class="sub-link">Insights</a>
+                            <a href="" class="sub-link">Transactions</a>
+                            <a href="" class="sub-link">Reports</a>
+                        </nav>
+                    </li>
+                    <li class="nav-item">
+                        <a href="" class="nav-link with-sub"><i data-feather="monitor"></i><span>Site Analytics</span></a>
+                        <nav class="nav-sub">
+                            <a href="" class="sub-link">Summary</a>
+                            <a href="" class="sub-link">Geolocation</a>
+                            <a href="" class="sub-link">Accounts</a>
+                        </nav>
+                    </li>
+                    <li class="nav-item"><a href="" class="nav-link"><i data-feather="shopping-bag"></i><span>Sales Monitoring</span></a></li>
+                    <li class="nav-item">
+                        <a href="" class="nav-link with-sub"><i data-feather="file-text"></i><span>Documents</span></a>
+                        <nav class="nav-sub">
+                            <a href="" class="sub-link">Updates</a>
+                            <a href="" class="sub-link">Promotions</a>
+                            <a href="" class="sub-link">Articles</a>
+                        </nav>
+                    </li>
+                    <li class="nav-item"><a href="" class="nav-link"><i data-feather="calendar"></i><span>Calendar</span></a></li>
+                    <li class="nav-item"><a href="" class="nav-link"><i data-feather="briefcase"></i><span>Customers</span></a></li>
+                </ul>
+            </div><!-- nav-group -->
+            <div class="nav-group">
+                <div class="nav-group-label">Accounts &amp; Settings</div>
+                <ul class="nav-sidebar">
+                    <li class="nav-item">
+                        <a href="" class="nav-link"><i data-feather="activity"></i><span>Activity Logs</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="" class="nav-link with-sub"><i data-feather="settings"></i><span>Preferences</span></a>
+                        <nav class="nav-sub">
+                            <a href="" class="sub-link">Language</a>
+                            <a href="" class="sub-link">Accessibility</a>
+                        </nav>
+                    </li>
+                    <li class="nav-item">
+                        <a href="" class="nav-link with-sub"><i data-feather="help-circle"></i><span>Help &amp; Support</span></a>
+                        <nav class="nav-sub">
+                            <a href="" class="sub-link">Report Center</a>
+                            <a href="" class="sub-link">Report a Problem</a>
+                            <a href="" class="sub-link">FAQ</a>
+                        </nav>
+                    </li>
+                    <li class="nav-item"><a href="" class="nav-link"><i data-feather="edit-3"></i><span>Give Feedback</span></a></li>
+                </ul>
+            </div><!-- nav-group -->
+        </div><!-- sidebar-body -->
+        <div class="sidebar-footer">
+            <a href="" class="avatar online"><span class="avatar-initial">s</span></a>
+            <div class="avatar-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h6>Samantha Doe</h6>
+                    <a href="" class="footer-menu"><i class="ri-settings-4-line"></i></a>
+                </div>
+                <span>Superuser/Administrator</span>
+            </div><!-- avatar-body -->
+        </div><!-- sidebar-footer -->
+    </div><!-- sidebar -->
+
+    <div class="content">
+        <div class="content-header">
+            <a id="contentMenu" href="#" class="content-menu d-none d-lg-flex"><i data-feather="menu"></i></a>
+            <a id="mobileMenu" href="#" class="content-menu d-lg-none"><i data-feather="menu"></i></a>
+        </div><!-- content-header -->
+        <div class="content-body">
+            @RenderBody()
+        </div>
     </div>
+    <script src="~/lib/jquery/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/feather-icons/feather.min.js"></script>
+    <script src="~/lib/perfect-scrollbar/perfect-scrollbar.min.js"></script>
+    <script src="~/dashnav/assets/js/script.js"></script>
+        @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
