@@ -136,7 +136,7 @@ $(function(){
   });
 
   //on page load
-  var sk = (localStorage.getItem('skin'))? localStorage.getItem('skin') : 'blue';
+  var sk = (localStorage.getItem('skin'))? localStorage.getItem('skin') : 'dark';
   var st = (localStorage.getItem('style'))? localStorage.getItem('style') : 'one';
 
   // skin

@@ -231,5 +231,11 @@
         "css/perfect-scrollbar.min.css"
       ]
     }
-  ]
+  ,
+{
+  "provider": "cdnjs",
+  "library": "remixicon@4.2.0",
+  "destination": "wwwroot/lib/remixicon/"
+}
+]
 }
