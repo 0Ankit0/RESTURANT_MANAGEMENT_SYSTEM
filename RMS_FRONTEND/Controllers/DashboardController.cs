@@ -11,8 +11,14 @@ namespace RMS_FRONTEND.Controllers
 			return View();
 		}
 
-		// GET: DashboardController/Details/5
-		public ActionResult Details(int id)
+        // GET: DashboardController/Settings
+        public ActionResult Settings()
+        {
+            return View();
+        }
+
+        // GET: DashboardController/Details/5
+        public ActionResult Details(int id)
 		{
 			return View();
 		}
