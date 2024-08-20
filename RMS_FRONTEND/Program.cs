@@ -10,6 +10,14 @@ builder.Services.AddDataProtection();
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// Add session services
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30); // Set session timeout
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true; // Make the session cookie essential
+});
+
 //To add Response caching to the application
 //check: https://docs.microsoft.com/en-us/aspnet/core/performance/caching/response?view=aspnetcore-8.0 for more details
 builder.Services.AddResponseCaching();
@@ -50,6 +58,10 @@ app.UseRouting();
 //To add Response caching middleware
 app.UseResponseCaching();
 
+// Use session before using authorization
+app.UseSession();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(

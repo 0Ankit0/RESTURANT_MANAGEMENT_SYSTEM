@@ -75,7 +75,7 @@ namespace RMS_FRONTEND.Controllers
                             CookieAuthenticationDefaults.AuthenticationScheme,
                             new ClaimsPrincipal(claimsIdentity),
                             authProperties);
-                        return RedirectToAction("Index", "Home");
+                        return RedirectToAction("Index", "Dashboard");
                     }
                     else
                     {
@@ -107,7 +107,7 @@ namespace RMS_FRONTEND.Controllers
         // POST: LoginController/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Edit(int id, IFormCollection collection)
+        public ActionResult Logout()
         {
             try
             {
