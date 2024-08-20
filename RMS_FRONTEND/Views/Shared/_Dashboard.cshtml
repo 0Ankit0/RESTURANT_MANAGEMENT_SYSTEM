@@ -4,7 +4,9 @@
 <head>
     <meta name="viewport" content="width=device-width" />
     <title>@ViewBag.Title</title>
-
+    @{
+        await Html.RenderPartialAsync("_LinkPartial");
+    }
     <link href="~/dashnav/assets/css/style.min.css" rel="stylesheet" />
 	<link href="~/lib/remixicon/remixicon.min.css" rel="stylesheet" />
 </head>
@@ -100,8 +102,12 @@
             @RenderBody()
         </div>
     </div>
-    <script src="~/lib/jquery/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+@*     <script src="~/lib/jquery/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script> *@
+    @{
+        await Html.RenderPartialAsync("_ScriptsPartial");
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
     <script src="~/lib/feather-icons/feather.min.js"></script>
     <script src="~/lib/perfect-scrollbar/perfect-scrollbar.min.js"></script>
     <script src="~/lib/feather-icons/feather.min.js"></script>
