@@ -94,10 +94,7 @@
     </div><!-- sidebar -->
 
     <div class="content">
-        <div class="content-header">
-            <a id="contentMenu" href="#" class="content-menu d-none d-lg-flex"><i data-feather="menu"></i></a>
-            <a id="mobileMenu" href="#" class="content-menu d-lg-none"><i data-feather="menu"></i></a>
-        </div><!-- content-header -->
+            @await Html.PartialAsync("_Header","Dashboard")
         <div class="content-body">
             @RenderBody()
         </div>

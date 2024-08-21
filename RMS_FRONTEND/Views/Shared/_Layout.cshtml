@@ -5,28 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - RMS_FRONTEND</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    @{
-        await Html.RenderPartialAsync("_LinkPartial");
-    }
 </head>
 <body >
-    <header>
-        <nav class="navbar navbar-expand-lg bg-white navbar-light border-bottom border-2 fixed-top" data-navbar-on-scroll="data-navbar-on-scroll">
-			<div class="container">
-                <a class="navbar-brand d-inline-flex" href="index.html"><img class="d-inline-block" width="60" src="~/assets/images/logo.png" alt="logo" /></a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"> </span></button>
-                <div class="collapse navbar-collapse border-lg-0 my-2 mt-lg-0" id="navbarSupportedContent">
-                    <div class="mx-auto pt-3 pt-lg-0 d-block d-lg-none d-xl-block">
-                       Home
-                    </div>
-                    <form class="d-flex mt-2 mt-lg-0 ms-lg-auto ms-xl-0">
-                       
-                        <a href="/Login" class="btn btn-light bg-white shadow-white text-primary" role="button" > <i class="fas fa-user me-2"></i>Login</a>
-                    </form>
-                </div>
-            </div>
-        </nav>
-    </header>
+   @await Html.PartialAsync("_Header")
+ 
   <div class="min-vh-100 d-flex flex-column">
         <main class="flex-grow-1">
             @RenderBody()
@@ -48,11 +30,7 @@
     </footer>
     </div>
     <script src="~/js/site.js" asp-append-version="true"></script>
-    
-    @{
-        await Html.RenderPartialAsync("_ScriptsPartial");
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
+
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
