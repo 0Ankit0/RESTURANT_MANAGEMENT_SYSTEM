@@ -1,14 +1,31 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace RMS_FRONTEND.Controllers
 {
 	public class DashboardController : Controller
 	{
+		[AutoValidateAntiforgeryToken]
+		[Authorize(Policy = "AdminPolicy")]
 		// GET: DashboardController
 		public ActionResult Index()
 		{
-			return View();
+            string name = User?.FindFirst(ClaimTypes.Name)?.Value;
+            string role = User?.FindFirst(ClaimTypes.Role)?.Value;
+
+            if (name != null && role != null)
+            {
+                HttpContext.Session.SetString("name", name);
+                HttpContext.Session.SetString("role", role);
+            return View();
+			}
+			else
+			{
+				return RedirectToAction("Index", "Login");
+			}
+           
 		}
 
         // GET: DashboardController/Settings
