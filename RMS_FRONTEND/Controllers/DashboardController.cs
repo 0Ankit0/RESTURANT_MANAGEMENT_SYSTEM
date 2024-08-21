@@ -12,6 +12,7 @@ namespace RMS_FRONTEND.Controllers
 		// GET: DashboardController
 		public ActionResult Index()
 		{
+			//throw new NotImplementedException();
             string name = User?.FindFirst(ClaimTypes.Name)?.Value;
             string role = User?.FindFirst(ClaimTypes.Role)?.Value;
 

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using RMS_FRONTEND.Middleware;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,6 +42,9 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+//Add the custom middleware
+app.UseExceptionHandlerMiddleware();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
