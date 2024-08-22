@@ -12,9 +12,18 @@ namespace RMS_FRONTEND.Controllers
     public class LoginController : Controller
     {
         // GET: LoginController
-        public ActionResult Index()
+        public ActionResult Index(string ReturnUrl)
         {
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                ModelState.AddModelError("UsernameOrEmail", "You need to login first");
+                return View(model: new LoginModel());
+            }
+            else
+            {
+
             return View();
+            }
         }
 
         // GET: LoginController/Details/5
@@ -104,20 +113,16 @@ namespace RMS_FRONTEND.Controllers
             return View();
         }
 
-        // POST: LoginController/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Logout()
+        // POST: LoginController/Logout
+        [HttpGet]
+        [AutoValidateAntiforgeryToken]
+        [Authorize(Policy = "AdminPolicy")]
+        public async Task<IActionResult> Logout()
         {
-            try
-            {
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Index", "Login");
         }
+
 
         // GET: LoginController/Delete/5
         public ActionResult Delete(int id)
