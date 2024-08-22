@@ -17,13 +17,6 @@
       ]
     },
     {
-      "library": "Chart.js@4.4.1",
-      "destination": "wwwroot/lib/Chart.js/",
-      "files": [
-        "chart.min.js"
-      ]
-    },
-    {
       "library": "datatables.net@2.1.2",
       "destination": "wwwroot/lib/datatables.net/",
       "files": [
@@ -230,12 +223,11 @@
         "perfect-scrollbar.min.js",
         "css/perfect-scrollbar.min.css"
       ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "remixicon@4.2.0",
+      "destination": "wwwroot/lib/remixicon/"
     }
-  ,
-{
-  "provider": "cdnjs",
-  "library": "remixicon@4.2.0",
-  "destination": "wwwroot/lib/remixicon/"
-}
-]
+  ]
 }
