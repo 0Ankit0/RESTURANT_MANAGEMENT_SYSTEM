@@ -35,7 +35,7 @@ namespace RMS_FRONTEND.Middleware
 			// Respond with appropriate error message
 			context.Response.ContentType = "application/json";
 			context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-			await context.Response.WriteAsync("An unexpected error occurred.");
+			await context.Response.WriteAsync(ex.Message);
 		}
 	}
 
