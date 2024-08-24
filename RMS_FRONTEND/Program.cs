@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Middleware;
 using System.Security.Claims;
 
@@ -22,6 +23,9 @@ builder.Services.AddSession(options =>
 //To add Response caching to the application
 //check: https://docs.microsoft.com/en-us/aspnet/core/performance/caching/response?view=aspnetcore-8.0 for more details
 builder.Services.AddResponseCaching();
+
+//Add the 2FAAuth class to the services
+builder.Services.AddSingleton<_2FAAuth>();
 
 //Add authentication scheme to the application
 //check: https://docs.microsoft.com/en-us/aspnet/core/security/authentication/cookie?view=aspnetcore-8.0 for more details
