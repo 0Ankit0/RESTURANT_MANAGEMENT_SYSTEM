@@ -6,11 +6,17 @@ using RMS_FRONTEND.Models;
 using System.Reflection;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using RMS_FRONTEND.Classes;
 
 namespace RMS_FRONTEND.Controllers
 {
     public class LoginController : Controller
     {
+        private static _2FAAuth _2FA;
+        public LoginController(_2FAAuth _2FAAuth)
+        {
+            _2FA = _2FAAuth;
+        }
         // GET: LoginController
         public ActionResult Index(string ReturnUrl)
         {
@@ -24,6 +30,12 @@ namespace RMS_FRONTEND.Controllers
 
             return View();
             }
+        }
+        [Authorize(Policy = "AdminPolicy")]
+         public ActionResult GetQR()
+        {
+            var name = User.FindFirst(ClaimTypes.Name).Value;
+            return StatusCode(StatusCodes.Status200OK,_2FA.GenerateUri(name));
         }
 
         // GET: LoginController/Details/5
