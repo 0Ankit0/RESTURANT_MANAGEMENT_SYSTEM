@@ -12,20 +12,21 @@ namespace RMS_FRONTEND.Controllers
 		// GET: DashboardController
 		public ActionResult Index()
 		{
-			//throw new NotImplementedException();
-            string name = User?.FindFirst(ClaimTypes.Name)?.Value;
-            string role = User?.FindFirst(ClaimTypes.Role)?.Value;
+			//To show name of the current user you can save the data in session and use it in view or import claim in role
 
-            if (name != null && role != null)
-            {
-                HttpContext.Session.SetString("name", name);
-                HttpContext.Session.SetString("role", role);
+            //string name = User?.FindFirst(ClaimTypes.Name)?.Value;
+            //string role = User?.FindFirst(ClaimTypes.Role)?.Value;
+
+            //if (name != null && role != null)
+            //{
+            //    HttpContext.Session.SetString("name", name);
+            //    HttpContext.Session.SetString("role", role);
             return View();
-			}
-			else
-			{
-				return RedirectToAction("Index", "Login");
-			}
+			//}
+			//else
+			//{
+			//	return RedirectToAction("Index", "Login");
+			//}
            
 		}
 

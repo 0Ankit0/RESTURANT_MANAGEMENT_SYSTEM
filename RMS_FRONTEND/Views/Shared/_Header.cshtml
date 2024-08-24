@@ -20,7 +20,15 @@
                     Home
                 </div>
                 <form class="d-flex mt-2 mt-lg-0 ms-lg-auto ms-xl-0">
+                    @if (User.Identity.IsAuthenticated)
+                    {
+                        <a href="/Login/Logout" class="btn btn-light bg-white shadow-white text-danger" role="button"> <i class="fas fa-user me-2"></i>Logout</a>
+                    }
+                    else
+                    {
                     <a href="/Login" class="btn btn-light bg-white shadow-white text-primary" role="button"> <i class="fas fa-user me-2"></i>Login</a>
+                        
+                    }
                 </form>
             </div>
         </div>
