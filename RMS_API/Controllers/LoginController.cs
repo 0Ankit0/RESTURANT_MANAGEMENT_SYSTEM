@@ -10,7 +10,7 @@ using System.Text;
 
 namespace RMS_API.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/User")]
     [ApiController]
     public class LoginController : ControllerBase
     {
@@ -24,7 +24,7 @@ namespace RMS_API.Controllers
         }
 
         // POST: api/Login/UserLogin
-        [HttpPost("UserLogin")]
+        [HttpPost("Login")]
         public IActionResult UserLogin([FromBody] LoginModel br)
         {
             try
@@ -35,6 +35,40 @@ namespace RMS_API.Controllers
                  new SqlParameter("@Password", br.Password),
                 };
                 var result = _dh.ReadDataWithResponse("Usp_Sys_UserLogin", param);
+                var jsonResult = JsonConvert.DeserializeObject<ResponseModel>(result);
+                if (jsonResult.status == 200)
+                {
+                    var token = _jwtAuth.GenerateToken(br.UsernameOrEmail, br.GUID);
+                    jsonResult.data = new { Token=token};
+                    return Ok(jsonResult);
+                }
+                else
+                {
+
+                    return StatusCode(StatusCodes.Status204NoContent);
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+
+            }
+        }
+
+        // POST: api/Login/Register
+        [HttpPost("Register")]
+        public IActionResult RegisterUser([FromBody] RegisterModel br)
+        {
+            try
+            {
+                SqlParameter[] param =
+                {
+                 new SqlParameter("@UserName", br.Username),
+                 new SqlParameter("@UserEmail", br.Email),
+                 new SqlParameter("@Password", br.Password),
+                 new SqlParameter("@PhoneNumber", br.PhoneNumber),
+                };
+                var result = _dh.ReadDataWithResponse("Usp_IU_RegisterUser", param);
 
                 return Ok(result);
             }
@@ -44,5 +78,6 @@ namespace RMS_API.Controllers
 
             }
         }
+       
     }
 }

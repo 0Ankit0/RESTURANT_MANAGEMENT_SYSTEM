@@ -11,7 +11,7 @@ namespace RMS_API.CustomClass
 {
      public interface IJwtAuth
     {
-        string GenerateToken(string username, int userId);
+        string GenerateToken(string username, string userId);
     }
 
     public class JwtAuth : IJwtAuth
@@ -25,7 +25,7 @@ namespace RMS_API.CustomClass
             _signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtSettings.SecretKey));
         }
 
-        public string GenerateToken(string username, int userId)
+        public string GenerateToken(string username, string userId)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor

@@ -11,6 +11,8 @@ namespace RMS_API.Models
         [Required(ErrorMessage = "Please enter your password")]
         [DataType(DataType.Password)]
         public string Password { get; set; }
+
+        public string GUID { get; set; }
     }
 
     public class RegisterModel
