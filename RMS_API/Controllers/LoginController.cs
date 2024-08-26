@@ -15,10 +15,12 @@ namespace RMS_API.Controllers
     public class LoginController : ControllerBase
     {
         private readonly IJwtAuth _jwtAuth;
+        private readonly IDataHandler _dh;
 
-        public LoginController(IJwtAuth jwtAuth)
+        public LoginController(IJwtAuth jwtAuth, IDataHandler dataHandler)
         {
             _jwtAuth = jwtAuth;
+            _dh = dataHandler;
         }
 
         // POST: api/Login/UserLogin
@@ -27,7 +29,14 @@ namespace RMS_API.Controllers
         {
             try
             {
-                return Ok();
+                SqlParameter[] param =
+                {
+                 new SqlParameter("@UserEmail", br.UsernameOrEmail),
+                 new SqlParameter("@Password", br.Password),
+                };
+                var result = _dh.ReadDataWithResponse("Usp_Sys_UserLogin", param);
+
+                return Ok(result);
             }
             catch (Exception ex)
             {

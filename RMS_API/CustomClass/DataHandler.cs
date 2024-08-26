@@ -14,7 +14,7 @@ namespace RMS_API.CustomClass
     public interface IDataHandler
     {
         public string ReadDataWithResponse(string sql, SqlParameter[] param);
-        public DataTable ReadDataTable(string sql, SqlParameter[] parm);
+        public DataTable? ReadDataTable(string sql, SqlParameter[] parm);
         public ResponseModel ReadCount(string sql, SqlParameter[] param);
         public string DataTableToJSON(DataTable Dt, string tagname, int status, string message);
     }
@@ -65,6 +65,7 @@ namespace RMS_API.CustomClass
             {
                 ResponseModel rm = new ResponseModel
                 {
+                    data = new { },
                     message = ex.Message,
                     status = StatusCodes.Status417ExpectationFailed
                 };
@@ -76,7 +77,7 @@ namespace RMS_API.CustomClass
             }
         }
 
-        public DataTable ReadDataTable(string sql, SqlParameter[] parm)
+        public DataTable? ReadDataTable(string sql, SqlParameter[] parm)
         {
             StringBuilder Sb = new StringBuilder();
             SqlConnection conn = new SqlConnection(_connectionString);
@@ -100,7 +101,7 @@ namespace RMS_API.CustomClass
             }
             catch (Exception ex)
             {
-                throw ex;
+                return null;
             }
             finally
             {

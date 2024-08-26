@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -42,8 +43,9 @@ builder.Services.AddSingleton(new ConcurrentDictionary<string, string>());
 // Read the connection string
 var BaseAddress = builder.Configuration.GetConnectionString("BaseAddress");
 
-//Add imemoryCache 
-builder.Services.AddScoped<ICustomMemoryCache, MemoryCache>();
+//Add imemoryCache along with memory cache
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<ICustomMemoryCache, CustomMemoryCache>();
 
 //Add datahandler as transient
 builder.Services.AddTransient<IDataHandler>(ServiceProvider =>

@@ -8,11 +8,11 @@ namespace RMS_API.CustomClass
         void Set<T>(string key, T value, TimeSpan? slidingExpiration = null, DateTimeOffset? absoluteExpiration = null);
         void Remove(string key);
     }
-    public class MemoryCache : ICustomMemoryCache
+    public class CustomMemoryCache : ICustomMemoryCache
     {
         private readonly IMemoryCache _memoryCache;
 
-        public MemoryCache(IMemoryCache memoryCache)
+        public CustomMemoryCache(IMemoryCache memoryCache)
         {
             _memoryCache = memoryCache;
         }
