@@ -6,6 +6,7 @@ new Chart("chart-line", {
     data: {
         labels: xValues,
         datasets: [{
+            label: 'My First Dataset',
             backgroundColor: "rgba(0,0,255,1.0)",
             borderColor: "rgba(0,0,255,0.1)",
             data: yValues
