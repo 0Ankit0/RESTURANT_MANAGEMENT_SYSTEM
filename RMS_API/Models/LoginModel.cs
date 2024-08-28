@@ -13,6 +13,8 @@ namespace RMS_API.Models
         public string Password { get; set; }
 
         public string GUID { get; set; }
+
+      
     }
 
     public class RegisterModel
@@ -38,7 +40,10 @@ namespace RMS_API.Models
         public string ConfirmPassword { get; set; }
 
         [Phone(ErrorMessage = "Please enter a valid phone number")]
+        [DataType(DataType.PhoneNumber)]
         public string PhoneNumber { get; set; }
+
+        public int Role { get; set; }
 
     }
 }

@@ -67,8 +67,9 @@ namespace RMS_API.Controllers
                  new SqlParameter("@UserEmail", br.Email),
                  new SqlParameter("@Password", br.Password),
                  new SqlParameter("@PhoneNumber", br.PhoneNumber),
+                 new SqlParameter("@Role",br.Role)
                 };
-                var result = _dh.ReadDataWithResponse("Usp_IU_RegisterUser", param);
+                var result = _dh.ReadDataWithResponse("Usp_IU_UserMaster", param);
 
                 return Ok(result);
             }
