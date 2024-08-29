@@ -18,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Configure API versioning 
+// Configure API versioning  more info https://dev.to/azzdcl/aspnet-core-web-api-with-swagger-api-versioning-for-dotnet-8-3c9j
 builder.Services.AddApiVersioning(options =>
     {
         options.AssumeDefaultVersionWhenUnspecified = true; // Assumes the default version if none is specified
