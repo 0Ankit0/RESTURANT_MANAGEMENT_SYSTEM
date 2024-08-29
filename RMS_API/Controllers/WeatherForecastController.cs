@@ -39,7 +39,7 @@ namespace RMS_API.Controllers
 
 
         [HttpGet(Name = "GetWeatherForecast")]
-        [MapToApiVersion("1.0")]
+        [MapToApiVersion("2.0")]
         [SimpleRateLimit(maxRequests: 5, seconds: 60)] // Allow 5 requests per 60 seconds
         public IEnumerable<WeatherForecast> Get2()
         {
