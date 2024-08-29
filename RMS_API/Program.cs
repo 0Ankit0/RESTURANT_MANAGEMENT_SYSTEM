@@ -18,15 +18,21 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Configure API versioning
+// Configure API versioning 
 builder.Services.AddApiVersioning(options =>
-{
-    options.AssumeDefaultVersionWhenUnspecified = true; // Assumes the default version if none is specified
-    options.DefaultApiVersion = new ApiVersion(1, 0);   // Set the default API version to 1.0
-    options.ReportApiVersions = true;                   // Report the API versions supported by the application
-});
+    {
+        options.AssumeDefaultVersionWhenUnspecified = true; // Assumes the default version if none is specified
+        options.DefaultApiVersion = new ApiVersion(1, 0);   // Set the default API version to 1.0
+        options.ReportApiVersions = true;                   // Report the API versions supported by the application
+    })
+    .AddApiExplorer(
+    options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    });
 
-// Configure Entity Framework Core with SQL Server
+// Configure Entity Framework Core with SQL Server more info https://learn.microsoft.com/en-us/aspnet/core/data/ef-rp/intro?view=aspnetcore-8.0
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlServer(builder.Configuration.GetConnectionString("BaseAddress")));
 
@@ -35,6 +41,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+//Add SignalR services more info https://learn.microsoft.com/en-us/aspnet/core/signalr/introduction?view=aspnetcore-8.0
 builder.Services.AddSignalR();
 
 //To Add Cors policy
