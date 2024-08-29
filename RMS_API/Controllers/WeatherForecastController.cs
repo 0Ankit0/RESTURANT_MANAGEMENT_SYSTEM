@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using RMS_API.Filter;
 
 namespace RMS_API.Controllers
 {
@@ -19,6 +20,7 @@ namespace RMS_API.Controllers
         }
 
         [HttpGet(Name = "GetWeatherForecast")]
+        [SimpleRateLimit(maxRequests: 5, seconds: 60)] // Allow 5 requests per 60 seconds
         public IEnumerable<WeatherForecast> Get()
         {
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
