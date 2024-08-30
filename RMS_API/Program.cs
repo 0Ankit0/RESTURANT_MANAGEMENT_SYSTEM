@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using RMS_API.Configuration;
 using RMS_API.CustomClass;
 using RMS_API.Data;
 using RMS_API.Models;
@@ -18,28 +19,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Configure API versioning  more info https://dev.to/azzdcl/aspnet-core-web-api-with-swagger-api-versioning-for-dotnet-8-3c9j
-builder.Services.AddApiVersioning(options =>
-    {
-        options.AssumeDefaultVersionWhenUnspecified = true; // Assumes the default version if none is specified
-        options.DefaultApiVersion = new ApiVersion(1, 0);   // Set the default API version to 1.0
-        options.ReportApiVersions = true;                   // Report the API versions supported by the application
-    })
-    .AddApiExplorer(
-    options =>
-    {
-        options.GroupNameFormat = "'v'VVV";
-        options.SubstituteApiVersionInUrl = true;
-    });
+// Instantiate the swagger configuration class
+var swaggerConfig = new SwaggerConfiguration(builder.Configuration);
+
+// Configure services using the instance
+swaggerConfig.ConfigureServices(builder.Services);
 
 // Configure Entity Framework Core with SQL Server more info https://learn.microsoft.com/en-us/aspnet/core/data/ef-rp/intro?view=aspnetcore-8.0
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlServer(builder.Configuration.GetConnectionString("BaseAddress")));
 
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 //Add SignalR services more info https://learn.microsoft.com/en-us/aspnet/core/signalr/introduction?view=aspnetcore-8.0
 builder.Services.AddSignalR();
@@ -77,68 +67,11 @@ builder.Services.AddTransient<IDataHandler>(ServiceProvider =>
     return new DatabaseHelper(connectionString);
 });
 
-// Configure JWT settings
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+// Instantiate the JWT configuration class
+var jwtConfig = new JwtConfiguration(builder.Configuration);
 
-// Inject JwtSettings using IOptions
-builder.Services.AddSingleton<IJwtAuth>(serviceProvider =>
-{
-    var jwtSettings = serviceProvider.GetRequiredService<IOptions<JwtSettings>>();
-    return new JwtAuth(jwtSettings);
-});
-
-// Configure JWT authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        var serviceProvider = builder.Services.BuildServiceProvider();
-        var jwtSettings = serviceProvider.GetRequiredService<IOptions<JwtSettings>>().Value;
-        var key = Encoding.ASCII.GetBytes(jwtSettings.SecretKey);
-
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true, // Validates token expiry
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings.Issuer,
-            ValidAudience = jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnTokenValidated = context =>
-            {
-                var claimsIdentity = context.Principal.Identity as ClaimsIdentity;
-                var userIdClaim = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier);
-                var usernameClaim = claimsIdentity?.FindFirst(ClaimTypes.Name);
-
-                if (userIdClaim != null && usernameClaim != null)
-                {
-                    var user = new AuthenticatedUser
-                    {
-                        UserId = userIdClaim.Value,
-                        Username = usernameClaim.Value
-                    };
-
-                    // Add the user object to the HttpContext items
-                    context.HttpContext.Items["User"] = user;
-                }
-
-                return Task.CompletedTask;
-            },
-            OnAuthenticationFailed = context =>
-            {
-                // Log the exception
-                context.NoResult();
-                context.Response.StatusCode = 500;
-                context.Response.ContentType = "text/plain";
-                return context.Response.WriteAsync(context.Exception.ToString());
-            }
-        };
-    });
-
+// Configure services using the instance
+jwtConfig.ConfigureServices(builder.Services);
 
 
 var app = builder.Build();
@@ -147,7 +80,16 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(
+    options =>
+    {
+        var descriptions = app.DescribeApiVersions();
+
+        foreach (var description in descriptions)
+        {
+            options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+        }
+    });
 }
 
 app.UseHttpsRedirection();

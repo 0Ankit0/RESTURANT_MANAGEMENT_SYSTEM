@@ -6,7 +6,7 @@ namespace RMS_API.Controllers
 {
     [ApiController]
     [Route("api/v{version:apiVersion}/WeatherForecast")]
-    [ApiVersion("1.0")]
+    [ApiVersion("1.0",Deprecated =true)]
     [ApiVersion("2.0")]
     public class WeatherForecastController : ControllerBase
     {
