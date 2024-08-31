@@ -12,21 +12,31 @@ namespace RMS_API.Services
     public class MessageHub : Hub
     {
         private readonly JwtAuth _jwtAuth;
-        private readonly ConcurrentDictionary<string, string> _connectionIdToGuidMap;
+        private readonly AssymetricCryptography _cryptography;
+        private readonly ConcurrentDictionary<string, MapToHubId> _connectionIdToGuidMap;
 
-        public MessageHub(JwtAuth jwtAuth, ConcurrentDictionary<string, string> connectionIdToGuidMap)
+        public MessageHub(JwtAuth jwtAuth, ConcurrentDictionary<string, MapToHubId> connectionIdToGuidMap, AssymetricCryptography cryptography)
         {
             _jwtAuth = jwtAuth;
             _connectionIdToGuidMap = connectionIdToGuidMap;
+            _cryptography = cryptography;
         }
 
-        public Task MapConnectionIdToGuid(MessageModel data)
+        public async Task MapConnectionIdToGuid(MessageModel data)
         {
             try
             {
                 var senderId = data.Sender;
-                _connectionIdToGuidMap.TryAdd(Context.ConnectionId, senderId);
-                return Task.CompletedTask;
+                (string publicKey, string privateKey) = _cryptography.GenerateKeys();
+                MapToHubId mapToHubId = new MapToHubId
+                {
+                    Publickey = publicKey,
+                    Privatekey = privateKey,
+                    UserId = senderId
+                };
+                _connectionIdToGuidMap.TryAdd(Context.ConnectionId, mapToHubId);
+                await Clients.Caller.SendAsync("MappedSuccessfully", new { key = publicKey });
+                return;
             }
             catch (System.Exception)
             {
@@ -43,7 +53,11 @@ namespace RMS_API.Services
                 var senderId = data.Sender;
                 var message = data.MessageText;
                 var token = data.TokenNo;
-
+                if (!IsBase64String(message))
+                {
+                    await Clients.Caller.SendAsync("errorMessage", new { error = "The message is not encrypted." });
+                    return;
+                }
                 MessageModel msg = new MessageModel
                 {
                     MessageText = message,
@@ -58,9 +72,9 @@ namespace RMS_API.Services
                 var response = await httpClient.PostAsync("https://localhost:44348/api/Home/message", content);
                 response.EnsureSuccessStatusCode();
                 await Clients.Caller.SendAsync("messageSent", new { userId = msg.Sender, message = msg.MessageText });
-                if (_connectionIdToGuidMap.Any(x => x.Value == receiverId))
+                if (_connectionIdToGuidMap.Any(x => x.Value.UserId == receiverId))
                 {
-                    var connectionId = _connectionIdToGuidMap.FirstOrDefault(x => x.Value == receiverId).Key;
+                    var connectionId = _connectionIdToGuidMap.FirstOrDefault(x => x.Value.UserId == receiverId).Key;
                     await Clients.Client(connectionId).SendAsync("liveMessage", new { userId = msg.Sender, message = msg.MessageText });
                 }
 
@@ -77,7 +91,25 @@ namespace RMS_API.Services
             _connectionIdToGuidMap.TryRemove(Context.ConnectionId, out _);
             return base.OnDisconnectedAsync(exception);
         }
+        // Helper method to check if a string is a valid Base64 string
+        private bool IsBase64String(string base64)
+        {
+            if (string.IsNullOrEmpty(base64) || base64.Length % 4 != 0)
+                return false;
+
+            try
+            {
+                Convert.FromBase64String(base64);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
 
     }
+
+
 }
 

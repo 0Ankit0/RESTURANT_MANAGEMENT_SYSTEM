@@ -4,13 +4,13 @@ using System.Text.Json;
 
 namespace RMS_API.CustomClass
 {
-    interface ICryptography
+    interface ICustomCryptography
     {
         public string Encrypt(string clearText, string key);
         public string Decrypt(string cipherText, string key);
     }
 
-    public class SymmetricCryptography : ICryptography
+    public class SymmetricCryptography : ICustomCryptography
     {
         // Method to encrypt a given clear text using AES encryption with PBKDF2 for key derivation.
         public string Encrypt(string clearText, string password = "|3w?.3423df./,;''#asdWDe:';23|")
@@ -106,10 +106,10 @@ namespace RMS_API.CustomClass
         }
     }
 
-    public class AssymetricCryptography : ICryptography
+    public class AssymetricCryptographyUsingFileKey : ICustomCryptography
     {
         //Provide a default filepath for storing key pairs
-        private string _filePath = "keyPairs.json";
+        private string _filePath = "./Data/keyPairs.json";
 
         // Encrypts the provided data using RSA asymmetric cryptography with the specified public key.
         public string Encrypt(string dataToEncrypt, string publicKey)
@@ -227,4 +227,53 @@ namespace RMS_API.CustomClass
         }
 
     }
+     public class AssymetricCryptography : ICustomCryptography
+    {
+        // Encrypts the provided data using RSA asymmetric cryptography with the specified public key.
+        public string Encrypt(string dataToEncrypt, string publicKey)
+        {
+            byte[] dataBytes = Encoding.Unicode.GetBytes(dataToEncrypt);
+            byte[] encryptedData;
+
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            {
+                rsa.PersistKeyInCsp = false;
+                rsa.ImportCspBlob(Convert.FromBase64String(publicKey));
+                encryptedData = rsa.Encrypt(dataBytes, false);
+            }
+
+            return Convert.ToBase64String(encryptedData);
+        }
+
+        // Decrypts the provided data using RSA asymmetric cryptography with the specified private key.
+        public string Decrypt(string dataToDecrypt, string privateKey)
+        {
+            byte[] dataBytes = Convert.FromBase64String(dataToDecrypt);
+            byte[] decryptedData;
+
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            {
+                rsa.PersistKeyInCsp = false;
+                rsa.ImportCspBlob(Convert.FromBase64String(privateKey));
+                decryptedData = rsa.Decrypt(dataBytes, false);
+            }
+
+            return Encoding.Unicode.GetString(decryptedData);
+        }
+
+        // Generates a pair of RSA keys (public and private) and returns them as base64 strings.
+        public (string publicKey, string privateKey) GenerateKeys()
+        {
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            {
+                rsa.PersistKeyInCsp = false;
+                string publicKey = Convert.ToBase64String(rsa.ExportCspBlob(false));
+                string privateKey = Convert.ToBase64String(rsa.ExportCspBlob(true));
+
+                return (publicKey, privateKey);
+            }
+        }
+
+    }
+
 }

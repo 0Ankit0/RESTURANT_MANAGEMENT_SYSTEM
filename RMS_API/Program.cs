@@ -48,8 +48,11 @@ builder.Services.AddCors(options =>
         });
 });
 
-//Add a dictionary as a singleton to map the connection id with the token
-builder.Services.AddSingleton(new ConcurrentDictionary<string, string>());
+//Add the custom AsymmetricCryptography as transient
+builder.Services.AddSingleton<ICustomCryptography, AssymetricCryptography>();
+
+//Add a dictionary as a singleton to map the connection id with the token in hub
+builder.Services.AddSingleton(new ConcurrentDictionary<string, MapToHubId>());
 
 
 // Read the connection string
@@ -58,6 +61,7 @@ var BaseAddress = builder.Configuration.GetConnectionString("BaseAddress");
 //Add imemoryCache along with memory cache
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ICustomMemoryCache, CustomMemoryCache>();
+
 
 //Add datahandler as transient
 builder.Services.AddTransient<IDataHandler>(ServiceProvider =>
