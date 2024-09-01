@@ -2,15 +2,18 @@
 {
 	public class RoleMaster
 	{
-		public int UkId { get; set; }
-		public int RoleId { get; set; }
+        public RoleMaster()
+        {
+            GUID = Guid.NewGuid().ToString();
+        }
+        public int RoleId { get; set; }
 		public string RoleName { get; set; }
 		public string GUID { get; set; }
 		public DateTime CreatedAt { get; set; }
 		public DateTime? UpdatedAt { get; set; }
-		public bool? Active { get; set; }
+		public bool Active { get; set; }= true;
 
-		public ICollection<UserMaster> Users { get; set; }
+        public ICollection<UserMaster> Users { get; set; }
 		public ICollection<UserRole> UserRoles { get; set; }
 	}
 }
