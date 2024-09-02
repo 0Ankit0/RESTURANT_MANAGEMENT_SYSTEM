@@ -45,13 +45,10 @@ namespace RMS_API.Data
 
             // Configuring UserRole
             modelBuilder.Entity<UserRole>()
-                .Property(ur => ur.UserRoleId);
+                .HasKey(ur => ur.UserRoleId);
             
             modelBuilder.Entity<UserRole>()
-                .HasKey(ur => ur.UkId);
-            
-            modelBuilder.Entity<UserRole>()
-                .Property(ur => ur.UkId)
+                .Property(ur => ur.UserRoleId)
                 .ValueGeneratedOnAdd();
 
             modelBuilder.Entity<UserRole>()

@@ -7,7 +7,7 @@ using System;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
-namespace RMS_API.Controllers
+namespace RMS_API.Controllers.Users
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -30,8 +30,8 @@ namespace RMS_API.Controllers
                      .Select(ur => new RoleModel
                      {
                          RoleId = ur.RoleId,
-                         RoleName=ur.RoleName,
-                         GUID=ur.GUID
+                         RoleName = ur.RoleName,
+                         GUID = ur.GUID
                      })
                     .ToListAsync();
                 return Ok(roles);
@@ -71,7 +71,7 @@ namespace RMS_API.Controllers
             {
                 RoleMaster roleMaster = new RoleMaster()
                 {
-                    RoleName=role.RoleName,
+                    RoleName = role.RoleName,
                     GUID = Guid.NewGuid().ToString()
                 };
 
