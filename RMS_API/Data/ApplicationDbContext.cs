@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using RMS_API.Models.Users;
+using RMS_API.Data.Users;
 
 namespace RMS_API.Data
 {
@@ -45,7 +45,14 @@ namespace RMS_API.Data
 
             // Configuring UserRole
             modelBuilder.Entity<UserRole>()
-                .HasKey(ur => ur.UserRoleId);
+                .Property(ur => ur.UserRoleId);
+            
+            modelBuilder.Entity<UserRole>()
+                .HasKey(ur => ur.UkId);
+            
+            modelBuilder.Entity<UserRole>()
+                .Property(ur => ur.UkId)
+                .ValueGeneratedOnAdd();
 
             modelBuilder.Entity<UserRole>()
                 .HasOne(ur => ur.User)
