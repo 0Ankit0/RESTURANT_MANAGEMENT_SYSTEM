@@ -15,6 +15,7 @@ namespace RMS_API.Data.Users
         public string? Address { get; set; }
         public string? Phone { get; set; }
         public string GUID { get; set; }
+        public int? RoleId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public bool Active { get; set; } = true;

@@ -31,8 +31,8 @@ namespace RMS_API.Data
                 .WithOne(ur => ur.Role)
                 .HasForeignKey(ur => ur.RoleId)
                 .OnDelete(DeleteBehavior.SetNull);  // Prevent cascading delete
- 
-           
+
+
             // Configuring UserMaster
             modelBuilder.Entity<UserMaster>()
                 .HasKey(u => u.UserId);
@@ -45,13 +45,10 @@ namespace RMS_API.Data
 
             // Configuring UserRole
             modelBuilder.Entity<UserRole>()
-                .Property(ur => ur.UserRoleId);
-            
+                .HasKey(ur => ur.UserRoleId);
+
             modelBuilder.Entity<UserRole>()
-                .HasKey(ur => ur.UkId);
-            
-            modelBuilder.Entity<UserRole>()
-                .Property(ur => ur.UkId)
+                .Property(ur => ur.UserRoleId)
                 .ValueGeneratedOnAdd();
 
             modelBuilder.Entity<UserRole>()
@@ -65,11 +62,11 @@ namespace RMS_API.Data
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(ur => ur.RoleId)
                 .OnDelete(DeleteBehavior.SetNull);  // Prevent cascading delete
-            
-           
+
+
 
         }
     }
 
-    
+
 }
