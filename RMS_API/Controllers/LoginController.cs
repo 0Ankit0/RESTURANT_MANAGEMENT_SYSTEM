@@ -9,6 +9,7 @@ using System.Data;
 using System.Text;
 using RMS_API.Data;
 using RMS_API.Data.Users;
+using RMS_API.Models.Users;
 
 namespace RMS_API.Controllers
 {
@@ -27,30 +28,33 @@ namespace RMS_API.Controllers
             _context = context;
         }
 
+        [HttpPost("Role")]
+        public async Task<IActionResult> Post([FromBody] UserRoleModel userRole)
+        {
+            try
+            {
+                UserRole role = new UserRole()
+                {
+                    UserId = userRole.UserId,
+                    RoleId = userRole.RoleId,
+                    CreatedAt = DateTime.Now,
+                    GUID = Guid.NewGuid().ToString()
+                };
+                await _context.UserRoles.AddAsync(role);
+                await _context.SaveChangesAsync();
+                return Ok(role);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
+            }
+        }
         // POST: api/Login/UserLogin
         [HttpPost("Login")]
         public IActionResult UserLogin([FromBody] LoginModel br)
         {
             try
             {
-				//SqlParameter[] param =
-				//{
-				// new SqlParameter("@UserEmail", br.UsernameOrEmail),
-				// new SqlParameter("@Password", br.Password),
-				//};
-				//var result = _dh.ReadDataWithResponse("Usp_Sys_UserLogin", param);
-				//var jsonResult = JsonConvert.DeserializeObject<ResponseModel>(result);
-				//if (jsonResult.status == 200)
-				//{
-				//    var token = _jwtAuth.GenerateToken(br.UsernameOrEmail, br.GUID);
-				//    jsonResult.data = new { Token=token};
-				//    return Ok(jsonResult);
-				//}
-				//else
-				//{
-
-				//    return StatusCode(StatusCodes.Status204NoContent);
-				//}
 				var user = _context.UserMasters
 						   .FirstOrDefault(u => u.UserEmail == br.UsernameOrEmail && u.Password == br.Password);
 
@@ -88,18 +92,6 @@ namespace RMS_API.Controllers
         {
             try
             {
-				//SqlParameter[] param =
-				//{
-				// new SqlParameter("@UserName", br.Username),
-				// new SqlParameter("@UserEmail", br.Email),
-				// new SqlParameter("@Password", br.Password),
-				// new SqlParameter("@PhoneNumber", br.PhoneNumber),
-				// new SqlParameter("@Role",br.Role)
-				//};
-				//var result = _dh.ReadDataWithResponse("Usp_IU_UserMaster", param);
-
-				//return Ok(result);
-
 				var existingUser = _context.UserMasters.FirstOrDefault(u => u.UserEmail == br.Email);
 				if (existingUser != null)
 				{
@@ -140,5 +132,54 @@ namespace RMS_API.Controllers
             }
         }
 
+        [HttpPut("Update")]
+        public IActionResult UpdateUser([FromBody] UserMaster user)
+        {
+            try
+            {
+                var existingUser = _context.UserMasters.FirstOrDefault(u => u.UserId == user.UserId);
+                if (existingUser == null)
+                {
+                    return NotFound("User not found.");
+                }
+
+                existingUser.UserName = user.UserName;
+                existingUser.UserEmail = user.UserEmail;
+                existingUser.Phone = user.Phone;
+                existingUser.RoleId = user.RoleId;
+                existingUser.UpdatedAt = DateTime.Now;
+
+                _context.SaveChanges();
+
+                return Ok("User updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpDelete("Delete/{id}")]
+        public IActionResult DeleteUser(int id)
+        {
+            try
+            {
+                var user = _context.UserMasters.FirstOrDefault(u => u.UserId == id);
+                if (user == null)
+                {
+                    return NotFound("User not found.");
+                }
+
+                //_context.UserMasters.Remove(user);
+                user.Active = false;
+                _context.SaveChanges();
+
+                return Ok("User deleted successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
     }
 }

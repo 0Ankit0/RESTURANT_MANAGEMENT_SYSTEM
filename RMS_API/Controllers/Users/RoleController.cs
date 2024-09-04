@@ -11,11 +11,11 @@ namespace RMS_API.Controllers.Users
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UserRoleController : ControllerBase
+    public class RoleController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
-        public UserRoleController(ApplicationDbContext context)
+        public RoleController(ApplicationDbContext context)
         {
             _context = context;
         }
@@ -81,7 +81,7 @@ namespace RMS_API.Controllers.Users
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
             }
         }
 
