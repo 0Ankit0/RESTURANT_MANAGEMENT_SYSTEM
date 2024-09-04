@@ -35,8 +35,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\Finance\" />
-    <Folder Include="Controllers\Orders\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
 

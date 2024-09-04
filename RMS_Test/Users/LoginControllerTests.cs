@@ -52,7 +52,7 @@ namespace RMS_API.Tests
             _mockJwtAuth.Setup(auth => auth.GenerateToken(It.IsAny<string>(), It.IsAny<string>()))
                         .Returns("fake-jwt-token");
 
-            var controller = new LoginController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
 
             // Act
             var result = controller.UserLogin(loginModel) as OkObjectResult;
@@ -78,7 +78,7 @@ namespace RMS_API.Tests
                 Password = "wrongpassword"
             };
 
-            var controller = new LoginController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
 
             // Act
             var result = controller.UserLogin(loginModel) as ObjectResult;
@@ -113,7 +113,7 @@ namespace RMS_API.Tests
             _context.RoleMasters.Add(role);
             _context.SaveChanges();
 
-            var controller = new LoginController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
 
             // Act
             var result = controller.RegisterUser(registerModel) as OkObjectResult;
@@ -146,7 +146,7 @@ namespace RMS_API.Tests
                 Role = 1
             };
 
-            var controller = new LoginController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
 
             // Act
             var result = controller.RegisterUser(registerModel) as ObjectResult;
@@ -172,7 +172,7 @@ namespace RMS_API.Tests
             };
 
             // Mock the database context and create the controller
-            var controller = new LoginController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
 
             // Act
 

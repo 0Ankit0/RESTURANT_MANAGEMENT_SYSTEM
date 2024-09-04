@@ -11,17 +11,17 @@ using RMS_API.Data;
 using RMS_API.Data.Users;
 using RMS_API.Models.Users;
 
-namespace RMS_API.Controllers
+namespace RMS_API.Controllers.Users
 {
     [Route("api/User")]
     [ApiController]
-    public class LoginController : ControllerBase
+    public class UserController : ControllerBase
     {
         private readonly IJwtAuth _jwtAuth;
         private readonly IDataHandler _dh;
         private readonly ApplicationDbContext _context;
 
-        public LoginController(IJwtAuth jwtAuth, IDataHandler dataHandler,ApplicationDbContext context)
+        public UserController(IJwtAuth jwtAuth, IDataHandler dataHandler, ApplicationDbContext context)
         {
             _jwtAuth = jwtAuth;
             _dh = dataHandler;
@@ -55,30 +55,30 @@ namespace RMS_API.Controllers
         {
             try
             {
-				var user = _context.UserMasters
-						   .FirstOrDefault(u => u.UserEmail == br.UsernameOrEmail && u.Password == br.Password);
+                var user = _context.UserMasters
+                           .FirstOrDefault(u => u.UserEmail == br.UsernameOrEmail && u.Password == br.Password);
 
-				if (user != null)
-				{
-					var token = _jwtAuth.GenerateToken(user.UserEmail, user.GUID);
-					var response = new ResponseModel
-					{
-						status = 200,
-						data = new { Token = token }
-					};
-					return Ok(response);
-				}
-				else
-				{
-					var res= new ResponseModel
-					{
-						status = 204,
-						message = "Invalid email or password."
-					};
-                    return StatusCode(StatusCodes.Status404NotFound,res);
-				}
+                if (user != null)
+                {
+                    var token = _jwtAuth.GenerateToken(user.UserEmail, user.GUID);
+                    var response = new ResponseModel
+                    {
+                        status = 200,
+                        data = new { Token = token }
+                    };
+                    return Ok(response);
+                }
+                else
+                {
+                    var res = new ResponseModel
+                    {
+                        status = 204,
+                        message = "Invalid email or password."
+                    };
+                    return StatusCode(StatusCodes.Status404NotFound, res);
+                }
 
-			}
+            }
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
@@ -92,39 +92,39 @@ namespace RMS_API.Controllers
         {
             try
             {
-				var existingUser = _context.UserMasters.FirstOrDefault(u => u.UserEmail == br.Email);
-				if (existingUser != null)
-				{
-					return Conflict("User with this email already exists.");
-				}
+                var existingUser = _context.UserMasters.FirstOrDefault(u => u.UserEmail == br.Email);
+                if (existingUser != null)
+                {
+                    return Conflict("User with this email already exists.");
+                }
 
-				// Find the role by name (assuming you have a method or logic to retrieve the role)
-				var role = _context.RoleMasters.FirstOrDefault(r => r.RoleId == br.Role);
-				if (role == null)
-				{
-					return BadRequest("Invalid role specified.");
-				}
+                // Find the role by name (assuming you have a method or logic to retrieve the role)
+                var role = _context.RoleMasters.FirstOrDefault(r => r.RoleId == br.Role);
+                if (role == null)
+                {
+                    return BadRequest("Invalid role specified.");
+                }
 
-				// Create a new UserMaster entity
-				var user = new UserMaster
-				{
-					UserName = br.Username,
-					UserEmail = br.Email,
-					Password = br.Password, // Ensure that the password is hashed in production
-					Phone = br.PhoneNumber,
-					RoleId = role.RoleId, // Set the RoleId
-					CreatedAt = DateTime.Now,
-					GUID = Guid.NewGuid().ToString(),
-					Active = true
-				};
+                // Create a new UserMaster entity
+                var user = new UserMaster
+                {
+                    UserName = br.Username,
+                    UserEmail = br.Email,
+                    Password = br.Password, // Ensure that the password is hashed in production
+                    Phone = br.PhoneNumber,
+                    RoleId = role.RoleId, // Set the RoleId
+                    CreatedAt = DateTime.Now,
+                    GUID = Guid.NewGuid().ToString(),
+                    Active = true
+                };
 
-				// Add the user to the database
-				_context.UserMasters.Add(user);
-				_context.SaveChanges();
+                // Add the user to the database
+                _context.UserMasters.Add(user);
+                _context.SaveChanges();
 
-				// Return a success response
-				return Ok("User registered successfully.");
-			}
+                // Return a success response
+                return Ok("User registered successfully.");
+            }
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
