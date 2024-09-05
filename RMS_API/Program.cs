@@ -1,28 +1,16 @@
-using Asp.Versioning;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using RMS_API.Configuration;
-using RMS_API.CustomClass;
 using RMS_API.Data;
-using RMS_API.Models;
 using RMS_API.Services;
-using System.Collections.Concurrent;
-using System.Security.Claims;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 
-// Instantiate the swagger configuration class
+// Instantiate the swagger configuration class and Configure services using the instance
 var swaggerConfig = new SwaggerConfiguration(builder.Configuration);
-
-// Configure services using the instance
 swaggerConfig.ConfigureServices(builder.Services);
 
 // Configure Entity Framework Core with SQL Server more info https://learn.microsoft.com/en-us/aspnet/core/data/ef-rp/intro?view=aspnetcore-8.0
@@ -48,33 +36,20 @@ builder.Services.AddCors(options =>
         });
 });
 
-//Add the custom AsymmetricCryptography as transient
-builder.Services.AddSingleton<ICustomCryptography, AssymetricCryptography>();
-
-//Add a dictionary as a singleton to map the connection id with the token in hub
-builder.Services.AddSingleton(new ConcurrentDictionary<string, MapToHubId>());
-
 
 // Read the connection string
 var BaseAddress = builder.Configuration.GetConnectionString("BaseAddress");
 
-//Add imemoryCache along with memory cache
-builder.Services.AddMemoryCache();
-builder.Services.AddScoped<ICustomMemoryCache, CustomMemoryCache>();
+//Add the depencencies configuration
+
+var dependenciesConfig = new DependenciesConfiguration(builder.Configuration);
+dependenciesConfig.Configureservices(builder.Services);
 
 
-//Add datahandler as transient
-builder.Services.AddTransient<IDataHandler>(ServiceProvider =>
-{
-    // Read the connection string
-    var connectionString = builder.Configuration.GetConnectionString("BaseAddress");
-    return new DatabaseHelper(connectionString);
-});
 
-// Instantiate the JWT configuration class
+
+// Instantiate the JWT configuration class and Configure services using the instance
 var jwtConfig = new JwtConfiguration(builder.Configuration);
-
-// Configure services using the instance
 jwtConfig.ConfigureServices(builder.Services);
 
 
