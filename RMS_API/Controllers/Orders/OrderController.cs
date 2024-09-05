@@ -116,12 +116,7 @@ namespace RMS_API.Controllers.Orders
             }
         }
 
-        [HttpPut]
-        // Put: OrderController/Edit/5
-        public ActionResult Edit(int id)
-        {
-            return View();
-        }
+        
 
         
         // GET: OrderController/Delete/5

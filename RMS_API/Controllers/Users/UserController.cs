@@ -210,5 +210,29 @@ namespace RMS_API.Controllers.Users
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
+    [HttpDelete("Role/{id}")]
+        public IActionResult DeleteUserRole(int id)
+        {
+            try
+            {
+                var user = _context.UserMasters.FirstOrDefault(u => u.UserId == id);
+                if (user == null)
+                {
+                    return NotFound("User not found.");
+                }
+
+                //_context.UserMasters.Remove(user);
+                user.RoleId = null;
+                _context.SaveChanges();
+
+                return Ok("User's role removed successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+    
+    
     }
 }

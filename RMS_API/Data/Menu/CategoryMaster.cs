@@ -13,6 +13,6 @@ namespace RMS_API.Data.Menu
         public DateTime? UpdatedAt { get; set; }
         public bool Active { get; set; }
 
-        public ICollection<MenuMaster> Menus { get; set; } // Navigation property
+        public List<MenuMaster> Menus { get; set; } // Navigation property
     }
 }
