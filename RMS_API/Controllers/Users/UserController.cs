@@ -10,6 +10,7 @@ using System.Text;
 using RMS_API.Data;
 using RMS_API.Data.Users;
 using RMS_API.Models.Users;
+using Microsoft.EntityFrameworkCore;
 
 namespace RMS_API.Controllers.Users
 {
@@ -27,6 +28,34 @@ namespace RMS_API.Controllers.Users
             _dh = dataHandler;
             _context = context;
         }
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<UserModel>>> Get()
+        {
+            try
+            {
+                var users = await _context.UserMasters
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .Select(u => new UserModel
+                {
+                    UserId = u.UserId,
+                    UserName = u.UserName,
+                    UserEmail = u.UserEmail,
+                    Phone = u.Phone,
+                    GUID = u.GUID,
+                    Role = u.UserRoles.Where(ur => ur.UserId == u.UserId)
+                          .Select(ur => ur.Role.RoleName)
+                          .FirstOrDefault() ?? string.Empty
+                })
+                .ToListAsync();
+
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
+            }
+        }
 
         [HttpPost("Role")]
         public async Task<IActionResult> Post([FromBody] UserRoleModel userRole)
@@ -35,7 +64,7 @@ namespace RMS_API.Controllers.Users
             {
                 UserRole role = new UserRole()
                 {
-                    UserId = userRole.UserId,
+                    UserId=userRole.UserId,
                     RoleId = userRole.RoleId,
                     CreatedAt = DateTime.Now,
                     GUID = Guid.NewGuid().ToString()
@@ -114,7 +143,7 @@ namespace RMS_API.Controllers.Users
                     Phone = br.PhoneNumber,
                     RoleId = role.RoleId, // Set the RoleId
                     CreatedAt = DateTime.Now,
-                    GUID = Guid.NewGuid().ToString(),
+                    //GUID = Guid.NewGuid().ToString(),
                     Active = true
                 };
 

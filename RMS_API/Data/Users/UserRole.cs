@@ -1,4 +1,6 @@
-﻿namespace RMS_API.Data.Users
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace RMS_API.Data.Users
 {
     public class UserRole
     {
@@ -6,6 +8,7 @@
         {
             GUID = Guid.NewGuid().ToString();
         }
+        [Key]
         public int UserRoleId { get; set; }
         public int? UserId { get; set; }
         public int? RoleId { get; set; }

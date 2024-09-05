@@ -1,4 +1,6 @@
-﻿namespace RMS_API.Models.Orders
+﻿using RMS_API.Data.Orders;
+
+namespace RMS_API.Models.Orders
 {
     public class OrderModel
     {
@@ -7,5 +9,6 @@
         public int? WaiterId { get; set; }
         public string OrderStatus { get; set; }
 
+        public ICollection<OrderDetailsModel> OrderDetails { get; set; }
     }
 }

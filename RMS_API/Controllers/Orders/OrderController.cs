@@ -1,11 +1,17 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RMS_API.Data;
 using RMS_API.Data.Orders;
+using RMS_API.Data.Users;
+using RMS_API.Models.Orders;
+using RMS_API.Models.Users;
 using StackExchange.Redis;
 
 namespace RMS_API.Controllers.Orders
 {
+    [Route("api/[controller]")]
+    [ApiController]
     public class OrderController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -14,26 +20,43 @@ namespace RMS_API.Controllers.Orders
         {
             _context = context;
         }
-
+        [HttpGet]
         // GET: OrderController
-        public ActionResult Index()
+        public async Task<ActionResult<IEnumerable<OrderModel>>> Get()
         {
-            return View();
+            try
+            {
+                var roles = await _context.Orders
+                     .Select(ur => new OrderModel
+                     {
+                         OrderId = ur.OrderId,
+                         OrderStatus = ur.OrderStatus,
+                         TableNumber = ur.TableNumber,
+                         WaiterId = ur.WaiterId
+                     })
+                    .ToListAsync();
+                return Ok(roles);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
 
-     // GET: OrderController/Details/5
-    public async Task<ActionResult<OrderDetails>> Details(int id)
+        [HttpGet("{id}")]
+        // GET: OrderController/Get/5
+        public async Task<ActionResult<OrderDetails>> Get(int id)
     {
         try
         {
-            var roleMaster =_context.OrderDetails.Where(od => od.OrderId == id).ToList();
+            var orderDetails =_context.OrderDetails.Where(od => od.OrderId == id).ToList();
 
-            if (roleMaster == null)
+            if (orderDetails == null)
             {
                 return NotFound($"Order with ID {id} not found.");
             }
 
-            return Ok(roleMaster);
+            return Ok(orderDetails);
         }
         catch (Exception ex)
         {
@@ -41,48 +64,66 @@ namespace RMS_API.Controllers.Orders
         }
     }
 
-        // GET: OrderController/Create
-        public ActionResult Create()
-        {
-            return View();
-        }
-
-        // POST: OrderController/Create
+        
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Create(IFormCollection collection)
+        // POST: OrderController/Post
+        public async Task<IActionResult> Post([FromBody] OrderModel order)
         {
             try
             {
-                return RedirectToAction(nameof(Index));
+                using (var transaction = await _context.Database.BeginTransactionAsync())
+                {
+                    try
+                    {
+                        var orderMaster = new OrderMaster
+                        {
+                            OrderStatus = order.OrderStatus,
+                            TableNumber = order.TableNumber,
+                            WaiterId = order.WaiterId
+                        };
+
+                        _context.Orders.Add(orderMaster);
+                        await _context.SaveChangesAsync();
+
+                        foreach (var item in order.OrderDetails)
+                        {
+                            var orderDetail = new OrderDetails
+                            {
+                                OrderId = orderMaster.OrderId,
+                                MenuId = item.MenuId,
+                                Quantity = item.Quantity,
+                                Price = item.Price
+                            };
+                            _context.OrderDetails.Add(orderDetail);
+                        }
+
+                        await _context.SaveChangesAsync();
+
+                        await transaction.CommitAsync();
+                        return Ok(orderMaster);
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+                        return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while processing the order: {ex.Message}");
+                    }
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return View();
+                // Log the exception
+                return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while processing the order: {ex.Message}");
             }
         }
 
-        // GET: OrderController/Edit/5
+        [HttpPut]
+        // Put: OrderController/Edit/5
         public ActionResult Edit(int id)
         {
             return View();
         }
 
-        // POST: OrderController/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Edit(int id, IFormCollection collection)
-        {
-            try
-            {
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
-        }
-
+        
         // GET: OrderController/Delete/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
