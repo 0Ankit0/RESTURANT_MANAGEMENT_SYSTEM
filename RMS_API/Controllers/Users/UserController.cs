@@ -11,6 +11,7 @@ using RMS_API.Data;
 using RMS_API.Data.Users;
 using RMS_API.Models.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace RMS_API.Controllers.Users
 {
@@ -21,12 +22,15 @@ namespace RMS_API.Controllers.Users
         private readonly IJwtAuth _jwtAuth;
         private readonly IDataHandler _dh;
         private readonly ApplicationDbContext _context;
+        private readonly IPasswordHasher<UserMaster> _passwordHasher;
 
-        public UserController(IJwtAuth jwtAuth, IDataHandler dataHandler, ApplicationDbContext context)
+
+        public UserController(IJwtAuth jwtAuth, IDataHandler dataHandler, ApplicationDbContext context, IPasswordHasher<UserMaster> passwordHasher)
         {
             _jwtAuth = jwtAuth;
             _dh = dataHandler;
             _context = context;
+            _passwordHasher = passwordHasher;
         }
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UserModel>>> Get()
@@ -85,9 +89,9 @@ namespace RMS_API.Controllers.Users
             try
             {
                 var user = _context.UserMasters
-                           .FirstOrDefault(u => u.UserEmail == br.UsernameOrEmail && u.Password == br.Password);
-
-                if (user != null)
+                           .FirstOrDefault(u => u.UserEmail == br.UsernameOrEmail);
+                var isValid = _passwordHasher.VerifyHashedPassword(user, user.Password, br.Password);
+                if (isValid == PasswordVerificationResult.Success)
                 {
                     var token = _jwtAuth.GenerateToken(user.UserEmail, user.GUID);
                     var response = new ResponseModel
@@ -139,7 +143,7 @@ namespace RMS_API.Controllers.Users
                 {
                     UserName = br.Username,
                     UserEmail = br.Email,
-                    Password = br.Password, // Ensure that the password is hashed in production
+                    Password = _passwordHasher.HashPassword(null, br.Password) ,
                     Phone = br.PhoneNumber,
                     RoleId = role.RoleId, // Set the RoleId
                     CreatedAt = DateTime.Now,
