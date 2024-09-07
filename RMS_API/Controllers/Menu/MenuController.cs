@@ -197,6 +197,7 @@ namespace RMS_API.Controllers.Menu
                         // Add new menu
                         curCategory.Menus.Add(new MenuMaster
                         {
+                            CategoryId = curCategory.CategoryId,
                             MenuName = menu.MenuName,
                             Description = menu.Description,
                             Price = menu.Price,
