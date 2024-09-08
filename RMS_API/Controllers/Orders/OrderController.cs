@@ -95,7 +95,24 @@ namespace RMS_API.Controllers.Orders
                                 Price = item.Price
                             };
                             _context.OrderDetails.Add(orderDetail);
+
+                            var recipeItems = await _context.Recipes.Where(r => r.MenuId == item.MenuId).ToListAsync();
+
+                            foreach (var recipeItem in recipeItems)
+                            {
+                                var inventory = await _context.Inventories.FindAsync(recipeItem.InventoryId);
+                                if (inventory != null && inventory.Quantity >= recipeItem.QuantityRequired * item.Quantity)
+                                {
+                                    inventory.Quantity -= recipeItem.QuantityRequired * item.Quantity;
+                                    _context.Inventories.Update(inventory);
+                                }
+                                else
+                                {
+                                    throw new InvalidOperationException($"Insufficient quantity for menu sith id {recipeItem.MenuId}");
+                                }
+                            }
                         }
+
 
                         await _context.SaveChangesAsync();
 
