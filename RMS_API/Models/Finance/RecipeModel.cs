@@ -13,4 +13,9 @@ namespace RMS_API.Models.Finance
         public string GUID { get; set; }
 
      }
+    public class RecipeModelWithMenu 
+    {
+        public int? MenuId { get; set; }
+        public required List<RecipeModel> Recipes { get; set; }
+    }
 }

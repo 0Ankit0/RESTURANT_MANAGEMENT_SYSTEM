@@ -167,49 +167,61 @@ namespace RMS_API.Controllers.Menu
         {
             try
             {
-                var curCategory = await _context.Categories.FindAsync(id);
-                if (curCategory == null)
+                using (var transaction = await _context.Database.BeginTransactionAsync())
                 {
-                    return NotFound($"Category with ID {id} not found.");
-                }
-
-                curCategory.CategoryName = category.CategoryName;
-                curCategory.Active = category.Active;
-                // Handle menu updates
-                // Remove menus that are not in the incoming model
-                var menuIds = category.Menu.Select(m => m.MenuId).ToList();
-                curCategory.Menus.RemoveAll(m => !menuIds.Contains(m.MenuId));
-
-                // Update or add new menus
-                foreach (var menu in category.Menu)
-                {
-                    var existingMenu = curCategory.Menus.FirstOrDefault(m => m.MenuId == menu.MenuId);
-                    if (existingMenu != null)
+                    try
                     {
-                        // Update existing menu
-                        existingMenu.MenuName = menu.MenuName;
-                        existingMenu.Description = menu.Description;
-                        existingMenu.Price = menu.Price;
-                        existingMenu.IsAvailable = menu.IsAvailable;
-                    }
-                    else
-                    {
-                        // Add new menu
-                        curCategory.Menus.Add(new MenuMaster
+                        var curCategory = await _context.Categories.FindAsync(id);
+                        if (curCategory == null)
                         {
-                            CategoryId = curCategory.CategoryId,
-                            MenuName = menu.MenuName,
-                            Description = menu.Description,
-                            Price = menu.Price,
-                            IsAvailable = menu.IsAvailable,
-                            Active = menu.Active,
-                            GUID = menu.GUID
-                        });
+                            return NotFound($"Category with ID {id} not found.");
+                        }
+
+                        curCategory.CategoryName = category.CategoryName;
+                        curCategory.Active = category.Active;
+                        // Handle menu updates
+                        // Remove menus that are not in the incoming model
+                        var menuIds = category.Menu.Select(m => m.MenuId).ToList();
+                        curCategory.Menus.RemoveAll(m => !menuIds.Contains(m.MenuId));
+
+                        // Update or add new menus
+                        foreach (var menu in category.Menu)
+                        {
+                            var existingMenu = curCategory.Menus.FirstOrDefault(m => m.MenuId == menu.MenuId);
+                            if (existingMenu != null)
+                            {
+                                // Update existing menu
+                                existingMenu.MenuName = menu.MenuName;
+                                existingMenu.Description = menu.Description;
+                                existingMenu.Price = menu.Price;
+                                existingMenu.IsAvailable = menu.IsAvailable;
+                            }
+                            else
+                            {
+                                // Add new menu
+                                curCategory.Menus.Add(new MenuMaster
+                                {
+                                    CategoryId = curCategory.CategoryId,
+                                    MenuName = menu.MenuName,
+                                    Description = menu.Description,
+                                    Price = menu.Price,
+                                    IsAvailable = menu.IsAvailable,
+                                    Active = menu.Active,
+                                    GUID = menu.GUID
+                                });
+                            }
+                        }
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                        return Ok(curCategory);
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+                        return StatusCode(500, $"Internal server error: {ex.Message}");
                     }
                 }
-
-                await _context.SaveChangesAsync();
-                return Ok(curCategory);
             }
             catch (Exception ex)
             {

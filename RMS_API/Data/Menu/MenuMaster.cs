@@ -23,7 +23,7 @@ namespace RMS_API.Data.Menu
 
         [ForeignKey("CategoryId")]
         public CategoryMaster Category { get; set; } // Navigation property
-        public ICollection<Recipe> Recipes { get; set; } // Navigation property
+        public List<Recipe> Recipes { get; set; } // Navigation property
         public ICollection<OrderDetails> OrderDetails { get; set; } // Navigation property
     }
 }
