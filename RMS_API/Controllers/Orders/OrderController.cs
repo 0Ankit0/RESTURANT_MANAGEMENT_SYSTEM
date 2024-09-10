@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RMS_API.Data;
+using RMS_API.Data.Finance;
 using RMS_API.Data.Orders;
 using RMS_API.Data.Users;
 using RMS_API.Models.Orders;
@@ -49,7 +50,7 @@ namespace RMS_API.Controllers.Orders
     {
         try
         {
-            var orderDetails =_context.OrderDetails.Where(od => od.OrderId == id).ToList();
+            var orderDetails =await _context.OrderDetails.Where(od => od.OrderId == id).ToListAsync();
 
             if (orderDetails == null)
             {
@@ -237,7 +238,7 @@ namespace RMS_API.Controllers.Orders
             }
         }
 
-        [HttpPatch("Order/{id}/status")]
+        [HttpPatch("status/{id}")]
         public async Task<IActionResult> PatchOrderStatus(int id, [FromBody] string newStatus)
         {
             try
@@ -279,6 +280,17 @@ namespace RMS_API.Controllers.Orders
                                 }
                             }
                         }
+                    }
+                    else if (newStatus == "completed")
+                    {
+                        var billingDetails = new Billing
+                        {
+                            OrderId = order.OrderId,
+                            TotalAmount = order.OrderDetails.Sum(od => od.Price * od.Quantity),
+                            Paid = false
+                        };
+                        _context.Billings.Add(billingDetails);
+
                     }
 
                     await _context.SaveChangesAsync();

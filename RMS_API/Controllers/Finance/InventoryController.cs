@@ -94,14 +94,49 @@ namespace RMS_API.Controllers.Finance
 
         // PUT api/<InventoryController>/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        public async Task<ActionResult> Put(int id, [FromBody] InventoryModel im)
         {
+            try
+            {
+                var inventory = await _context.Inventories.FirstOrDefaultAsync(i => i.InventoryId == id);
+                if (inventory == null)
+                {
+                    return NotFound();
+                }
+                inventory.Quantity = im.Quantity;
+                inventory.ItemName = im.ItemName;
+                inventory.Unit = im.Unit;
+                _context.Inventories.Update(inventory);
+                await _context.SaveChangesAsync();
+                return Ok(inventory);
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
 
         // DELETE api/<InventoryController>/5
         [HttpDelete("{id}")]
-        public void Delete(int id)
+        public async Task<ActionResult> Delete(int id)
         {
+            try
+            {
+                var inventory = await _context.Inventories.FirstOrDefaultAsync(i => i.InventoryId == id);
+                if (inventory == null)
+                {
+                    return NotFound();
+                }
+                _context.Inventories.Remove(inventory);
+                await _context.SaveChangesAsync();
+                return Ok(inventory);
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
     }
 }

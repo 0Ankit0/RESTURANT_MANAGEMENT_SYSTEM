@@ -1,4 +1,4 @@
-﻿using StackExchange.Redis;
+﻿using RMS_API.Models.Orders;
 
 namespace RMS_API.Models.Finance
 {
@@ -9,5 +9,6 @@ namespace RMS_API.Models.Finance
         public decimal TotalAmount { get; set; }
         public bool Paid { get; set; }
 
+        public List<OrderDetailsModel> OrderDetails { get; set; }
     }
 }
