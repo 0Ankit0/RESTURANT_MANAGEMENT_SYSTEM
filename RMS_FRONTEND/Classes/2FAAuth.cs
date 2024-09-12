@@ -38,7 +38,7 @@ namespace RMS_FRONTEND.Classes
             {
                 var Issuer = "MyApp";
                 // Create an instance of the TwoFactorAuth class
-                var tfa = new TwoFactorAuth("MyApp");
+                var tfa = new TwoFactorAuth(Issuer);
 
                 // Generate a secret key for the user
                 string secret = tfa.CreateSecret(160); // 160 bits secret
