@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace RMS_API.Models.Finance
+namespace RMS_FRONTEND.Models.Finance
 {
     public class InventoryModel
     {

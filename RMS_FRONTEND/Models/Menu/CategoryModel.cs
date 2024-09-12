@@ -1,7 +1,7 @@
-﻿using RMS_API.Models.Orders;
+﻿using RMS_FRONTEND.Models.Orders;
 using System.ComponentModel.DataAnnotations;
 
-namespace RMS_API.Models.Menu
+namespace RMS_FRONTEND.Models.Menu
 {
     public class CategoryModel
     {

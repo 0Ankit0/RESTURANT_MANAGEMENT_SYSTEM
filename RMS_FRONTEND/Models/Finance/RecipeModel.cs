@@ -1,7 +1,7 @@
-﻿using RMS_API.Models.Menu;
+﻿using RMS_FRONTEND.Models.Menu;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace RMS_API.Models.Finance
+namespace RMS_FRONTEND.Models.Finance
 {
     public class RecipeModel
     {

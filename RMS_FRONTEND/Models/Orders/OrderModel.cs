@@ -1,6 +1,6 @@
-﻿using RMS_API.Data.Orders;
+﻿using RMS_FRONTEND.Data.Orders;
 
-namespace RMS_API.Models.Orders
+namespace RMS_FRONTEND.Models.Orders
 {
     public class OrderModel
     {

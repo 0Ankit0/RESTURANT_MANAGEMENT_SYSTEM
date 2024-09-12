@@ -1,6 +1,6 @@
-﻿using RMS_API.Models.Orders;
+﻿using RMS_FRONTEND.Models.Orders;
 
-namespace RMS_API.Models.Finance
+namespace RMS_FRONTEND.Models.Finance
 {
     public class BillingModel
     {

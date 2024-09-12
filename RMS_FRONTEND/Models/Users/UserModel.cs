@@ -1,12 +1,39 @@
-﻿namespace RMS_API.Models.Users
+﻿using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+
+namespace RMS_FRONTEND.Models.Users
 {
     public class UserModel
     {
         public int UserId { get; set; }
-        public string UserName { get; set; }
+		[Required(ErrorMessage = "User name is required.")]
+		public string UserName { get; set; }
+
+
+		[Required(ErrorMessage = "Email is required.")]
+		[EmailAddress(ErrorMessage = "Invalid email address.")]
         public string UserEmail { get; set; }
+
+
+		[Required(ErrorMessage = "Password is required.")]
+		[DataType(DataType.Password)]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,15}$", ErrorMessage = "Password must be greater than 8 characters and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.")]
+		[MaxLength(15, ErrorMessage = "Password must be less than 15 characters long.")]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters long.")]
         public string Password { get; set; }
+
+
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+		[Required(ErrorMessage = "Confirm password is required.")]
+        [DataType(DataType.Password)]
+		public string ConfirmPassword { get; set; }
+
+        
         public string? Address { get; set; }
+
+
+		[DataType(DataType.PhoneNumber)]
+        [Phone(ErrorMessage = "Invalid phone number.")]
         public string? Phone { get; set; }
         public string? Role { get; set; }
         public string GUID { get; set; }

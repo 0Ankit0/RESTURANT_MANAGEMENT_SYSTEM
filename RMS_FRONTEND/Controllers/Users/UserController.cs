@@ -5,18 +5,22 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Users;
+using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Users
 {
     public class UserController : Controller
     {
         private readonly DummyDbContext _context;
+        private readonly ICustomFunctions _customFunctions;
 
-        public UserController(DummyDbContext context)
+        public UserController(DummyDbContext context, ICustomFunctions customFunctions)
         {
             _context = context;
+			_customFunctions = customFunctions;
         }
 
         // GET: User
@@ -57,16 +61,19 @@ namespace RMS_FRONTEND.Controllers.Users
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("UserId,UserName,UserEmail,Password,Address,Phone,GUID,RoleId,CreatedAt,UpdatedAt,Active")] UserMaster userMaster)
+        public async Task<IActionResult> Create([Bind("UserId,UserName,UserEmail,Password,Address,Phone,GUID,Role,ConfirmPassword")] UserModel userModel)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(userMaster);
+                UserMaster userMaster = new UserMaster();
+                _customFunctions.MapProperties(userModel, userMaster);
+
+				_context.Add(userModel);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["RoleId"] = new SelectList(_context.RoleMasters, "RoleId", "RoleId", userMaster.RoleId);
-            return View(userMaster);
+            ViewData["Role"] = new SelectList(_context.RoleMasters, "Role", "Role", userModel.Role);
+            return View(userModel);
         }
 
         // GET: User/Edit/5

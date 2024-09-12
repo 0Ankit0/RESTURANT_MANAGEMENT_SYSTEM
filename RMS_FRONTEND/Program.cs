@@ -33,6 +33,9 @@ builder.Services.AddResponseCaching();
 //Add the 2FAAuth class to the services
 builder.Services.AddSingleton<_2FAAuth>();
 
+//Add the customclass as shared
+builder.Services.AddScoped<ICustomFunctions, CustomFunctions>();
+
 //Add authentication scheme to the application
 //check: https://docs.microsoft.com/en-us/aspnet/core/security/authentication/cookie?view=aspnetcore-8.0 for more details
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

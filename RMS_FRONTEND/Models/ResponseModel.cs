@@ -1,4 +1,4 @@
-﻿namespace RMS_API.Models
+﻿namespace RMS_FRONTEND.Models
 {
     public class ResponseModel
     {

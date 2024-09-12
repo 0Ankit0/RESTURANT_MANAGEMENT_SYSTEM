@@ -1,4 +1,4 @@
-﻿namespace RMS_API.Models.Users
+﻿namespace RMS_FRONTEND.Models.Users
 {
     public class UserRoleModel
     {

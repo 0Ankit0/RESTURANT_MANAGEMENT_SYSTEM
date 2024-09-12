@@ -1,6 +1,6 @@
-﻿using RMS_API.Models.Menu;
+﻿using RMS_FRONTEND.Models.Menu;
 
-namespace RMS_API.Models.Orders
+namespace RMS_FRONTEND.Models.Orders
 {
     public class OrderDetailsModel
     {
