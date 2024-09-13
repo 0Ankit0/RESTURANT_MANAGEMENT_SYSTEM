@@ -61,14 +61,15 @@ namespace RMS_FRONTEND.Controllers.Users
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("UserId,UserName,UserEmail,Password,Address,Phone,GUID,Role,ConfirmPassword")] UserModel userModel)
+        public async Task<IActionResult> Create([Bind("UserId,UserName,UserEmail,Password,Address,Phone,Role,ConfirmPassword")] UserModel userModel)
         {
             if (ModelState.IsValid)
             {
                 UserMaster userMaster = new UserMaster();
                 _customFunctions.MapProperties(userModel, userMaster);
-
-				_context.Add(userModel);
+                userMaster.GUID = Guid.NewGuid().ToString();
+				userMaster.CreatedAt = DateTime.Now;
+				_context.Add(userMaster);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
@@ -90,7 +91,9 @@ namespace RMS_FRONTEND.Controllers.Users
                 return NotFound();
             }
             ViewData["RoleId"] = new SelectList(_context.RoleMasters, "RoleId", "RoleId", userMaster.RoleId);
-            return View(userMaster);
+            UserModel userModel = new UserModel();
+            _customFunctions.MapProperties(userMaster, userModel);
+            return View(userModel);
         }
 
         // POST: User/Edit/5
@@ -98,35 +101,37 @@ namespace RMS_FRONTEND.Controllers.Users
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("UserId,UserName,UserEmail,Password,Address,Phone,GUID,RoleId,CreatedAt,UpdatedAt,Active")] UserMaster userMaster)
+        public async Task<IActionResult> Edit(int id, [Bind("UserName,UserEmail,Address,Phone")] UserModel userModel)
         {
-            if (id != userMaster.UserId)
+            
+            try
             {
-                return NotFound();
+                var userMaster = _context.UserMasters.Find(id);
+                if(userMaster == null)
+                {
+                    return NotFound();
+                }
+                userMaster.UserName = userModel.UserName;
+                userMaster.UserEmail = userModel.UserEmail;
+                userMaster.Address = userModel.Address;
+                userMaster.Phone = userModel.Phone;
+                userMaster.UpdatedAt = DateTime.Now;
+                _context.Update(userMaster);
+                await _context.SaveChangesAsync();
             }
-
-            if (ModelState.IsValid)
+            catch (DbUpdateConcurrencyException)
             {
-                try
+                if (!UserMasterExists(id))
                 {
-                    _context.Update(userMaster);
-                    await _context.SaveChangesAsync();
+                    return NotFound();
                 }
-                catch (DbUpdateConcurrencyException)
+                else
                 {
-                    if (!UserMasterExists(userMaster.UserId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    throw;
                 }
-                return RedirectToAction(nameof(Index));
             }
-            ViewData["RoleId"] = new SelectList(_context.RoleMasters, "RoleId", "RoleId", userMaster.RoleId);
-            return View(userMaster);
+            return RedirectToAction(nameof(Index));
+           
         }
 
         // GET: User/Delete/5

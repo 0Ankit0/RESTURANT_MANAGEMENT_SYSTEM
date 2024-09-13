@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Data.Users.UserMaster
+﻿@model RMS_FRONTEND.Models.Users.UserModel;
 
 @{
     ViewData["Title"] = "Edit";
@@ -13,7 +13,7 @@
     <div class="col-md-4">
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <input type="hidden" asp-for="UserId" />
+            <input type="hidden" name="id" value="@Model.UserId" asp-for="UserId" />
             <div class="form-group">
                 <label asp-for="UserName" class="control-label"></label>
                 <input asp-for="UserName" class="form-control" />
@@ -23,11 +23,6 @@
                 <label asp-for="UserEmail" class="control-label"></label>
                 <input asp-for="UserEmail" class="form-control" />
                 <span asp-validation-for="UserEmail" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="Password" class="control-label"></label>
-                <input asp-for="Password" class="form-control" />
-                <span asp-validation-for="Password" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="Address" class="control-label"></label>
@@ -40,29 +35,9 @@
                 <span asp-validation-for="Phone" class="text-danger"></span>
             </div>
             <div class="form-group">
-                <label asp-for="GUID" class="control-label"></label>
-                <input asp-for="GUID" class="form-control" />
-                <span asp-validation-for="GUID" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="RoleId" class="control-label"></label>
-                <select asp-for="RoleId" class="form-control" asp-items="ViewBag.RoleId"></select>
-                <span asp-validation-for="RoleId" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="CreatedAt" class="control-label"></label>
-                <input asp-for="CreatedAt" class="form-control" />
-                <span asp-validation-for="CreatedAt" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="UpdatedAt" class="control-label"></label>
-                <input asp-for="UpdatedAt" class="form-control" />
-                <span asp-validation-for="UpdatedAt" class="text-danger"></span>
-            </div>
-            <div class="form-group form-check">
-                <label class="form-check-label">
-                    <input class="form-check-input" asp-for="Active" /> @Html.DisplayNameFor(model => model.Active)
-                </label>
+                <label asp-for="Role" class="control-label"></label>
+                <select asp-for="Role" class="form-control" asp-items="ViewBag.Role"></select>
+                <span asp-validation-for="Role" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <input type="submit" value="Save" class="btn btn-primary" />

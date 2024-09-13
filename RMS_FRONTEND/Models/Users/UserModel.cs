@@ -17,9 +17,8 @@ namespace RMS_FRONTEND.Models.Users
 
 		[Required(ErrorMessage = "Password is required.")]
 		[DataType(DataType.Password)]
-        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,15}$", ErrorMessage = "Password must be greater than 8 characters and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.")]
-		[MaxLength(15, ErrorMessage = "Password must be less than 15 characters long.")]
-        [MinLength(8, ErrorMessage = "Password must be at least 8 characters long.")]
+        [Display(Name = "Password")]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$", ErrorMessage = "Password must be greater than 8 characters and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.")]
         public string Password { get; set; }
 
 
@@ -36,6 +35,6 @@ namespace RMS_FRONTEND.Models.Users
         [Phone(ErrorMessage = "Invalid phone number.")]
         public string? Phone { get; set; }
         public string? Role { get; set; }
-        public string GUID { get; set; }
+        public string? GUID { get; set; }
     }
 }
