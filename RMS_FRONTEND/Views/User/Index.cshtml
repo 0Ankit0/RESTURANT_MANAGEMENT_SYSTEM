@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Data.Users.UserMaster>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Users.UserModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -26,15 +26,6 @@
                 @Html.DisplayNameFor(model => model.Phone)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.CreatedAt)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.UpdatedAt)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.Active)
-            </th>
-            <th>
                 @Html.DisplayNameFor(model => model.Role)
             </th>
             <th></th>
@@ -56,16 +47,7 @@
                 @Html.DisplayFor(modelItem => item.Phone)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.CreatedAt)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.UpdatedAt)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Active)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Role.RoleId)
+                @Html.DisplayFor(modelItem => item.Role)
             </td>
             <td>
                 <a asp-action="Edit" asp-route-id="@item.UserId">Edit</a> |

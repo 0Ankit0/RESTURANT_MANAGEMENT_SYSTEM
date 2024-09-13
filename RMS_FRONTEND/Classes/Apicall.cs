@@ -21,7 +21,7 @@ namespace RMS_FRONTEND.Classes
 
         public Apicall(IConfiguration configuration)
         {
-            _baseAddress = configuration.GetConnectionString("BaseAddress");
+            _baseAddress = configuration.GetConnectionString("ApiBaseUrl");
             _httpClient = new HttpClient { BaseAddress = new Uri(_baseAddress) };
         }
 

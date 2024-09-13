@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.DotNet.MSIdentity.Shared;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Users;
@@ -16,18 +18,21 @@ namespace RMS_FRONTEND.Controllers.Users
     {
         private readonly DummyDbContext _context;
         private readonly ICustomFunctions _customFunctions;
+        private readonly IApiCall _apiCall;
 
-        public UserController(DummyDbContext context, ICustomFunctions customFunctions)
+        public UserController(DummyDbContext context, ICustomFunctions customFunctions,IApiCall apiCall)
         {
             _context = context;
 			_customFunctions = customFunctions;
+            _apiCall = apiCall;
         }
 
         // GET: User
         public async Task<IActionResult> Index()
         {
-            var dummyDbContext = _context.UserMasters.Include(u => u.Role);
-            return View(await dummyDbContext.ToListAsync());
+            var responseData = await _apiCall.GetAsync("User");
+            var userList = JsonConvert.DeserializeObject<IEnumerable<UserModel>>(responseData);
+            return View(userList);
         }
 
         // GET: User/Details/5

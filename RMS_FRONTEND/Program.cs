@@ -31,7 +31,12 @@ builder.Services.AddSession(options =>
 builder.Services.AddResponseCaching();
 
 //Add the 2FAAuth class to the services
-builder.Services.AddSingleton<_2FAAuth>();
+builder.Services.AddScoped<_2FAAuth>();
+
+//Add apicall as singleton dependency
+builder.Services.AddSingleton<IApiCall>(sp =>
+    new Apicall(sp.GetRequiredService<IConfiguration>()));
+
 
 //Add the customclass as shared
 builder.Services.AddScoped<ICustomFunctions, CustomFunctions>();
