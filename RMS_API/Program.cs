@@ -52,12 +52,16 @@ dependenciesConfig.Configureservices(builder.Services);
 var jwtConfig = new JwtConfiguration(builder.Configuration);
 jwtConfig.ConfigureServices(builder.Services);
 
+//Add logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI(
     options =>
@@ -66,7 +70,14 @@ if (app.Environment.IsDevelopment())
 
         foreach (var description in descriptions)
         {
-            options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+            try
+            {
+                options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating SwaggerDoc for version {description.GroupName}: {ex}");
+            }
         }
     });
 }

@@ -2,7 +2,7 @@
 
 
 ### GET Request Example
-GET {{RMS_API_HostAddress}}/weatherforecast/
+GET {{RMS_API_HostAddress}}/api/User/
 Accept: application/json
 
 ### POST Request for User Login

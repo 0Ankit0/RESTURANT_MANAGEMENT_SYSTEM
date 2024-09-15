@@ -17,7 +17,7 @@ namespace RMS_API.Models
       
     }
 
-    public class RegisterModel
+    public class userModel
     {
         [Required(ErrorMessage = "Please enter your username")]
         [StringLength(50, ErrorMessage = "Username cannot be longer than 50 characters")]
@@ -43,7 +43,6 @@ namespace RMS_API.Models
         [DataType(DataType.PhoneNumber)]
         public string PhoneNumber { get; set; }
 
-        public int Role { get; set; }
 
     }
 }
