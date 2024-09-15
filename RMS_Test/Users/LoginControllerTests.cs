@@ -7,6 +7,9 @@ using RMS_API.Models;
 using RMS_API.Data.Users;
 using Xunit;
 using RMS_API.CustomClass;
+using RMS_API.Controllers.Users;
+using Microsoft.AspNetCore.Identity;
+using RMS_API.Models.Users;
 
 namespace RMS_API.Tests
 {
@@ -15,6 +18,7 @@ namespace RMS_API.Tests
         private readonly Mock<IJwtAuth> _mockJwtAuth;
         private readonly Mock<IDataHandler> _mockDataHandler;
         private readonly ApplicationDbContext _context;
+        private readonly IPasswordHasher<UserMaster> _passwordHasher;
 
         public LoginControllerTests()
         {
@@ -52,7 +56,7 @@ namespace RMS_API.Tests
             _mockJwtAuth.Setup(auth => auth.GenerateToken(It.IsAny<string>(), It.IsAny<string>()))
                         .Returns("fake-jwt-token");
 
-            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context, _passwordHasher);
 
             // Act
             var result = controller.UserLogin(loginModel) as OkObjectResult;
@@ -78,7 +82,7 @@ namespace RMS_API.Tests
                 Password = "wrongpassword"
             };
 
-            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context, _passwordHasher);
 
             // Act
             var result = controller.UserLogin(loginModel) as ObjectResult;
@@ -95,28 +99,21 @@ namespace RMS_API.Tests
         public void RegisterUser_NewUser_ReturnsSuccess()
         {
             // Arrange
-            var registerModel = new RegisterModel
+            var userModel = new UserModel
             {
-                Username = "testuser",
-                Email = "newuser@example.com",
+                UserName = "testuser",
+                UserEmail = "newuser@example.com",
                 Password = "password",
-                PhoneNumber = "1234567890",
-                Role = 1
+                Phone = "1234567890",
+                Role = "Admin"
             };
 
-            var role = new RoleMaster
-            {
-                RoleId = 1,
-                RoleName = "Admin"
-            };
+        
 
-            _context.RoleMasters.Add(role);
-            _context.SaveChanges();
-
-            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context, _passwordHasher);
 
             // Act
-            var result = controller.RegisterUser(registerModel) as OkObjectResult;
+            var result = controller.RegisterUser(userModel) as OkObjectResult;
 
             // Assert
             Assert.NotNull(result);
@@ -137,19 +134,19 @@ namespace RMS_API.Tests
             _context.UserMasters.Add(existingUser);
             _context.SaveChanges();
 
-            var registerModel = new RegisterModel
+            var userModel = new UserModel
             {
-                Username = "testuser",
-                Email = "existing@example.com",
+                UserName = "testuser",
+                UserEmail = "newuser@example.com",
                 Password = "password",
-                PhoneNumber = "1234567890",
-                Role = 1
+                Phone = "1234567890",
+                Role = "Admin"
             };
 
-            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context, _passwordHasher);
 
             // Act
-            var result = controller.RegisterUser(registerModel) as ObjectResult;
+            var result = controller.RegisterUser(userModel) as ObjectResult;
 
             // Assert
             Assert.NotNull(result);
@@ -161,22 +158,21 @@ namespace RMS_API.Tests
         public void RegisterUser_InvalidRole_ReturnsBadRequest()
         {
             // Arrange
-            var registerModel = new RegisterModel
+            var userModel = new UserModel
             {
-                Username = "testuser",
-                Email = "newuser@example.com",
-                Password = "password@123",
-                ConfirmPassword = "password@123",
-                PhoneNumber = "1234567890",
-                Role = 999 // Invalid role, assuming 999 does not exist in the RoleMasters table
+                UserName = "testuser",
+                UserEmail = "newuser@example.com",
+                Password = "password",
+                Phone = "1234567890",
+                Role = "SuperAdmin"
             };
 
             // Mock the database context and create the controller
-            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context);
+            var controller = new UserController(_mockJwtAuth.Object, _mockDataHandler.Object, _context, _passwordHasher);
 
             // Act
 
-            var result = controller.RegisterUser(registerModel) as ObjectResult;
+            var result = controller.RegisterUser(userModel) as ObjectResult;
 
             // Assert
             Assert.NotNull(result); // Ensure that the result is not null
