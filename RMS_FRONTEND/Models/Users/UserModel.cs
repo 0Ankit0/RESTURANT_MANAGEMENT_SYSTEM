@@ -36,5 +36,17 @@ namespace RMS_FRONTEND.Models.Users
         public string? Phone { get; set; }
         public string? Role { get; set; }
         public string? GUID { get; set; }
+
+        public bool IsValidRole()
+        {
+            return Enum.TryParse<RoleEnum>(Role, out _);
+        }
+    }
+    public enum RoleEnum
+    {
+        Admin,
+        Waiter,
+        Cook,
+        Cashier
     }
 }

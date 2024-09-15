@@ -57,7 +57,7 @@ namespace RMS_FRONTEND.Controllers.Users
         // GET: User/Create
         public IActionResult Create()
         {
-            ViewData["RoleId"] = new SelectList(_context.RoleMasters, "RoleId", "RoleId");
+            ViewData["Role"] = _customFunctions.EnumToSelectList<RoleEnum>();
             return View();
         }
 
@@ -78,7 +78,7 @@ namespace RMS_FRONTEND.Controllers.Users
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["Role"] = new SelectList(_context.RoleMasters, "Role", "Role", userModel.Role);
+            ViewData["Role"] = _customFunctions.EnumToSelectList<RoleEnum>();
             return View(userModel);
         }
 
@@ -95,7 +95,7 @@ namespace RMS_FRONTEND.Controllers.Users
             {
                 return NotFound();
             }
-            ViewData["RoleId"] = new SelectList(_context.RoleMasters, "RoleId", "RoleId", userMaster.RoleId);
+            ViewData["Role"] = _customFunctions.EnumToSelectList<RoleEnum>();
             UserModel userModel = new UserModel();
             _customFunctions.MapProperties(userMaster, userModel);
             return View(userModel);

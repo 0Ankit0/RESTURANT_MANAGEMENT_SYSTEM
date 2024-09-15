@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using RMS_FRONTEND.Models.Users;
+using System.ComponentModel.DataAnnotations;
 
 namespace RMS_FRONTEND.Data.Users
 {
@@ -15,12 +16,10 @@ namespace RMS_FRONTEND.Data.Users
         public string? Address { get; set; }
         public string? Phone { get; set; }
         public string GUID { get; set; }
-		public int? RoleId { get; set; }
+		public string? Role { get; set; }
 		public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public bool Active { get; set; } = true;
-
-        public RoleMaster Role { get; set; }
-        public ICollection<UserRole> UserRoles { get; set; }
+       
     }
 }
