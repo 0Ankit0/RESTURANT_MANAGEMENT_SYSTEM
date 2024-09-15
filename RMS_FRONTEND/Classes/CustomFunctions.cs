@@ -7,10 +7,9 @@ namespace RMS_FRONTEND.Classes
     {
         string GetRandomString(int length);
         SelectList CreateSelectList<T>(IEnumerable<T> items, string idPropertyName, string namePropertyName) where T : class;
-
-		public void MapProperties<TSource, TDestination>(TSource source, TDestination destination) where TSource:class where TDestination:class;
-
-	}
+		void MapProperties<TSource, TDestination>(TSource source, TDestination destination) where TSource:class where TDestination:class;
+        SelectList EnumToSelectList<TEnum>() where TEnum : Enum;
+    }
 
     public class CustomFunctions : ICustomFunctions
     {
@@ -21,6 +20,7 @@ namespace RMS_FRONTEND.Classes
             return new string(Enumerable.Repeat(chars, length)
               .Select(s => s[random.Next(s.Length)]).ToArray());
         }
+
         public SelectList CreateSelectList<T>(IEnumerable<T> items, string idPropertyName, string namePropertyName) where T : class
         {
             PropertyInfo idProperty = typeof(T).GetProperty(idPropertyName);
@@ -39,6 +39,7 @@ namespace RMS_FRONTEND.Classes
 
             return new SelectList(selectItems, "Value", "Text");
         }
+
         public void MapProperties<TSource, TDestination>(TSource source, TDestination destination) where TSource : class where TDestination : class
         {
             var sourceProperties = typeof(TSource).GetProperties();
@@ -53,6 +54,15 @@ namespace RMS_FRONTEND.Classes
                     destinationProperty.SetValue(destination, sourceProperty.GetValue(source));
                 }
             }
+        }
+
+        public SelectList EnumToSelectList<TEnum>() where TEnum : Enum
+        {
+            var values = Enum.GetValues(typeof(TEnum)).Cast<TEnum>()
+                .Select(e => new { Value = e.ToString(), Text = e.ToString() })
+                .ToList();
+
+            return new SelectList(values, "Value", "Text");
         }
     }
 }
