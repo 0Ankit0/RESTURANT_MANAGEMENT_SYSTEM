@@ -55,7 +55,7 @@ namespace RMS_API.Controllers.Users
 
         // POST: api/Login/UserLogin
         [HttpPost("Login")]
-        public IActionResult UserLogin([FromBody] LoginModel br)
+        public IActionResult UserLogin([Bind("User")] LoginModel br)
         {
             try
             {
@@ -72,7 +72,9 @@ namespace RMS_API.Controllers.Users
                     var response = new ResponseModel
                     {
                         status = 200,
-                        data = new { Token = token }
+                        TokenNo = token,
+                        Role = user.Role,
+                        data = new { }
                     };
                     return Ok(response);
                 }
