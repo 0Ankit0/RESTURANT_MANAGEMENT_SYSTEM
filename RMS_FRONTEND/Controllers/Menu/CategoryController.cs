@@ -5,25 +5,33 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Menu;
+using RMS_FRONTEND.Models.Menu;
+using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Menu
 {
     public class CategoryController : Controller
     {
         private readonly DummyDbContext _context;
+		private readonly IApiCall _apiCall;
 
-        public CategoryController(DummyDbContext context)
+		public CategoryController(DummyDbContext context,IApiCall apiCall)
         {
             _context = context;
+            _apiCall = apiCall;
         }
 
         // GET: Category
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Categories.ToListAsync());
-        }
+			var responseData = await _apiCall.GetAsync("Category");
+			var categories = JsonConvert.DeserializeObject<IEnumerable<CategoryModel>>(responseData);
+            return Ok(categories);
+		}
 
         // GET: Category/Details/5
         public async Task<IActionResult> Details(int? id)

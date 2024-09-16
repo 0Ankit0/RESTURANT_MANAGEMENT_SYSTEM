@@ -10,7 +10,7 @@ namespace RMS_FRONTEND.Classes
 {
     public interface IApiCall
     {
-        Task<string> GetAsync(string endpoint, string queryString = null);
+        Task<string> GetAsync(string endpoint, string id = "");
         Task<string> PostAsync(string endpoint, string content = "");
         Task<string> PostAsync(string endpoint, object data = null);
         Task<string> PostFileAsync(string endpoint, IFormFile file);
@@ -18,7 +18,7 @@ namespace RMS_FRONTEND.Classes
         Task<string> PutAsync(string endpoint, object data = null);
         Task<string> PatchAsync(string endpoint, string content = "");
         Task<string> PatchAsync(string endpoint, object data = null);
-        Task<string> DeleteAsync(string endpoint, string id);
+        Task<string> DeleteAsync(string endpoint, string id = "");
     }
 
     public class Apicall : IApiCall
@@ -33,11 +33,11 @@ namespace RMS_FRONTEND.Classes
         }
 
         // GET: Parameterized and Parameterless
-        public async Task<string> GetAsync(string endpoint, string queryString = null)
+        public async Task<string> GetAsync(string endpoint, string id = "")
         {
             try
             {
-                var fullEndpoint = string.IsNullOrWhiteSpace(queryString) ? endpoint : $"{endpoint}?{queryString}";
+                var fullEndpoint = string.IsNullOrWhiteSpace(id) ? endpoint : $"{endpoint}/{id}";
                 HttpResponseMessage response = await _httpClient.GetAsync(fullEndpoint);
                 //response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();

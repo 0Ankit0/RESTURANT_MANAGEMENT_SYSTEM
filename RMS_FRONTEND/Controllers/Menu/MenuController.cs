@@ -5,26 +5,33 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Menu;
+using RMS_FRONTEND.Models.Menu;
+using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Menu
 {
     public class MenuController : Controller
     {
         private readonly DummyDbContext _context;
+		private readonly IApiCall _apiCall;
 
-        public MenuController(DummyDbContext context)
+		public MenuController(DummyDbContext context,IApiCall apiCall)
         {
             _context = context;
+            _apiCall = apiCall;
         }
 
         // GET: Menu
         public async Task<IActionResult> Index()
         {
-            var dummyDbContext = _context.Menus.Include(m => m.Category);
-            return View(await dummyDbContext.ToListAsync());
-        }
+			var responseData = await _apiCall.GetAsync("Menu");
+			var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData);
+            return Ok(menus);
+		}
 
         // GET: Menu/Details/5
         public async Task<IActionResult> Details(int? id)

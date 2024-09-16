@@ -5,25 +5,33 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Finance;
+using RMS_FRONTEND.Models.Finance;
+using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Finance
 {
     public class InventoryController : Controller
     {
         private readonly DummyDbContext _context;
+        private readonly IApiCall _apiCall;
 
-        public InventoryController(DummyDbContext context)
+        public InventoryController(DummyDbContext context,IApiCall apiCall)
         {
             _context = context;
+            _apiCall = apiCall;
         }
 
         // GET: Inventory
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Inventories.ToListAsync());
-        }
+			var responseData = await _apiCall.GetAsync("User");
+			var inventories = JsonConvert.DeserializeObject<IEnumerable<InventoryModel>>(responseData);
+            return View(inventories);
+		}
 
         // GET: Inventory/Details/5
         public async Task<IActionResult> Details(int? id)

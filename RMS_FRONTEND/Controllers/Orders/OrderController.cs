@@ -5,25 +5,31 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Orders;
+using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Orders
 {
     public class OrderController : Controller
     {
         private readonly DummyDbContext _context;
+		private readonly IApiCall _apiCall;
 
-        public OrderController(DummyDbContext context)
+		public OrderController(DummyDbContext context,IApiCall apiCall)
         {
             _context = context;
+            _apiCall = apiCall;
         }
 
         // GET: Order
         public async Task<IActionResult> Index()
         {
-            var dummyDbContext = _context.OrderDetails.Include(o => o.Menu).Include(o => o.Order);
-            return View(await dummyDbContext.ToListAsync());
+			var responseData = await _apiCall.GetAsync("Order");
+			var orders = JsonConvert.DeserializeObject<IEnumerable<OrderDetails>>(responseData);
+			return View(orders);
         }
 
         // GET: Order/Details/5

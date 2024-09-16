@@ -5,26 +5,33 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Finance;
+using RMS_FRONTEND.Models.Finance;
+using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Finance
 {
     public class RecipeController : Controller
     {
         private readonly DummyDbContext _context;
+        private readonly IApiCall _apiCall;
 
-        public RecipeController(DummyDbContext context)
+        public RecipeController(DummyDbContext context, IApiCall apiCall)
         {
             _context = context;
+            _apiCall = apiCall;
         }
 
         // GET: Recipe
         public async Task<IActionResult> Index()
         {
-            var dummyDbContext = _context.Recipes.Include(r => r.Inventory).Include(r => r.Menu);
-            return View(await dummyDbContext.ToListAsync());
-        }
+			var responseData = await _apiCall.GetAsync("User");
+			var recipe = JsonConvert.DeserializeObject<IEnumerable<RecipeModel>>(responseData);
+            return View(recipe);
+		}
 
         // GET: Recipe/Details/5
         public async Task<IActionResult> Details(int? id)
@@ -134,15 +141,7 @@ namespace RMS_FRONTEND.Controllers.Finance
             {
                 return NotFound();
             }
-
-            var recipe = await _context.Recipes
-                .Include(r => r.Inventory)
-                .Include(r => r.Menu)
-                .FirstOrDefaultAsync(m => m.RecipeId == id);
-            if (recipe == null)
-            {
-                return NotFound();
-            }
+             var recipe = await _apiCall.DeleteAsync("Recipe/Delete",$"{id}");
 
             return View(recipe);
         }

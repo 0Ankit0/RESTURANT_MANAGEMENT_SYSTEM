@@ -43,14 +43,7 @@ namespace RMS_FRONTEND.Controllers.Users
                 return NotFound();
             }
 
-            var userMaster = await _context.UserMasters
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(m => m.UserId == id);
-            if (userMaster == null)
-            {
-                return NotFound();
-            }
-
+            var userMaster =await _apiCall.GetAsync("User/", $"{id}");
             return View(userMaster);
         }
 
@@ -147,13 +140,7 @@ namespace RMS_FRONTEND.Controllers.Users
                 return NotFound();
             }
 
-            var userMaster = await _context.UserMasters
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(m => m.UserId == id);
-            if (userMaster == null)
-            {
-                return NotFound();
-            }
+            var userMaster = await _apiCall.DeleteAsync("User/Delete", $"{id}");
 
             return View(userMaster);
         }
