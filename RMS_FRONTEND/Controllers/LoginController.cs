@@ -7,15 +7,19 @@ using System.Reflection;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using RMS_FRONTEND.Classes;
+using Newtonsoft.Json;
 
 namespace RMS_FRONTEND.Controllers
 {
     public class LoginController : Controller
     {
         private static _2FAAuth _2FA;
-        public LoginController(_2FAAuth _2FAAuth)
+        private readonly IApiCall _apiCall;
+
+        public LoginController(_2FAAuth _2FAAuth,IApiCall apiCall)
         {
             _2FA = _2FAAuth;
+            _apiCall = apiCall;
         }
         // GET: LoginController
         public ActionResult Index(string ReturnUrl)
@@ -73,30 +77,38 @@ namespace RMS_FRONTEND.Controllers
             {
                 if (ModelState.IsValid)
                 {
-                    if (model.UsernameOrEmail == "admin@gmail.com" && model.Password == "admin")
+                    var loginResponse = await _apiCall.PostAsync("User/Login", model);
+                    if (String.IsNullOrEmpty(loginResponse))
                     {
-                       
+                        ModelState.AddModelError("UsernameOrEmail", "Some error Occured.Please Try Again");
+                        return View(nameof(Index), model);
+                    }
+                        var responseModel = JsonConvert.DeserializeObject<ResponseModel>(loginResponse);
+                        if(responseModel.status == 200)
+                        {
                         var claims = new List<Claim>
-                        {
-                            new Claim(ClaimTypes.Name, model.UsernameOrEmail),
-                            new Claim(ClaimTypes.Role, "Admin")
-                        };
+                            {
+                                new Claim(ClaimTypes.Name, model.UsernameOrEmail),
+                                new Claim(ClaimTypes.Authentication, responseModel.TokenNo),
+                                new Claim(ClaimTypes.Role, responseModel.Role)
+                            };
 
-                        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
-                        var authProperties = new AuthenticationProperties
-                        {
-                            /*  If IsPersistent is set to true, the authentication cookie will persist even after the browser is closed. 
-                                If it's false, the authentication cookie will be deleted when the browser is closed.
-                                This is often used to implement "Remember Me" functionality in login forms.*/
-                            IsPersistent = true
-                        };
+                            var authProperties = new AuthenticationProperties
+                            {
+                                /*  If IsPersistent is set to true, the authentication cookie will persist even after the browser is closed. 
+                                    If it's false, the authentication cookie will be deleted when the browser is closed.
+                                    This is often used to implement "Remember Me" functionality in login forms.*/
+                                IsPersistent = true
+                            };
 
-                        await HttpContext.SignInAsync(
-                            CookieAuthenticationDefaults.AuthenticationScheme,
-                            new ClaimsPrincipal(claimsIdentity),
-                            authProperties);
-                        return RedirectToAction("Index", "Dashboard");
+                            await HttpContext.SignInAsync(
+                                CookieAuthenticationDefaults.AuthenticationScheme,
+                                new ClaimsPrincipal(claimsIdentity),
+                                authProperties);
+                            return RedirectToAction("Index", "Dashboard");
+                       
                     }
                     else
                     {
@@ -109,9 +121,10 @@ namespace RMS_FRONTEND.Controllers
                     return View("Index", model);
                 }
             }
-            catch
+            catch(Exception ex)
             {
-                return View();
+                ModelState.AddModelError("",ex.ToString());
+                return View(nameof(Index));
             }
         }
 
