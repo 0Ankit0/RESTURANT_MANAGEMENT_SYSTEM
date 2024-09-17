@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Data.Finance.Billing>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Finance.BillingModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -23,7 +23,7 @@
                 @Html.DisplayNameFor(model => model.Paid)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.Order)
+                @Html.DisplayNameFor(model => model.OrderId)
             </th>
             <th></th>
         </tr>
@@ -41,7 +41,7 @@
                 @Html.DisplayFor(modelItem => item.Paid)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.Order.OrderId)
+                @Html.DisplayFor(modelItem => item.OrderId)
             </td>
             <td>
                 <a asp-action="Edit" asp-route-id="@item.BillingId">Edit</a> |

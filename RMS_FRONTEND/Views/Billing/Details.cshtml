@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Data.Finance.Billing
+﻿@model RMS_FRONTEND.Models.Finance.BillingModel
 
 @{
     ViewData["Title"] = "Details";
@@ -30,10 +30,10 @@
             @Html.DisplayFor(model => model.Paid)
         </dd>
         <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Order)
+            @Html.DisplayNameFor(model => model.OrderId)
         </dt>
         <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Order.OrderId)
+            @Html.DisplayFor(model => model.OrderId)
         </dd>
     </dl>
 </div>
