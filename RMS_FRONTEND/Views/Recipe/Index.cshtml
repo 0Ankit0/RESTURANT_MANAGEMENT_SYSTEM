@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Data.Finance.Recipe>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Finance.RecipeModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -20,10 +20,10 @@
                 @Html.DisplayNameFor(model => model.GUID)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.Menu)
+                @Html.DisplayNameFor(model => model.MenuId)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.Inventory)
+                @Html.DisplayNameFor(model => model.InventoryId)
             </th>
             <th></th>
         </tr>
@@ -38,10 +38,10 @@
                 @Html.DisplayFor(modelItem => item.GUID)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.Menu.MenuId)
+                @Html.DisplayFor(modelItem => item.MenuId)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.Inventory.InventoryId)
+                @Html.DisplayFor(modelItem => item.InventoryId)
             </td>
             <td>
                 <a asp-action="Edit" asp-route-id="@item.RecipeId">Edit</a> |
