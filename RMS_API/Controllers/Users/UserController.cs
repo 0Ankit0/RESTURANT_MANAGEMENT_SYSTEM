@@ -34,6 +34,7 @@ namespace RMS_API.Controllers.Users
             try
             {
                 var users = await _context.UserMasters
+                    .Where(u => u.Active == true)
                     .Select(u => new UserModel
                     {
                         UserId = u.UserId,
@@ -60,6 +61,7 @@ namespace RMS_API.Controllers.Users
             try
             {
                 var user = _context.UserMasters
+                           .Where(u => u.Active == true)
                            .FirstOrDefault(u => u.UserEmail == br.UsernameOrEmail);
                 if (user == null)
                 {
