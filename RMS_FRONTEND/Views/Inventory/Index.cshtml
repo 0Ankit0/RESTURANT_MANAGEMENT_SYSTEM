@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Data.Finance.Inventory>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Finance.InventoryModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -25,12 +25,7 @@
             <th>
                 @Html.DisplayNameFor(model => model.GUID)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.CreatedAt)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.UpdatedAt)
-            </th>
+            
             <th></th>
         </tr>
     </thead>
@@ -49,12 +44,7 @@
             <td>
                 @Html.DisplayFor(modelItem => item.GUID)
             </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.CreatedAt)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.UpdatedAt)
-            </td>
+           
             <td>
                 <a asp-action="Edit" asp-route-id="@item.InventoryId">Edit</a> |
                 <a asp-action="Details" asp-route-id="@item.InventoryId">Details</a> |

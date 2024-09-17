@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Data.Finance.Inventory
+﻿@model RMS_FRONTEND.Models.Finance.InventoryModel
 
 @{
     ViewData["Title"] = "Edit";
@@ -33,16 +33,6 @@
                 <label asp-for="GUID" class="control-label"></label>
                 <input asp-for="GUID" class="form-control" />
                 <span asp-validation-for="GUID" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="CreatedAt" class="control-label"></label>
-                <input asp-for="CreatedAt" class="form-control" />
-                <span asp-validation-for="CreatedAt" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="UpdatedAt" class="control-label"></label>
-                <input asp-for="UpdatedAt" class="form-control" />
-                <span asp-validation-for="UpdatedAt" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <input type="submit" value="Save" class="btn btn-primary" />
