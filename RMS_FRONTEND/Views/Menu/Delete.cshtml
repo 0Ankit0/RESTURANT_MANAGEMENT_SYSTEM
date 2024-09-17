@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Data.Menu.MenuMaster
+﻿@model RMS_FRONTEND.Models.Menu.MenuModel
 
 @{
     ViewData["Title"] = "Delete";
@@ -42,18 +42,7 @@
         <dd class = "col-sm-10">
             @Html.DisplayFor(model => model.GUID)
         </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.CreatedAt)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.CreatedAt)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.UpdatedAt)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.UpdatedAt)
-        </dd>
+        
         <dt class = "col-sm-2">
             @Html.DisplayNameFor(model => model.Active)
         </dt>
@@ -61,10 +50,10 @@
             @Html.DisplayFor(model => model.Active)
         </dd>
         <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Category)
+            @Html.DisplayNameFor(model => model.CategoryId)
         </dt>
         <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Category.CategoryId)
+            @Html.DisplayFor(model => model.CategoryId)
         </dd>
     </dl>
     

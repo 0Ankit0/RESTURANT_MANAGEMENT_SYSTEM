@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Data.Menu.MenuMaster>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Menu.MenuModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -28,17 +28,12 @@
             <th>
                 @Html.DisplayNameFor(model => model.GUID)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.CreatedAt)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.UpdatedAt)
-            </th>
+           
             <th>
                 @Html.DisplayNameFor(model => model.Active)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.Category)
+                @Html.DisplayNameFor(model => model.CategoryId)
             </th>
             <th></th>
         </tr>
@@ -62,16 +57,10 @@
                 @Html.DisplayFor(modelItem => item.GUID)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.CreatedAt)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.UpdatedAt)
-            </td>
-            <td>
                 @Html.DisplayFor(modelItem => item.Active)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.Category.CategoryId)
+                @Html.DisplayFor(modelItem => item.CategoryId)
             </td>
             <td>
                 <a asp-action="Edit" asp-route-id="@item.MenuId">Edit</a> |
