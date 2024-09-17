@@ -37,7 +37,7 @@ namespace RMS_FRONTEND.Classes
         {
             try
             {
-                var fullEndpoint = string.IsNullOrWhiteSpace(id) ? endpoint : $"{endpoint}/{id}";
+                var fullEndpoint = string.IsNullOrWhiteSpace(id) ? endpoint :Path.Combine(endpoint,id);
                 HttpResponseMessage response = await _httpClient.GetAsync(fullEndpoint);
                 //response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
@@ -147,7 +147,7 @@ namespace RMS_FRONTEND.Classes
             try
             {
                 // Append the ID to the endpoint
-                var fullEndpoint = $"{endpoint}/{id}";
+                var fullEndpoint = Path.Combine(endpoint, id);
 
                 HttpResponseMessage response = await _httpClient.DeleteAsync(fullEndpoint);
                 //response.EnsureSuccessStatusCode();
