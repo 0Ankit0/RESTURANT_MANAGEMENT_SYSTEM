@@ -53,6 +53,31 @@ namespace RMS_API.Controllers.Users
                 return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
             }
         }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<IEnumerable<UserModel>>> Get(int id)
+        {
+            try
+            {
+                var users = await _context.UserMasters
+                    .Where(u => u.Active == true && u.UserId==id)
+                    .Select(u => new UserModel
+                    {
+                        UserId = u.UserId,
+                        UserName = u.UserName,
+                        UserEmail = u.UserEmail,
+                        Phone = u.Phone,
+                        GUID = u.GUID,
+                        Role = u.Role
+                    })
+                    .ToListAsync();
+
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
+            }
+        }
 
         // POST: api/Login/UserLogin
         [HttpPost("Login")]
