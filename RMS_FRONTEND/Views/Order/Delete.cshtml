@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Models.Orders.OrderDetails
+﻿@model RMS_FRONTEND.Models.Orders.OrderDetailsModel
 
 @{
     ViewData["Title"] = "Delete";
@@ -25,16 +25,16 @@
             @Html.DisplayFor(model => model.Price)
         </dd>
         <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Order)
+            @Html.DisplayNameFor(model => model.OrderId)
         </dt>
         <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Order.OrderId)
+            @Html.DisplayFor(model => model.OrderId)
         </dd>
         <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Menu)
+            @Html.DisplayNameFor(model => model.MenuId)
         </dt>
         <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Menu.MenuId)
+            @Html.DisplayFor(model => model.MenuId)
         </dd>
     </dl>
     
