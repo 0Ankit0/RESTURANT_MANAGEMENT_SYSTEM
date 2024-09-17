@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Data.Menu.CategoryMaster>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Menu.CategoryModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -19,12 +19,7 @@
             <th>
                 @Html.DisplayNameFor(model => model.GUID)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.CreatedAt)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.UpdatedAt)
-            </th>
+           
             <th>
                 @Html.DisplayNameFor(model => model.Active)
             </th>
@@ -40,12 +35,7 @@
             <td>
                 @Html.DisplayFor(modelItem => item.GUID)
             </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.CreatedAt)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.UpdatedAt)
-            </td>
+            
             <td>
                 @Html.DisplayFor(modelItem => item.Active)
             </td>
