@@ -44,7 +44,8 @@ namespace RMS_FRONTEND.Controllers.Users
             }
 
             var userMaster =await _apiCall.GetAsync("User/", $"{id}");
-            return View(userMaster);
+            var userModel = JsonConvert.DeserializeObject<UserModel>(userMaster);
+            return View(userModel);
         }
 
         // GET: User/Create

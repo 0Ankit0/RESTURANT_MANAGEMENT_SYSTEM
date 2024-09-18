@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Orders;
+using RMS_FRONTEND.Models.Orders;
 using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Orders
@@ -28,7 +29,7 @@ namespace RMS_FRONTEND.Controllers.Orders
         public async Task<IActionResult> Index()
         {
 			var responseData = await _apiCall.GetAsync("Order");
-			var orders = JsonConvert.DeserializeObject<IEnumerable<OrderDetails>>(responseData);
+			var orders = JsonConvert.DeserializeObject<IEnumerable<OrderDetailsModel>>(responseData);
 			return View(orders);
         }
 
