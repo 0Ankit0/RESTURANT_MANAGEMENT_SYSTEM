@@ -30,7 +30,7 @@ namespace RMS_FRONTEND.Controllers.Menu
         {
 			var responseData = await _apiCall.GetAsync("Category");
 			var categories = JsonConvert.DeserializeObject<IEnumerable<CategoryModel>>(responseData);
-            return Ok(categories);
+            return View(categories);
 		}
 
         // GET: Category/Details/5
@@ -62,12 +62,11 @@ namespace RMS_FRONTEND.Controllers.Menu
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("CategoryId,CategoryName,GUID,CreatedAt,UpdatedAt,Active")] CategoryMaster categoryMaster)
+        public async Task<IActionResult> Create([Bind("CategoryName")] CategoryModel categoryMaster)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(categoryMaster);
-                await _context.SaveChangesAsync();
+                var responseData = await _apiCall.PostAsync("Category",categoryMaster);
                 return RedirectToAction(nameof(Index));
             }
             return View(categoryMaster);

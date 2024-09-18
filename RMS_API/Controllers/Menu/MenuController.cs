@@ -9,7 +9,7 @@ using RMS_API.Models.Orders;
 
 namespace RMS_API.Controllers.Menu
 {
-    [Route("api/[controller]")]
+    [Route("api")]
     [ApiController]
     public class MenuController : ControllerBase
     {
@@ -20,7 +20,7 @@ namespace RMS_API.Controllers.Menu
             _context = context;
         }
         // GET: api/<MenuController>
-        [HttpGet]
+        [HttpGet("Menu")]
         public async Task<ActionResult<IEnumerable<CategoryModel>>> Get()
         {
             try
@@ -53,9 +53,31 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-
+      [HttpGet("Category")]
+        public async Task<ActionResult<IEnumerable<CategoryModel>>> GetCategories()
+        {
+            try
+            {
+                var categories = await _context.Categories
+                             .Include(c => c.Menus)  // Includes related Menu items for each Category
+                             .Select(c => new CategoryModel
+                             {
+                                 CategoryId = c.CategoryId,
+                                 CategoryName = c.CategoryName,
+                                 GUID = c.GUID,
+                                 Active = c.Active,
+                             })
+                             .ToListAsync();
+                return Ok(categories);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+      
         // GET api/<MenuController>/5
-        [HttpGet("{id}")]
+        [HttpGet("Menu/{id}")]
         public async Task<ActionResult<IEnumerable<CategoryModel>>> Get(int id)
         {
             try
@@ -81,6 +103,36 @@ namespace RMS_API.Controllers.Menu
                                      GUID = m.GUID,
                                      Active = m.Active
                                  }).ToList()
+                             })
+                             .FirstOrDefaultAsync();
+                if(categories is not null) { 
+                    return Ok(categories);
+                }
+                else
+                {
+                    return NotFound();
+                }
+
+            }
+            catch (Exception ex) {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+        [HttpGet("Category/{id}")]
+        public async Task<ActionResult<IEnumerable<CategoryModel>>> GetCategory(int id)
+        {
+            try
+            {
+
+                var categories = await _context.Categories
+                             .Include(c => c.Menus)  // Includes related Menu items for each Category
+                             .Where(c => c.CategoryId == id)
+                             .Select(c => new CategoryModel
+                             {
+                                 CategoryId = c.CategoryId,
+                                 CategoryName = c.CategoryName,
+                                 GUID = c.GUID,
+                                 Active = c.Active,
                              })
                              .FirstOrDefaultAsync();
                 if(categories is not null) { 
@@ -184,7 +236,7 @@ namespace RMS_API.Controllers.Menu
                         }
 
                         curCategory.CategoryName = category.CategoryName;
-                        curCategory.Active = category.Active;
+                        curCategory.Active = category.Active ?? true;
                         // Handle menu updates
                         // Remove menus that are not in the incoming model
                         var menuIds = category.Menu.Select(m => m.MenuId).ToList();

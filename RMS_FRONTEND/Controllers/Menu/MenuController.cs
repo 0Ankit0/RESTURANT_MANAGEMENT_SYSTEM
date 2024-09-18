@@ -30,7 +30,7 @@ namespace RMS_FRONTEND.Controllers.Menu
         {
 			var responseData = await _apiCall.GetAsync("Menu");
 			var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData);
-            return Ok(menus);
+            return View(menus);
 		}
 
         // GET: Menu/Details/5
