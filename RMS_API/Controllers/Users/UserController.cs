@@ -69,9 +69,15 @@ namespace RMS_API.Controllers.Users
                         GUID = u.GUID,
                         Role = u.Role
                     })
-                    .ToListAsync();
-
+                    .FirstOrDefaultAsync();
+                if(users is not null)
+                {
                 return Ok(users);
+                }
+                else
+                {
+                    return NotFound();
+                }
             }
             catch (Exception ex)
             {

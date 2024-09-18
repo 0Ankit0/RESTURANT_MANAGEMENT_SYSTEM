@@ -82,8 +82,14 @@ namespace RMS_API.Controllers.Menu
                                      Active = m.Active
                                  }).ToList()
                              })
-                             .ToListAsync();
-                return Ok(categories);
+                             .FirstOrDefaultAsync();
+                if(categories is not null) { 
+                    return Ok(categories);
+                }
+                else
+                {
+                    return NotFound();
+                }
 
             }
             catch (Exception ex) {

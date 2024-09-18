@@ -50,7 +50,7 @@ namespace RMS_API.Controllers.Orders
     {
         try
         {
-            var orderDetails =await _context.OrderDetails.Where(od => od.OrderId == id).ToListAsync();
+            var orderDetails =await _context.OrderDetails.Where(od => od.OrderId == id).FirstOrDefaultAsync();
 
             if (orderDetails == null)
             {
