@@ -13,7 +13,7 @@
     <div class="col-md-4">
         <form asp-action="Edit">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <input type="hidden" asp-for="RecipeId" />
+            <input type="hidden" name="RecipeId" value="@Model.RecipeId" asp-for="RecipeId" />
             <div class="form-group">
                 <label asp-for="MenuId" class="control-label"></label>
                 <select asp-for="MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
