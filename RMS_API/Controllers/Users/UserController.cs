@@ -41,6 +41,7 @@ namespace RMS_API.Controllers.Users
                         UserName = u.UserName,
                         UserEmail = u.UserEmail,
                         Phone = u.Phone,
+                        Address = u.Address,
                         GUID = u.GUID,
                         Role = u.Role
                     })
@@ -65,6 +66,7 @@ namespace RMS_API.Controllers.Users
                         UserId = u.UserId,
                         UserName = u.UserName,
                         UserEmail = u.UserEmail,
+                        Address=u.Address,
                         Phone = u.Phone,
                         GUID = u.GUID,
                         Role = u.Role
@@ -152,6 +154,7 @@ namespace RMS_API.Controllers.Users
                     UserEmail = br.UserEmail,
                     Password = _passwordHasher.HashPassword(null, br.Password),
                     Phone = br.Phone,
+                    Address = br.Address,
                     Role = br.Role,
                     CreatedAt = DateTime.Now,
                     GUID = Guid.NewGuid().ToString(),
@@ -173,7 +176,7 @@ namespace RMS_API.Controllers.Users
         }
 
         [HttpPut("Update")]
-        public IActionResult Put([FromBody] UserMaster user)
+        public IActionResult Put([Bind("UserName,UserEmail,Phone,Address,Role")] UserMaster user)
         {
             try
             {
@@ -186,6 +189,7 @@ namespace RMS_API.Controllers.Users
                 existingUser.UserName = user.UserName;
                 existingUser.UserEmail = user.UserEmail;
                 existingUser.Phone = user.Phone;
+                existingUser.Address = user.Address;
                 existingUser.Role = user.Role;
                 existingUser.UpdatedAt = DateTime.Now;
 
