@@ -39,10 +39,34 @@ $(function(){
             $(this).toggleClass('onhover', e.type === 'mouseover');
         }
     });
+    function setActiveNavLink() {
+        var currentPath = window.location.pathname;
+        // Loop through all nav links and set active class if href matches
+        $('.nav-link').each(function () {
+            var linkPath = new URL($(this).attr('href'), window.location.origin).pathname;
+            console.log(linkPath, currentPath);
+            console.log(currentPath.includes(linkPath));
+            if (currentPath.includes(linkPath)) {
+                $(this).addClass('active');
+                $(this).parent().addClass('active'); // for li.nav-item
+                var navGroup = $(this).closest('.nav-group');
 
+                if (!navGroup.hasClass('show')) {
+                    $('.nav-group show').removeClass('show'); // Expand the parent group if needed
+                    navGroup.addClass('show');
+                }
+            } else {
+                $(this).removeClass('active');
+                $(this).parent().removeClass('active');
+            }
+        });
+    }
+
+    // Call the function on page load to highlight the correct link
+    setActiveNavLink();
     // single level menu
     $('.nav-sidebar > .nav-link').on('click', function (e) {
-        e.preventDefault();
+        //e.preventDefault();
 
         //var activeLink =  $(this).attr('data-id');
         //localStorage.setItem('activeSidebarLink', activeLink);
@@ -63,7 +87,7 @@ $(function(){
 
     // two level menu
     $('.nav-sidebar .nav-item').on('click', '.nav-link', function (e) {
-        e.preventDefault();
+        //e.preventDefault();
 
         //var activeLink =  $(this).attr('data-id');
         //localStorage.setItem('activeSidebarLink', activeLink);
