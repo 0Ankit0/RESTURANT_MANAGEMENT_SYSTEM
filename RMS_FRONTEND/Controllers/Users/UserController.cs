@@ -60,75 +60,31 @@ namespace RMS_FRONTEND.Controllers.Users
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("UserId,UserName,UserEmail,Password,Address,Phone,Role,ConfirmPassword")] UserModel userModel)
+        public async Task<IActionResult> Create([Bind("UserName,UserEmail,Password,Address,Phone,Role,ConfirmPassword")] UserModel userModel)
         {
-            if (ModelState.IsValid)
+            if (ModelState.IsValid && userModel.IsValidRole())
             {
-                UserMaster userMaster = new UserMaster();
-                _customFunctions.MapProperties(userModel, userMaster);
-                userMaster.GUID = Guid.NewGuid().ToString();
-				userMaster.CreatedAt = DateTime.Now;
-				_context.Add(userMaster);
-                await _context.SaveChangesAsync();
+                var userMaster = await _apiCall.PostAsync("User/Register",userModel);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["Role"] = _customFunctions.EnumToSelectList<RoleEnum>();
             return View(userModel);
         }
 
         // GET: User/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var userMaster = await _context.UserMasters.FindAsync(id);
-            if (userMaster == null)
-            {
-                return NotFound();
-            }
+            string response = await _apiCall.GetAsync("User/", $"{id}");
             ViewData["Role"] = _customFunctions.EnumToSelectList<RoleEnum>();
-            UserModel userModel = new UserModel();
-            _customFunctions.MapProperties(userMaster, userModel);
+            var userModel = JsonConvert.DeserializeObject<UserModel>(response);
+            
             return View(userModel);
         }
-
-        // POST: User/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("UserName,UserEmail,Address,Phone")] UserModel userModel)
+        public async Task<IActionResult> Edit([Bind("UserId,UserName,UserEmail,Address,Phone,Role")] UserModel userModel)
         {
-            
-            try
-            {
-                var userMaster = _context.UserMasters.Find(id);
-                if(userMaster == null)
-                {
-                    return NotFound();
-                }
-                userMaster.UserName = userModel.UserName;
-                userMaster.UserEmail = userModel.UserEmail;
-                userMaster.Address = userModel.Address;
-                userMaster.Phone = userModel.Phone;
-                userMaster.UpdatedAt = DateTime.Now;
-                _context.Update(userMaster);
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UserMasterExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+
+            string response = await _apiCall.PutAsync("User/Update",userModel);
             return RedirectToAction(nameof(Index));
            
         }
@@ -143,7 +99,7 @@ namespace RMS_FRONTEND.Controllers.Users
 
             var userMaster = await _apiCall.DeleteAsync("User/Delete", $"{id}");
 
-            return View(userMaster);
+            return RedirectToAction(nameof(Index));
         }
 
         // POST: User/Delete/5
