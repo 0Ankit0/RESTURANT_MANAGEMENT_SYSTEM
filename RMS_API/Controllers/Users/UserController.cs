@@ -154,7 +154,7 @@ namespace RMS_API.Controllers.Users
                     Phone = br.Phone,
                     Role = br.Role,
                     CreatedAt = DateTime.Now,
-                    //GUID = Guid.NewGuid().ToString(),
+                    GUID = Guid.NewGuid().ToString(),
                     Active = true
                 };
 
