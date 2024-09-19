@@ -80,12 +80,13 @@ namespace RMS_FRONTEND.Controllers.Menu
                 return NotFound();
             }
 
-            var categoryMaster = await _context.Categories.FindAsync(id);
-            if (categoryMaster == null)
+            var categoryMaster = await _apiCall.GetAsync("Category", $"{id}");
+			if (categoryMaster == null)
             {
                 return NotFound();
             }
-            return View(categoryMaster);
+            var category = JsonConvert.DeserializeObject<CategoryModel>(categoryMaster);
+            return View(category);
         }
 
         // POST: Category/Edit/5
@@ -93,31 +94,13 @@ namespace RMS_FRONTEND.Controllers.Menu
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("CategoryId,CategoryName,GUID,CreatedAt,UpdatedAt,Active")] CategoryMaster categoryMaster)
+        public async Task<IActionResult> Edit([Bind("CategoryId,CategoryName")] CategoryModel categoryMaster)
         {
-            if (id != categoryMaster.CategoryId)
-            {
-                return NotFound();
-            }
+           
 
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(categoryMaster);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!CategoryMasterExists(categoryMaster.CategoryId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+               var response = await _apiCall.PutAsync("Category", categoryMaster);
                 return RedirectToAction(nameof(Index));
             }
             return View(categoryMaster);
