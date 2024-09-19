@@ -176,7 +176,7 @@ namespace RMS_API.Controllers.Users
         }
 
         [HttpPut("Update")]
-        public IActionResult Put([Bind("UserName,UserEmail,Phone,Address,Role")] UserMaster user)
+        public IActionResult Put([Bind("UserId,UserName,UserEmail,Phone,Address,Role")] UserModel user)
         {
             try
             {
