@@ -195,11 +195,12 @@ namespace RMS_API.Controllers.Menu
         }
 
         // PUT api/<MenuController>/5
-        [HttpPut("Menu/{id}")]
-        public async Task<IActionResult> Put(int id, [FromBody] MenuModel menu)
+        [HttpPut("Menu")]
+        public async Task<IActionResult> Put([FromBody] MenuModel menu)
         {
             try
             {
+                var id = menu.MenuId;
                 var curMenu = await _context.Menus.FindAsync(id);
                 if(curMenu == null)
                 {
@@ -219,9 +220,28 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+        [HttpPut("Category")]
+        public IActionResult Put([Bind("CategoryId, CategoryName")] CategoryModel category)
+        {
+            try
+            {
+                var id = category.CategoryId;
+                var curCategory = _context.Categories.Find(id);
+                curCategory.CategoryName = category.CategoryName;
 
-        [HttpPut("Category/{id}")]
-        public async Task<IActionResult> Put(int id, [FromBody] CategoryModel category)
+
+                _context.SaveChanges();
+
+                return Ok("User updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPut("MenuDetails")]
+        public async Task<IActionResult> MenuDetails([FromBody] CategoryModel category)
         {
             try
             {
@@ -229,6 +249,7 @@ namespace RMS_API.Controllers.Menu
                 {
                     try
                     {
+                        var id = category.CategoryId;
                         var curCategory = await _context.Categories.FindAsync(id);
                         if (curCategory == null)
                         {
