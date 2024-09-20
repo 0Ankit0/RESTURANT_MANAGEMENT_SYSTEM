@@ -20,8 +20,8 @@ namespace RMS_API.Controllers.Menu
             _context = context;
         }
         // GET: api/<MenuController>
-        [HttpGet("Menu")]
-        public async Task<ActionResult<IEnumerable<CategoryModel>>> Get()
+        [HttpGet("MenuList")]
+        public async Task<ActionResult<IEnumerable<CategoryModel>>> MenuList()
         {
             try
             {
@@ -53,38 +53,55 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+      [HttpGet]
+        public async Task<ActionResult<IEnumerable<MenuModel>>> Get()
+        {
+            try
+            {
+                var menus = await _context.Menus
+                                .Include(m=>m.Category)
+                                .Select(m=>new MenuModel
+                                {
+                                    CategoryId = m.Category.CategoryName,
+                                    MenuId = m.MenuId,
+                                    MenuName = m.MenuName,
+                                    Description = m.Description,
+                                    Price = m.Price,
+                                    IsAvailable = m.IsAvailable,
+                                    GUID = m.GUID
+                                })
+                                .ToListAsync();
+                return Ok(menus);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
      
         // GET api/<MenuController>/5
-        [HttpGet("Menu/{id}")]
-        public async Task<ActionResult<IEnumerable<CategoryModel>>> Get(int id)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<MenuModel>> Get(int id)
         {
             try
             {
 
-                var categories = await _context.Categories
-                             .Include(c => c.Menus)  // Includes related Menu items for each Category
-                             .Where(c => c.CategoryId == id)
-                             .Select(c => new CategoryModel
-                             {
-                                 CategoryId = c.CategoryId,
-                                 CategoryName = c.CategoryName,
-                                 GUID = c.GUID,
-                                 Active = c.Active,
-                                 // Map Menu details for each category
-                                 Menu = c.Menus.Select(m => new MenuModel
+                var menu = await _context.Menus
+                             .Include(c => c.Category)  // Includes related Menu items for each Category
+                             .Select(m => new MenuModel
                                  {
                                      MenuId = m.MenuId,
+                                     CategoryId= m.CategoryId.ToString(),
                                      MenuName = m.MenuName,
                                      Description = m.Description,
                                      Price = m.Price,
                                      IsAvailable = m.IsAvailable,
                                      GUID = m.GUID,
                                      Active = m.Active
-                                 }).ToList()
                              })
                              .FirstOrDefaultAsync();
-                if(categories is not null) { 
-                    return Ok(categories);
+                if(menu is not null) { 
+                    return Ok(menu);
                 }
                 else
                 {
@@ -108,7 +125,7 @@ namespace RMS_API.Controllers.Menu
                     Description = menu.Description,
                     Price = menu.Price,
                     IsAvailable = menu.IsAvailable,
-                    CategoryId = menu.CategoryId,
+                    CategoryId =Convert.ToInt32(menu.CategoryId),
                     GUID = Guid.NewGuid().ToString(),
                     Active = true
                 };
@@ -138,7 +155,7 @@ namespace RMS_API.Controllers.Menu
                 curMenu.Description = menu.Description;
                 curMenu.Price = menu.Price;
                 curMenu.IsAvailable = menu.IsAvailable;
-                curMenu.CategoryId = menu.CategoryId;
+                curMenu.CategoryId = Convert.ToInt32(menu.CategoryId);
                 await _context.SaveChangesAsync();
                 return Ok(curMenu);
             }
@@ -193,7 +210,7 @@ namespace RMS_API.Controllers.Menu
                                     Description = menu.Description,
                                     Price = menu.Price,
                                     IsAvailable = menu.IsAvailable,
-                                    Active = menu.Active,
+                                    Active = true,
                                     GUID = menu.GUID
                                 });
                             }
