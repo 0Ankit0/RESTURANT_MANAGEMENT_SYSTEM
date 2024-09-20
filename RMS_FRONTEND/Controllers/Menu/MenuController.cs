@@ -29,7 +29,7 @@ namespace RMS_FRONTEND.Controllers.Menu
         public async Task<IActionResult> Index()
         {
 			var responseData = await _apiCall.GetAsync("Menu");
-			var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData);
+			var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData)?? Enumerable.Empty<MenuModel>() ;
             return View(menus);
 		}
 
@@ -53,9 +53,11 @@ namespace RMS_FRONTEND.Controllers.Menu
         }
 
         // GET: Menu/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "CategoryId", "CategoryId");
+            var responseData = await _apiCall.GetAsync("Category");
+            var categories = JsonConvert.DeserializeObject<IEnumerable<CategoryModel>>(responseData) ?? Enumerable.Empty<CategoryModel>();
+            ViewData["CategoryId"] = new SelectList(categories, "CategoryId", "CategoryName");
             return View();
         }
 
@@ -64,16 +66,15 @@ namespace RMS_FRONTEND.Controllers.Menu
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("MenuId,MenuName,Description,Price,CategoryId,IsAvailable,GUID,CreatedAt,UpdatedAt,Active")] MenuMaster menuMaster)
+        public async Task<IActionResult> Create([Bind("MenuId,MenuName,Description,Price,CategoryId,IsAvailable")] MenuModel menuModel)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(menuMaster);
-                await _context.SaveChangesAsync();
+               var response = await _apiCall.PostAsync("Menu", menuModel);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "CategoryId", "CategoryId", menuMaster.CategoryId);
-            return View(menuMaster);
+           
+            return View(menuModel);
         }
 
         // GET: Menu/Edit/5
@@ -83,14 +84,12 @@ namespace RMS_FRONTEND.Controllers.Menu
             {
                 return NotFound();
             }
-
-            var menuMaster = await _context.Menus.FindAsync(id);
-            if (menuMaster == null)
-            {
-                return NotFound();
-            }
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "CategoryId", "CategoryId", menuMaster.CategoryId);
-            return View(menuMaster);
+            var menuDetails = await _apiCall.GetAsync("Menu", $"{id}");
+            var menuModel = JsonConvert.DeserializeObject<MenuModel>(menuDetails) ?? new MenuModel();
+            var responseData = await _apiCall.GetAsync("Category");
+            var categories = JsonConvert.DeserializeObject<IEnumerable<CategoryModel>>(responseData) ?? Enumerable.Empty<CategoryModel>();
+            ViewData["CategoryId"] = new SelectList(categories, "CategoryId", "CategoryName");
+            return View(menuModel);
         }
 
         // POST: Menu/Edit/5
@@ -98,35 +97,15 @@ namespace RMS_FRONTEND.Controllers.Menu
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("MenuId,MenuName,Description,Price,CategoryId,IsAvailable,GUID,CreatedAt,UpdatedAt,Active")] MenuMaster menuMaster)
+        public async Task<IActionResult> Edit([Bind("MenuId,MenuName,Description,Price,CategoryId,IsAvailable")] MenuModel menuModel)
         {
-            if (id != menuMaster.MenuId)
-            {
-                return NotFound();
-            }
-
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(menuMaster);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!MenuMasterExists(menuMaster.MenuId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+                    var response = await _apiCall.PutAsync("Menu", menuModel);
+                
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "CategoryId", "CategoryId", menuMaster.CategoryId);
-            return View(menuMaster);
+            return View(menuModel);
         }
 
         // GET: Menu/Delete/5
@@ -137,35 +116,10 @@ namespace RMS_FRONTEND.Controllers.Menu
                 return NotFound();
             }
 
-            var menuMaster = await _context.Menus
-                .Include(m => m.Category)
-                .FirstOrDefaultAsync(m => m.MenuId == id);
-            if (menuMaster == null)
-            {
-                return NotFound();
-            }
+            var response = await _apiCall.DeleteAsync("Menu", $"{id}");
 
-            return View(menuMaster);
-        }
-
-        // POST: Menu/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var menuMaster = await _context.Menus.FindAsync(id);
-            if (menuMaster != null)
-            {
-                _context.Menus.Remove(menuMaster);
-            }
-
-            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
-        private bool MenuMasterExists(int id)
-        {
-            return _context.Menus.Any(e => e.MenuId == id);
-        }
     }
 }
