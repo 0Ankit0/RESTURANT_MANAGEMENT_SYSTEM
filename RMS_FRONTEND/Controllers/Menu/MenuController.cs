@@ -51,6 +51,19 @@ namespace RMS_FRONTEND.Controllers.Menu
 
             return View(menuMaster);
         }
+        [HttpGet]
+        public async Task<IActionResult> MenuList()
+        {
+            try
+            {
+                var menuList = await _apiCall.GetAsync("Menu/MenuList");
+                var menu = JsonConvert.DeserializeObject<IEnumerable<CategoryModel>>(menuList) ?? Enumerable.Empty<CategoryModel>();
+                return View(menu);
+            }catch (Exception ex)
+            {
+                return View(Enumerable.Empty<CategoryModel>());
+            }
+        }
 
         // GET: Menu/Create
         public async Task<IActionResult> Create()

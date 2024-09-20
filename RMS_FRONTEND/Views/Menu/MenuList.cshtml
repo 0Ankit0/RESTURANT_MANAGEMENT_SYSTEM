@@ -1,0 +1,45 @@
+﻿@model IEnumerable<RMS_FRONTEND.Models.Menu.CategoryModel>
+
+@{
+    ViewData["Title"] = "MenuList";
+    Layout = "~/Views/Shared/_Dashboard.cshtml";
+}
+
+<h1>MenuList</h1>
+
+<div>
+    <h4>CategoryMaster</h4>
+    <hr />
+    <dl class="row">
+        @foreach (var data in Model){
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => data.CategoryName)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => data.CategoryName)
+        </dd>
+       
+        @foreach (var item in data.Menu)
+        {
+            <dd class = "col-sm-6">
+	            @Html.DisplayFor(model => item.MenuName)<br />
+	            @Html.DisplayFor(model => item.Description)
+            </dd>
+            <dd class = "col-sm-6">
+	            @Html.DisplayFor(model => item.Price)
+            </dd>
+            <dt class = "col-sm-2">
+				@Html.DisplayNameFor(model => item.IsAvailable)
+			</dt>
+			<dd class = "col-sm-10">
+				@Html.DisplayFor(model => item.IsAvailable)
+			</dd>
+
+
+        }
+        }
+    </dl>
+</div>
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
