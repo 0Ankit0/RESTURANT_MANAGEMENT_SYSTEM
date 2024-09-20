@@ -153,7 +153,7 @@ namespace RMS_API.Controllers.Orders
 
                     // Identify the order details that are removed in the updated order
                     var updatedMenuIds = order.OrderDetails.Select(od => od.MenuId).ToList();
-                    var removedOrderDetails = orderMaster.OrderDetails.Where(od => !updatedMenuIds.Contains(od.MenuId)).ToList();
+                    var removedOrderDetails = orderMaster.OrderDetails.Where(od => !updatedMenuIds.Contains((int)od.MenuId)).ToList();
 
                     // Add back the inventory for the removed order items
                     foreach (var removedItem in removedOrderDetails)
