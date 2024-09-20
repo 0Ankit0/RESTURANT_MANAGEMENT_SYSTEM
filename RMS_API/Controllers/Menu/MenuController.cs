@@ -9,7 +9,7 @@ using RMS_API.Models.Orders;
 
 namespace RMS_API.Controllers.Menu
 {
-    [Route("api")]
+    [Route("api/[controller]")]
     [ApiController]
     public class MenuController : ControllerBase
     {
@@ -53,29 +53,7 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-      [HttpGet("Category")]
-        public async Task<ActionResult<IEnumerable<CategoryModel>>> GetCategories()
-        {
-            try
-            {
-                var categories = await _context.Categories
-                             .Include(c => c.Menus)  // Includes related Menu items for each Category
-                             .Select(c => new CategoryModel
-                             {
-                                 CategoryId = c.CategoryId,
-                                 CategoryName = c.CategoryName,
-                                 GUID = c.GUID,
-                                 Active = c.Active,
-                             })
-                             .ToListAsync();
-                return Ok(categories);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
-      
+     
         // GET api/<MenuController>/5
         [HttpGet("Menu/{id}")]
         public async Task<ActionResult<IEnumerable<CategoryModel>>> Get(int id)
@@ -118,59 +96,8 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-        [HttpGet("Category/{id}")]
-        public async Task<ActionResult<IEnumerable<CategoryModel>>> GetCategory(int id)
-        {
-            try
-            {
-
-                var categories = await _context.Categories
-                             .Include(c => c.Menus)  // Includes related Menu items for each Category
-                             .Where(c => c.CategoryId == id)
-                             .Select(c => new CategoryModel
-                             {
-                                 CategoryId = c.CategoryId,
-                                 CategoryName = c.CategoryName,
-                                 GUID = c.GUID,
-                                 Active = c.Active,
-                             })
-                             .FirstOrDefaultAsync();
-                if(categories is not null) { 
-                    return Ok(categories);
-                }
-                else
-                {
-                    return NotFound();
-                }
-
-            }
-            catch (Exception ex) {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
-
-        // POST api/<MenuController>
-        [HttpPost("Category")]
-        public ActionResult Post([FromBody] CategoryModel category)
-        {
-            try
-            {
-                var newCategory = new CategoryMaster
-                {
-                    CategoryName = category.CategoryName,
-                    GUID = Guid.NewGuid().ToString(),
-                    Active = true
-                };
-                _context.Categories.AddAsync(newCategory);
-                _context.SaveChanges();
-                return Ok(newCategory);
-            }catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
-
-        [HttpPost("Menu")]
+       
+        [HttpPost]
         public ActionResult Post([FromBody] MenuModel menu)
         {
             try
@@ -195,7 +122,7 @@ namespace RMS_API.Controllers.Menu
         }
 
         // PUT api/<MenuController>/5
-        [HttpPut("Menu")]
+        [HttpPut]
         public async Task<IActionResult> Put([FromBody] MenuModel menu)
         {
             try
@@ -220,26 +147,7 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-        [HttpPut("Category")]
-        public IActionResult Put([Bind("CategoryId, CategoryName")] CategoryModel category)
-        {
-            try
-            {
-                var id = category.CategoryId;
-                var curCategory = _context.Categories.Find(id);
-                curCategory.CategoryName = category.CategoryName;
-
-
-                _context.SaveChanges();
-
-                return Ok("User updated successfully.");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
-            }
-        }
-
+        
         [HttpPut("MenuDetails")]
         public async Task<IActionResult> MenuDetails([FromBody] CategoryModel category)
         {
@@ -309,8 +217,8 @@ namespace RMS_API.Controllers.Menu
         }
 
         // DELETE api/<MenuController>/5
-        [HttpDelete("Menu/{id}")]
-        public ActionResult DeleteMenu(int id)
+        [HttpDelete("{id}")]
+        public ActionResult Delete(int id)
         {
             try
             {
@@ -332,35 +240,6 @@ namespace RMS_API.Controllers.Menu
             }
         }
 
-        [HttpDelete("Category/{id}")]
-        public ActionResult DeleteCategory(int id)
-        {
-            try
-            {
-                var category = _context.Categories.Find(id);
-                if (category == null)
-                {
-                    return NotFound($"Category with ID {id} not found.");
-                }
-
-                // Check if any menus are associated with this category
-                var associatedMenus = _context.Menus.Any(m => m.CategoryId == id);
-                if (associatedMenus)
-                {
-                    return BadRequest("Category cannot be deleted because it is associated with one or more menus. Please make sure that the category is empty before deleting.");
-                }
-
-                // If no associated menus, proceed with deletion
-                _context.Categories.Remove(category);
-                _context.SaveChanges();
-                return Ok($"Category with ID {id} has been successfully deleted.");
-            }
-            catch (Exception ex)
-            {
-                // Handle the exception and log it as necessary
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
-
+       
     }
 }
