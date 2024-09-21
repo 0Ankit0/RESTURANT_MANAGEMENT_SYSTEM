@@ -1,8 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -26,10 +28,17 @@ namespace RMS_FRONTEND.Classes
         private readonly HttpClient _httpClient;
         private readonly string _baseAddress;
 
-        public Apicall(IConfiguration configuration)
+        public Apicall(IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
             _baseAddress = configuration.GetConnectionString("ApiBaseUrl");
             _httpClient = new HttpClient { BaseAddress = new Uri(_baseAddress) };
+
+            var token = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Authentication)?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
         }
 
         // GET: Parameterized and Parameterless

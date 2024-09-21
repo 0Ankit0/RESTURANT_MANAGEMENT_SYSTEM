@@ -58,13 +58,15 @@ namespace RMS_API.Configuration
                             var claimsIdentity = context.Principal.Identity as ClaimsIdentity;
                             var userIdClaim = claimsIdentity?.FindFirst(ClaimTypes.NameIdentifier);
                             var usernameClaim = claimsIdentity?.FindFirst(ClaimTypes.Name);
+                            var userRole = claimsIdentity?.FindFirst(ClaimTypes.Role);
 
-                            if (userIdClaim != null && usernameClaim != null)
+                            if (userIdClaim != null && usernameClaim != null && userRole != null)
                             {
                                 var user = new AuthenticatedUser
                                 {
                                     UserId = userIdClaim.Value,
-                                    Username = usernameClaim.Value
+                                    Username = usernameClaim.Value,
+                                    Role = userRole.Value
                                 };
 
                                 // Add the user object to the HttpContext items

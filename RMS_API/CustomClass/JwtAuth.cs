@@ -11,7 +11,7 @@ namespace RMS_API.CustomClass
 {
      public interface IJwtAuth
     {
-        string GenerateToken(string username, string userId);
+        string GenerateToken(string username, string Role, string UserId);
     }
 
     public class JwtAuth : IJwtAuth
@@ -25,7 +25,7 @@ namespace RMS_API.CustomClass
             _signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_jwtSettings.SecretKey));
         }
 
-        public string GenerateToken(string username, string userId)
+        public string GenerateToken(string username, string Role,string UserId)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -33,7 +33,8 @@ namespace RMS_API.CustomClass
                 Subject = new ClaimsIdentity(new[]
                 {
                     new Claim(ClaimTypes.Name, username),
-                    new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                    new Claim(ClaimTypes.Role, Role),
+                    new Claim(ClaimTypes.NameIdentifier,UserId),
                     // Add more claims here as needed
                 }),
                 Expires = DateTime.UtcNow.AddHours(_jwtSettings.TokenLifetimeHours), // Assuming TokenLifetimeHours is a property in JwtSettings
