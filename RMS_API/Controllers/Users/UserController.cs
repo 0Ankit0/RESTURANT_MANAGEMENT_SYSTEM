@@ -103,7 +103,7 @@ namespace RMS_API.Controllers.Users
                 var isValid = _passwordHasher.VerifyHashedPassword(user, user.Password, br.Password);
                 if (isValid == PasswordVerificationResult.Success)
                 {
-                    var token = _jwtAuth.GenerateToken(user.UserEmail, user.Role.ToString());
+                    var token = _jwtAuth.GenerateToken(user.UserEmail, user.Role.ToString(),user.UserId.ToString());
                     var response = new ResponseModel
                     {
                         status = 200,
