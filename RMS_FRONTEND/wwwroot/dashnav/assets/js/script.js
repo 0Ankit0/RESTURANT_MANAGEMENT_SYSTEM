@@ -44,8 +44,6 @@ $(function(){
         // Loop through all nav links and set active class if href matches
         $('.nav-link').each(function () {
             var linkPath = new URL($(this).attr('href'), window.location.origin).pathname;
-            console.log(linkPath, currentPath);
-            console.log(currentPath.includes(linkPath));
             if (currentPath.includes(linkPath)) {
                 $(this).addClass('active');
                 $(this).parent().addClass('active'); // for li.nav-item

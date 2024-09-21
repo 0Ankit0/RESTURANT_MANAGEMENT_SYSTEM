@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
 using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Data.Orders;
+using RMS_FRONTEND.Models.Menu;
 using RMS_FRONTEND.Models.Orders;
 using RMS_FRONTEND.Models.Users;
 
@@ -54,10 +55,11 @@ namespace RMS_FRONTEND.Controllers.Orders
         }
 
         // GET: Order/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId");
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId");
+            var responseData = await _apiCall.GetAsync("Menu");
+            var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
+            ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
             return View();
         }
 
@@ -66,17 +68,15 @@ namespace RMS_FRONTEND.Controllers.Orders
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("OrderDetailId,OrderId,MenuId,Quantity,Price")] OrderDetails orderDetails)
+        public async Task<IActionResult> Create([FromForm] OrderModel order)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(orderDetails);
-                await _context.SaveChangesAsync();
+                var responseData = await _apiCall.PostAsync("Order",order);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId", orderDetails.MenuId);
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId", orderDetails.OrderId);
-            return View(orderDetails);
+           
+            return View(order);
         }
 
         // GET: Order/Edit/5
