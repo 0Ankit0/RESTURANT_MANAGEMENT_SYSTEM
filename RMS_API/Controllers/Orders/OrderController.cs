@@ -1,13 +1,16 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RMS_API.Data;
 using RMS_API.Data.Finance;
 using RMS_API.Data.Orders;
 using RMS_API.Data.Users;
+using RMS_API.Models;
 using RMS_API.Models.Orders;
 using RMS_API.Models.Users;
 using StackExchange.Redis;
+using System.Security.Claims;
 
 namespace RMS_API.Controllers.Orders
 {
@@ -67,6 +70,7 @@ namespace RMS_API.Controllers.Orders
 
         
         [HttpPost]
+        [Authorize]
         // POST: OrderController/Post
         public async Task<IActionResult> Post([FromBody] OrderModel order)
         {
@@ -76,11 +80,14 @@ namespace RMS_API.Controllers.Orders
                 {
                     try
                     {
+                        var authenticatedUser = HttpContext.Items["User"] as AuthenticatedUser;
+                        var userId = Convert.ToInt32(authenticatedUser?.UserId);
+                        
                         var orderMaster = new OrderMaster
                         {
-                            OrderStatus = order.OrderStatus,
+                            OrderStatus = "Created",
                             TableNumber = order.TableNumber,
-                            WaiterId = order.WaiterId
+                            WaiterId = userId
                         };
 
                         _context.Orders.Add(orderMaster);
@@ -88,12 +95,15 @@ namespace RMS_API.Controllers.Orders
 
                         foreach (var item in order.OrderDetails)
                         {
+                            var menu = await _context.Menus.FindAsync(item.MenuId);
+                            var price = menu.Price * item.Quantity;
+
                             var orderDetail = new OrderDetails
                             {
                                 OrderId = orderMaster.OrderId,
                                 MenuId = item.MenuId,
                                 Quantity = item.Quantity,
-                                Price = item.Price
+                                Price = price
                             };
                             _context.OrderDetails.Add(orderDetail);
 
