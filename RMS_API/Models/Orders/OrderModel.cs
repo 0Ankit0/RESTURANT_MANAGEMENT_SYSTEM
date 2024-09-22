@@ -9,6 +9,6 @@ namespace RMS_API.Models.Orders
         public int? WaiterId { get; set; }
         public string? OrderStatus { get; set; } = "Created";
 
-        public ICollection<OrderDetailsModel> OrderDetails { get; set; }
+        public List<OrderDetailsModel> OrderDetails { get; set; }
     }
 }

@@ -53,7 +53,23 @@ namespace RMS_API.Controllers.Orders
     {
         try
         {
-            var orderDetails =await _context.OrderDetails.Where(od => od.OrderId == id).FirstOrDefaultAsync();
+                var orderDetails = await _context.Orders
+                                    .Include(o => o.OrderDetails)
+                                    .Select(o => new OrderModel
+                                    {
+                                        OrderId = o.OrderId,
+                                        TableNumber=o.TableNumber,
+                                        OrderDetails= o.OrderDetails.Select(od => new OrderDetailsModel
+                                        {
+                                            MenuId= (int)od.MenuId,
+                                            OrderDetailId=od.OrderDetailId,
+                                            OrderId=od.OrderId,
+                                            Quantity=od.Quantity,
+                                            Price=od.Price
+
+                                        }).ToList()
+                                    })
+                                    .FirstOrDefaultAsync();
 
             if (orderDetails == null)
             {
