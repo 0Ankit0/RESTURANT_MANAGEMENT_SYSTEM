@@ -1,4 +1,4 @@
-﻿@model IEnumerable<RMS_FRONTEND.Models.Orders.OrderDetailsModel>
+﻿@model IEnumerable<RMS_FRONTEND.Models.Orders.OrderModel>
 
 @{
     ViewData["Title"] = "Index";
@@ -14,16 +14,13 @@
     <thead>
         <tr>
             <th>
-                @Html.DisplayNameFor(model => model.Quantity)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.Price)
-            </th>
-            <th>
                 @Html.DisplayNameFor(model => model.OrderId)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.MenuId)
+                @Html.DisplayNameFor(model => model.TableNumber)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.OrderStatus)
             </th>
             <th></th>
         </tr>
@@ -31,22 +28,20 @@
     <tbody>
 @foreach (var item in Model) {
         <tr>
-            <td>
-                @Html.DisplayFor(modelItem => item.Quantity)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Price)
-            </td>
+            
             <td>
                 @Html.DisplayFor(modelItem => item.OrderId)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.MenuId)
+                @Html.DisplayFor(modelItem => item.TableNumber)
             </td>
             <td>
-                <a asp-action="Edit" asp-route-id="@item.OrderDetailId">Edit</a> |
-                <a asp-action="Details" asp-route-id="@item.OrderDetailId">Details</a> |
-                <a asp-action="Delete" asp-route-id="@item.OrderDetailId">Delete</a>
+                @Html.DisplayFor(modelItem => item.OrderStatus)
+            </td>
+            <td>
+                <a asp-action="Edit" asp-route-id="@item.OrderId">Edit</a> |
+                <a asp-action="Details" asp-route-id="@item.OrderId">Details</a> |
+                    <a asp-action="Delete" asp-route-id="@item.OrderId">Delete</a>
             </td>
         </tr>
 }

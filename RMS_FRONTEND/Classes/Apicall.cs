@@ -39,6 +39,10 @@ namespace RMS_FRONTEND.Classes
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
+            else
+            {
+                _httpClient.DefaultRequestHeaders.Remove("Authorization");
+            }
         }
 
         // GET: Parameterized and Parameterless

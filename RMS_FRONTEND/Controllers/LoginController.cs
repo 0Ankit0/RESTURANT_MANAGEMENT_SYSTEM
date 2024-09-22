@@ -141,10 +141,18 @@ namespace RMS_FRONTEND.Controllers
         // POST: LoginController/Logout
         [HttpGet]
         [AutoValidateAntiforgeryToken]
-        [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> Logout()
         {
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            // Clear all authentication schemes
+            await HttpContext.SignOutAsync();
+
+            // Clear any custom authentication cookies
+            Response.Cookies.Delete(".AspNetCore.Identity.Application");
+
+            // Clear any custom authentication tokens
+            Response.Headers.Remove(".AspNetCore.Identity.Application");
+
+
             return RedirectToAction("Index", "Login");
         }
 

@@ -9,6 +9,6 @@ namespace RMS_FRONTEND.Models.Orders
         public int? WaiterId { get; set; }
         public string? OrderStatus { get; set; }
 
-        public ICollection<OrderDetailsModel> OrderDetails { get; set; }
+        public List<OrderDetailsModel> OrderDetails { get; set; }
     }
 }

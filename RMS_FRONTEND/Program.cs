@@ -37,7 +37,7 @@ builder.Services.AddScoped<_2FAAuth>();
 builder.Services.AddHttpContextAccessor();
 
 //Add apicall as singleton dependency
-builder.Services.AddSingleton<IApiCall>(sp =>
+builder.Services.AddScoped<IApiCall>(sp =>
     new Apicall(sp.GetRequiredService<IConfiguration>(),sp.GetRequiredService<IHttpContextAccessor>()));
 
 

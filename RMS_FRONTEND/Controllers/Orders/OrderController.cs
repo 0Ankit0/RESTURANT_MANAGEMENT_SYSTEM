@@ -30,7 +30,7 @@ namespace RMS_FRONTEND.Controllers.Orders
         public async Task<IActionResult> Index()
         {
 			var responseData = await _apiCall.GetAsync("Order");
-			var orders = JsonConvert.DeserializeObject<IEnumerable<OrderDetailsModel>>(responseData);
+			var orders = JsonConvert.DeserializeObject<IEnumerable<OrderModel>>(responseData);
 			return View(orders);
         }
 
@@ -87,14 +87,12 @@ namespace RMS_FRONTEND.Controllers.Orders
                 return NotFound();
             }
 
-            var orderDetails = await _context.OrderDetails.FindAsync(id);
-            if (orderDetails == null)
-            {
-                return NotFound();
-            }
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId", orderDetails.MenuId);
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId", orderDetails.OrderId);
-            return View(orderDetails);
+            var order = await _apiCall.GetAsync("Order", $"{id}");
+            var responseData = await _apiCall.GetAsync("Menu");
+            var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
+            ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
+            var orderModel= JsonConvert.DeserializeObject<OrderModel>(order);
+            return View(orderModel);
         }
 
         // POST: Order/Edit/5
