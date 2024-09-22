@@ -22,6 +22,10 @@
             <th>
                 @Html.DisplayNameFor(model => model.OrderStatus)
             </th>
+            <th>
+                @Html.DisplayNameFor(model => model.TotalPrice)
+            </th>
+
             <th></th>
         </tr>
     </thead>
@@ -37,6 +41,9 @@
             </td>
             <td>
                 @Html.DisplayFor(modelItem => item.OrderStatus)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.TotalPrice)
             </td>
             <td>
                 <a asp-action="Edit" asp-route-id="@item.OrderId">Edit</a> |

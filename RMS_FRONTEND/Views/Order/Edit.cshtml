@@ -11,38 +11,41 @@
 <hr />
 <div class="row">
     <div class="col-md-4">
-        <form asp-action="Edit">
+        <form asp-action="Edit" method="post">
+            @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <input type="hidden" asp-for="OrderId" />
+            <input type="hidden" asp-for="OrderId" value="@Model.OrderId" />
             <div id="inputRowsContainer">
                 <div class="col-md-5">
                     <label>Table Number</label>
                     <input type="number" asp-for="TableNumber" name="TableNumber" class="form-control" />
                 </div>
                 @for (int i = 0; i < Model.OrderDetails.Count; i++)
-{
+                {
                     var detail = Model.OrderDetails[i];
-                <div class="row mb-2 form-row">
-                    <div class="col-md-5">
-                        <label>Menu</label>
-                        <select name="orderDetails[i].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
+                    <input type="hidden" asp-for="OrderDetails[@i].OrderDetailId" value="@detail.OrderDetailId" />
+                    <div class="row mb-2 form-row">
+                        <div class="col-md-5">
+                            <label>Menu</label>
+                            <select name="OrderDetails[@i].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
+                        </div>
+                        <div class="col-md-5">
+                            <label>Quantity</label>
+                            <input name="OrderDetails[@i].Quantity" value="@detail.Quantity" class="form-control" />
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-success add-row me-2">+</button>
+                            <button type="button" class="btn btn-danger remove-row">-</button>
+                        </div>
                     </div>
-                    <div class="col-md-5">
-                        <label>Quantity</label>
-                            <input name="orderDetails[i].Quantity" value="@detail.Quantity" class="form-control" />
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="button" class="btn btn-success add-row me-2">+</button>
-                        <button type="button" class="btn btn-danger remove-row">-</button>
-                    </div>
-                </div>
-}
+                }
             </div>
 
             <div class="form-group">
-                <input type="submit" value="Create" class="btn btn-primary" />
+                <input type="submit" value="Save" class="btn btn-primary" />
             </div>
         </form>
+
     </div>
 </div>
 
@@ -67,8 +70,8 @@
                 newRow.find('input, select').val('');  // Clear the input values
 
                 // Update the names of the inputs to match the new index
-                newRow.find('select').attr('name', 'orderDetails[' + rowIndex + '].MenuId');
-                newRow.find('input').attr('name', 'orderDetails[' + rowIndex + '].Quantity');
+                newRow.find('select').attr('name', 'OrderDetails[' + rowIndex + '].MenuId');
+                newRow.find('input').attr('name', 'OrderDetails[' + rowIndex + '].Quantity');
 
                 $('#inputRowsContainer').append(newRow);
             });
@@ -81,8 +84,8 @@
 
                     // After removing, update the names of all remaining rows to ensure correct indexing
                     $('#inputRowsContainer .form-row').each(function (index) {
-                        $(this).find('select').attr('name', 'orderDetails[' + index + '].MenuId');
-                        $(this).find('input').attr('name', 'orderDetails[' + index + '].Quantity');
+                        $(this).find('select').attr('name', 'OrderDetails[' + index + '].MenuId');
+                        $(this).find('input').attr('name', 'OrderDetails[' + index + '].Quantity');
                     });
                 }
             });

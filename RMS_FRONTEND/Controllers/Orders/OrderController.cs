@@ -100,35 +100,18 @@ namespace RMS_FRONTEND.Controllers.Orders
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("OrderDetailId,OrderId,MenuId,Quantity,Price")] OrderDetails orderDetails)
+        public async Task<IActionResult> Edit([FromForm] OrderModel orderDetails)
         {
-            if (id != orderDetails.OrderDetailId)
-            {
-                return NotFound();
-            }
-
+            //var formCollection = await Request.ReadFormAsync();
+            //foreach (var key in formCollection.Keys)
+            //{
+            //    Console.WriteLine($"{key}: {formCollection[key]}");
+            //}
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(orderDetails);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!OrderDetailsExists(orderDetails.OrderDetailId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+                var orders = await _apiCall.PutAsync("Order", orderDetails);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId", orderDetails.MenuId);
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId", orderDetails.OrderId);
             return View(orderDetails);
         }
 

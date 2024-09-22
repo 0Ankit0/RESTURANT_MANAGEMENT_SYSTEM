@@ -36,7 +36,8 @@ namespace RMS_API.Controllers.Orders
                          OrderId = ur.OrderId,
                          OrderStatus = ur.OrderStatus,
                          TableNumber = ur.TableNumber,
-                         WaiterId = ur.WaiterId
+                         WaiterId = ur.WaiterId,
+                         TotalPrice = ur.OrderDetails.Sum(od => od.Price)
                      })
                     .ToListAsync();
                 return Ok(roles);
@@ -161,13 +162,14 @@ namespace RMS_API.Controllers.Orders
         }
 
 
-        [HttpPut("{orderId}")]
-        public async Task<IActionResult> Put(int orderId, [FromBody] OrderModel order)
+        [HttpPut]
+        public async Task<IActionResult> Put([FromBody] OrderModel order)
         {
             using (var transaction = await _context.Database.BeginTransactionAsync())
             {
                 try
                 {
+                    var orderId = order.OrderId;
                     // Fetch the existing order with its details
                     var orderMaster = await _context.Orders.Include(o => o.OrderDetails)
                                                            .FirstOrDefaultAsync(o => o.OrderId == orderId);
