@@ -100,13 +100,8 @@ namespace RMS_FRONTEND.Controllers.Orders
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit([FromForm] OrderModel orderDetails)
+        public async Task<IActionResult> Edit([FromBody] OrderModel orderDetails)
         {
-            //var formCollection = await Request.ReadFormAsync();
-            //foreach (var key in formCollection.Keys)
-            //{
-            //    Console.WriteLine($"{key}: {formCollection[key]}");
-            //}
             if (ModelState.IsValid)
             {
                 var orders = await _apiCall.PutAsync("Order", orderDetails);

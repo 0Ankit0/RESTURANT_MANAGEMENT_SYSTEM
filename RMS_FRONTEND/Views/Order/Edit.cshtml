@@ -11,7 +11,7 @@
 <hr />
 <div class="row">
     <div class="col-md-4">
-        <form asp-action="Edit" method="post">
+        <form id="orderForm" asp-action="Edit" method="post">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <input type="hidden" asp-for="OrderId" value="@Model.OrderId" />
@@ -20,39 +20,39 @@
                     <label>Table Number</label>
                     <input type="number" asp-for="TableNumber" name="TableNumber" class="form-control" />
                 </div>
-                @for (int i = 0; i < Model.OrderDetails.Count; i++)
+                @{
+                    var i = 0;
+                }
+                @foreach (var item in Model.OrderDetails)
                 {
-                    var detail = Model.OrderDetails[i];
-                    <input type="hidden" asp-for="OrderDetails[@i].OrderDetailId" value="@detail.OrderDetailId" />
                     <div class="row mb-2 form-row">
                         <div class="col-md-5">
                             <label>Menu</label>
-                            <select name="OrderDetails[@i].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
+                            <select asp-for="OrderDetails[@i].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
                         </div>
                         <div class="col-md-5">
                             <label>Quantity</label>
-                            <input name="OrderDetails[@i].Quantity" value="@detail.Quantity" class="form-control" />
+                            <input asp-for="OrderDetails[@i].Quantity" class="form-control" />
                         </div>
                         <div class="col-md-2 d-flex align-items-end">
                             <button type="button" class="btn btn-success add-row me-2">+</button>
                             <button type="button" class="btn btn-danger remove-row">-</button>
                         </div>
                     </div>
+                    i++;
                 }
             </div>
 
             <div class="form-group">
-                <input type="submit" value="Save" class="btn btn-primary" />
+                <button type="button" id="submitButton" class="btn btn-primary">Save</button>
             </div>
         </form>
-
     </div>
 </div>
 
 <div>
     <a asp-action="Index">Back to List</a>
 </div>
-
 
 @section Scripts {
     @{
@@ -89,7 +89,53 @@
                     });
                 }
             });
-        });
 
+                    // Handle form submission
+                $('#submitButton').on('click', function () {
+                            submitFormAjax();
+                    });
+
+                    // Submit form using AJAX
+                     function submitFormAjax() {
+                        var data = {
+                            OrderId: parseInt($('input[name="OrderId"]').val()),
+                            TableNumber: parseInt($('input[name="TableNumber"]').val()),
+                            OrderDetails: []
+                        };
+
+                        $('#inputRowsContainer .form-row').each(function () {
+                            var menuId = parseInt($(this).find('select').val());
+                            var quantity = parseInt($(this).find('input').val());
+                            data.OrderDetails.push({
+                                MenuId: menuId,
+                                Quantity: quantity
+                            });
+                        });
+                        // Get anti-forgery token from form
+                         var antiForgeryToken = $('input[name="__RequestVerificationToken"]').val();
+
+                        $.ajax({
+                            url: $('#orderForm').attr('action'),
+                            type: 'POST',
+                            contentType: 'application/json',
+                            headers: {
+                                'RequestVerificationToken': antiForgeryToken // Include anti-forgery token in headers
+                            },
+                            data: JSON.stringify(data),
+                            success: function (response) {
+                                // Handle success response
+                                console.log('Form submitted successfully');
+                                // Optionally, redirect or update the UI
+                                window.location.href = '/Order/Index';
+                            },
+                            error: function (xhr, status, error) {
+                                // Handle error response
+                                console.error('Form submission failed: ' + error);
+                            }
+                        });
+                    }
+
+
+                });
     </script>
 }
