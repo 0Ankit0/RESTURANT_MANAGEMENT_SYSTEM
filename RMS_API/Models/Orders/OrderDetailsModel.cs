@@ -8,7 +8,7 @@ namespace RMS_API.Models.Orders
         public int? OrderId { get; set; }
         public int MenuId { get; set; }
         public int Quantity { get; set; }
-        public decimal Price { get; set; }
+        public decimal? Price { get; set; }
 
     }
 }

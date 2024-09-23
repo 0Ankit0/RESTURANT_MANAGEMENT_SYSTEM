@@ -133,7 +133,7 @@ namespace RMS_API.Controllers.Finance
                     }
 
                     // Calculate the total amount for the partial bill item
-                    billingAmount += orderDetailModel.Quantity * orderDetailModel.Price;
+                    billingAmount += orderDetailModel.Quantity * (decimal)orderDetailModel.Price;
 
                     // Create a new OrderDetails item for the partial order
                     var partialOrderDetail = new OrderDetails

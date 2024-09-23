@@ -217,7 +217,7 @@ namespace RMS_API.Controllers.Orders
                                     OrderId = orderMaster.OrderId,
                                     MenuId = item.MenuId,
                                     Quantity = item.Quantity,
-                                    Price = item.Price
+                                    Price = (decimal)item.Price
                                 };
                                 _context.OrderDetails.Add(newOrderDetail);
 
@@ -239,9 +239,11 @@ namespace RMS_API.Controllers.Orders
                             }
                             else
                             {
-                                // Update existing order item (optional)
-                                existingOrderDetail.Quantity = item.Quantity;
-                                existingOrderDetail.Price = item.Price;
+                            var menu = await _context.Menus.FindAsync(item.MenuId);
+                            var price = menu.Price * item.Quantity;
+                            // Update existing order item (optional)
+                            existingOrderDetail.Quantity = item.Quantity;
+                                existingOrderDetail.Price = price;
                                 _context.OrderDetails.Update(existingOrderDetail);
                             }
                         }
