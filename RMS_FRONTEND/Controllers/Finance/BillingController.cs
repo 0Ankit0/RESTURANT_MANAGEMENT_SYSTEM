@@ -7,28 +7,25 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Finance;
 using RMS_FRONTEND.Models.Finance;
+using RMS_FRONTEND.Models.Orders;
 using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Finance
 {
     public class BillingController : Controller
     {
-        private readonly DummyDbContext _context;
         private readonly IApiCall _apiCall;
 
-        public BillingController(DummyDbContext context,IApiCall apiCall)
+        public BillingController(IApiCall apiCall)
         {
-            _context = context;
             _apiCall = apiCall;
         }
 
         // GET: Billing
         public async Task<IActionResult> Index()
         {
-			var responseData = await _apiCall.GetAsync("User");
+			var responseData = await _apiCall.GetAsync("Billing");
 			var billings = JsonConvert.DeserializeObject<IEnumerable<BillingModel>>(responseData);
             return View(billings);
 		}
@@ -41,21 +38,17 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var billing = await _context.Billings
-                .Include(b => b.Order)
-                .FirstOrDefaultAsync(m => m.BillingId == id);
-            if (billing == null)
-            {
-                return NotFound();
-            }
-
-            return View(billing);
+            var responseData = await _apiCall.GetAsync("Billing/",$"{id}");
+            var billings = JsonConvert.DeserializeObject<BillingModel>(responseData);
+            return View(billings);
         }
 
         // GET: Billing/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId");
+            var responseData = await _apiCall.GetAsync("Order");
+            var orders = JsonConvert.DeserializeObject<IEnumerable<OrderModel>>(responseData);
+            ViewData["OrderId"] = new SelectList(orders, "OrderId", "OrderId");
             return View();
         }
 
@@ -64,15 +57,14 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("BillingId,OrderId,TotalAmount,BillingDate,Paid")] Billing billing)
+        public async Task<IActionResult> Create([Bind("OrderId,TotalAmount,BillingDate,Paid")] BillingModel billing)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(billing);
-                await _context.SaveChangesAsync();
+                var responseData = await _apiCall.PostAsync("Billing",billing);
+                var orders = JsonConvert.DeserializeObject<IEnumerable<OrderModel>>(responseData);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId", billing.OrderId);
             return View(billing);
         }
 
@@ -84,13 +76,13 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var billing = await _context.Billings.FindAsync(id);
-            if (billing == null)
-            {
-                return NotFound();
-            }
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId", billing.OrderId);
-            return View(billing);
+            var orderData = await _apiCall.GetAsync("Order");
+            var orders = JsonConvert.DeserializeObject<IEnumerable<OrderModel>>(orderData);
+            ViewData["OrderId"] = new SelectList(orders, "OrderId", "OrderId");
+
+            var responseData = await _apiCall.GetAsync("Billing/",$"{id}");
+            var billingModel = JsonConvert.DeserializeObject<BillingModel>(responseData);
+            return View();
         }
 
         // POST: Billing/Edit/5
@@ -98,7 +90,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("BillingId,OrderId,TotalAmount,BillingDate,Paid")] Billing billing)
+        public async Task<IActionResult> Edit(int id, [Bind("BillingId,OrderId,TotalAmount,BillingDate,Paid")] BillingModel billing)
         {
             if (id != billing.BillingId)
             {
@@ -107,25 +99,10 @@ namespace RMS_FRONTEND.Controllers.Finance
 
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(billing);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!BillingExists(billing.BillingId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+                var responseData = await _apiCall.PostAsync("Billing",billing);
+                var orders = JsonConvert.DeserializeObject<OrderModel>(responseData);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["OrderId"] = new SelectList(_context.Orders, "OrderId", "OrderId", billing.OrderId);
             return View(billing);
         }
 
@@ -137,35 +114,10 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var billing = await _context.Billings
-                .Include(b => b.Order)
-                .FirstOrDefaultAsync(m => m.BillingId == id);
-            if (billing == null)
-            {
-                return NotFound();
-            }
-
-            return View(billing);
-        }
-
-        // POST: Billing/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var billing = await _context.Billings.FindAsync(id);
-            if (billing != null)
-            {
-                _context.Billings.Remove(billing);
-            }
-
-            await _context.SaveChangesAsync();
+            var responseData = await _apiCall.DeleteAsync("Billing/",$"{id}");
+            var billing = JsonConvert.DeserializeObject<BillingModel>(responseData);
             return RedirectToAction(nameof(Index));
         }
 
-        private bool BillingExists(int id)
-        {
-            return _context.Billings.Any(e => e.BillingId == id);
-        }
     }
 }
