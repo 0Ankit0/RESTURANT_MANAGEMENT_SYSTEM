@@ -7,21 +7,18 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Menu;
 using RMS_FRONTEND.Models.Menu;
+using RMS_FRONTEND.Models.Orders;
 using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Menu
 {
     public class CategoryController : Controller
     {
-        private readonly DummyDbContext _context;
 		private readonly IApiCall _apiCall;
 
-		public CategoryController(DummyDbContext context,IApiCall apiCall)
+		public CategoryController(IApiCall apiCall)
         {
-            _context = context;
             _apiCall = apiCall;
         }
 
@@ -41,13 +38,8 @@ namespace RMS_FRONTEND.Controllers.Menu
                 return NotFound();
             }
 
-            var categoryMaster = await _context.Categories
-                .FirstOrDefaultAsync(m => m.CategoryId == id);
-            if (categoryMaster == null)
-            {
-                return NotFound();
-            }
-
+            var responseData = await _apiCall.GetAsync("Category");
+            var categoryMaster = JsonConvert.DeserializeObject<CategoryModel>(responseData);
             return View(categoryMaster);
         }
 
@@ -114,34 +106,11 @@ namespace RMS_FRONTEND.Controllers.Menu
                 return NotFound();
             }
 
-            var categoryMaster = await _context.Categories
-                .FirstOrDefaultAsync(m => m.CategoryId == id);
-            if (categoryMaster == null)
-            {
-                return NotFound();
-            }
-
+            var responseData = await _apiCall.GetAsync("Category/",$"{id}");
+            var categoryMaster = JsonConvert.DeserializeObject<CategoryModel>(responseData);
             return View(categoryMaster);
         }
 
-        // POST: Category/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var categoryMaster = await _context.Categories.FindAsync(id);
-            if (categoryMaster != null)
-            {
-                _context.Categories.Remove(categoryMaster);
-            }
-
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
-
-        private bool CategoryMasterExists(int id)
-        {
-            return _context.Categories.Any(e => e.CategoryId == id);
-        }
+        
     }
 }
