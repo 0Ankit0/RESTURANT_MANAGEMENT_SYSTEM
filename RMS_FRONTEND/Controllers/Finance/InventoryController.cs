@@ -7,8 +7,6 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Finance;
 using RMS_FRONTEND.Models.Finance;
 using RMS_FRONTEND.Models.Users;
 
@@ -16,19 +14,17 @@ namespace RMS_FRONTEND.Controllers.Finance
 {
     public class InventoryController : Controller
     {
-        private readonly DummyDbContext _context;
         private readonly IApiCall _apiCall;
 
-        public InventoryController(DummyDbContext context,IApiCall apiCall)
+        public InventoryController(IApiCall apiCall)
         {
-            _context = context;
             _apiCall = apiCall;
         }
 
         // GET: Inventory
         public async Task<IActionResult> Index()
         {
-			var responseData = await _apiCall.GetAsync("User");
+			var responseData = await _apiCall.GetAsync("Inventory");
 			var inventories = JsonConvert.DeserializeObject<IEnumerable<InventoryModel>>(responseData);
             return View(inventories);
 		}
@@ -41,14 +37,9 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var inventory = await _context.Inventories
-                .FirstOrDefaultAsync(m => m.InventoryId == id);
-            if (inventory == null)
-            {
-                return NotFound();
-            }
-
-            return View(inventory);
+            var inventory = await _apiCall.GetAsync("Inventory/", $"{id}");
+            var inventoryModel = JsonConvert.DeserializeObject<InventoryModel>(inventory);
+            return View(inventoryModel);
         }
 
         // GET: Inventory/Create
@@ -62,13 +53,13 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("InventoryId,ItemName,Quantity,Unit,GUID,CreatedAt,UpdatedAt")] Inventory inventory)
+        public async Task<IActionResult> Create([Bind("ItemName,Quantity,Unit")] InventoryModel inventory)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(inventory);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                var inventoryMaster = await _apiCall.PostAsync("Inventory/",inventory);
+                var inventoryModel = JsonConvert.DeserializeObject<InventoryModel>(inventoryMaster);
+                return View(inventoryModel);
             }
             return View(inventory);
         }
@@ -81,12 +72,9 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var inventory = await _context.Inventories.FindAsync(id);
-            if (inventory == null)
-            {
-                return NotFound();
-            }
-            return View(inventory);
+            var inventoryMaster = await _apiCall.GetAsync("Inventory/", $"{id}");
+            var inventoryModel = JsonConvert.DeserializeObject<InventoryModel>(inventoryMaster);
+            return View(inventoryModel);
         }
 
         // POST: Inventory/Edit/5
@@ -94,7 +82,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("InventoryId,ItemName,Quantity,Unit,GUID,CreatedAt,UpdatedAt")] Inventory inventory)
+        public async Task<IActionResult> Edit(int id, [Bind("InventoryId,ItemName,Quantity,Unit")] InventoryModel inventory)
         {
             if (id != inventory.InventoryId)
             {
@@ -103,22 +91,9 @@ namespace RMS_FRONTEND.Controllers.Finance
 
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(inventory);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!InventoryExists(inventory.InventoryId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+                var inventoryMaster = await _apiCall.PutAsync("Inventory/", inventory);
+                var inventoryModel = JsonConvert.DeserializeObject<InventoryModel>(inventoryMaster);
+                
                 return RedirectToAction(nameof(Index));
             }
             return View(inventory);
@@ -132,34 +107,10 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var inventory = await _context.Inventories
-                .FirstOrDefaultAsync(m => m.InventoryId == id);
-            if (inventory == null)
-            {
-                return NotFound();
-            }
-
-            return View(inventory);
-        }
-
-        // POST: Inventory/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var inventory = await _context.Inventories.FindAsync(id);
-            if (inventory != null)
-            {
-                _context.Inventories.Remove(inventory);
-            }
-
-            await _context.SaveChangesAsync();
+            var inventoryMaster = await _apiCall.DeleteAsync("Inventory/", $"{id}");
+            var inventoryModel = JsonConvert.DeserializeObject<InventoryModel>(inventoryMaster);
             return RedirectToAction(nameof(Index));
         }
 
-        private bool InventoryExists(int id)
-        {
-            return _context.Inventories.Any(e => e.InventoryId == id);
-        }
     }
 }
