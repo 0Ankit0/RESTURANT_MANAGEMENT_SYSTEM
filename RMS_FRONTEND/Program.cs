@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
 using RMS_FRONTEND.Middleware;
 using System.Security.Claims;
 
@@ -11,9 +10,6 @@ var builder = WebApplication.CreateBuilder(args);
 //check: https://docs.microsoft.com/en-us/aspnet/core/security/data-protection/introduction?view=aspnetcore-8.0 for more details
 builder.Services.AddDataProtection();
 
-// Register DummyDbContext with In-Memory Database
-builder.Services.AddDbContext<DummyDbContext>(options =>
-    options.UseInMemoryDatabase("DummyDb"));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();

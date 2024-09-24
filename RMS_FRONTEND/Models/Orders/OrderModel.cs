@@ -1,5 +1,4 @@
-﻿using RMS_FRONTEND.Data.Orders;
-
+﻿
 namespace RMS_FRONTEND.Models.Orders
 {
     public class OrderModel
