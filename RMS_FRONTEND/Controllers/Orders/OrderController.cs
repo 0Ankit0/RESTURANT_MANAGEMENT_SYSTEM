@@ -7,8 +7,6 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Orders;
 using RMS_FRONTEND.Models.Menu;
 using RMS_FRONTEND.Models.Orders;
 using RMS_FRONTEND.Models.Users;
@@ -17,12 +15,10 @@ namespace RMS_FRONTEND.Controllers.Orders
 {
     public class OrderController : Controller
     {
-        private readonly DummyDbContext _context;
 		private readonly IApiCall _apiCall;
 
-		public OrderController(DummyDbContext context,IApiCall apiCall)
+		public OrderController(IApiCall apiCall)
         {
-            _context = context;
             _apiCall = apiCall;
         }
 
@@ -42,16 +38,9 @@ namespace RMS_FRONTEND.Controllers.Orders
                 return NotFound();
             }
 
-            var orderDetails = await _context.OrderDetails
-                .Include(o => o.Menu)
-                .Include(o => o.Order)
-                .FirstOrDefaultAsync(m => m.OrderDetailId == id);
-            if (orderDetails == null)
-            {
-                return NotFound();
-            }
-
-            return View(orderDetails);
+            var orderDetails = await _apiCall.GetAsync("Order/", $"{id}");
+            var orderModel = JsonConvert.DeserializeObject<OrderModel>(orderDetails);
+            return View(orderModel);
         }
 
         // GET: Order/Create
@@ -118,36 +107,12 @@ namespace RMS_FRONTEND.Controllers.Orders
                 return NotFound();
             }
 
-            var orderDetails = await _context.OrderDetails
-                .Include(o => o.Menu)
-                .Include(o => o.Order)
-                .FirstOrDefaultAsync(m => m.OrderDetailId == id);
-            if (orderDetails == null)
-            {
-                return NotFound();
-            }
-
-            return View(orderDetails);
+            var orderDetails = await _apiCall.DeleteAsync("Order/", $"{id}");
+            var orderModel = JsonConvert.DeserializeObject<UserModel>(orderDetails);
+            return View(orderModel);
+           
         }
 
-        // POST: Order/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var orderDetails = await _context.OrderDetails.FindAsync(id);
-            if (orderDetails != null)
-            {
-                _context.OrderDetails.Remove(orderDetails);
-            }
-
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
-
-        private bool OrderDetailsExists(int id)
-        {
-            return _context.OrderDetails.Any(e => e.OrderDetailId == id);
-        }
+        
     }
 }
