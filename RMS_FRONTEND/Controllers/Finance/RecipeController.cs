@@ -7,21 +7,18 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Finance;
 using RMS_FRONTEND.Models.Finance;
+using RMS_FRONTEND.Models.Menu;
 using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Finance
 {
     public class RecipeController : Controller
     {
-        private readonly DummyDbContext _context;
         private readonly IApiCall _apiCall;
 
-        public RecipeController(DummyDbContext context, IApiCall apiCall)
+        public RecipeController(IApiCall apiCall)
         {
-            _context = context;
             _apiCall = apiCall;
         }
 
@@ -41,23 +38,21 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var recipe = await _context.Recipes
-                .Include(r => r.Inventory)
-                .Include(r => r.Menu)
-                .FirstOrDefaultAsync(m => m.RecipeId == id);
-            if (recipe == null)
-            {
-                return NotFound();
-            }
-
-            return View(recipe);
+            var recipeMaster = await _apiCall.GetAsync("Recipe/", $"{id}");
+            var recipeModel = JsonConvert.DeserializeObject<RecipeModel>(recipeMaster);
+            return View(recipeModel);
         }
 
         // GET: Recipe/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["InventoryId"] = new SelectList(_context.Inventories, "InventoryId", "InventoryId");
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId");
+            var inventoryData = await _apiCall.GetAsync("Inventory");
+            var inventories = JsonConvert.DeserializeObject<IEnumerable<InventoryModel>>(inventoryData);
+            ViewData["InventoryId"] = new SelectList(inventories, "InventoryId", "InventoryId");
+
+            var responseData = await _apiCall.GetAsync("Menu");
+            var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
+            ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
             return View();
         }
 
@@ -66,16 +61,14 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("RecipeId,MenuId,InventoryId,QuantityRequired,GUID")] Recipe recipe)
+        public async Task<IActionResult> Create([Bind("RecipeId,MenuId,InventoryId,QuantityRequired")] RecipeModel recipe)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(recipe);
-                await _context.SaveChangesAsync();
+                var responseData = await _apiCall.PostAsync("Recipe",recipe);
+                var recipes = JsonConvert.DeserializeObject<RecipeModel>(responseData);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["InventoryId"] = new SelectList(_context.Inventories, "InventoryId", "InventoryId", recipe.InventoryId);
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId", recipe.MenuId);
             return View(recipe);
         }
 
@@ -87,14 +80,14 @@ namespace RMS_FRONTEND.Controllers.Finance
                 return NotFound();
             }
 
-            var recipe = await _context.Recipes.FindAsync(id);
-            if (recipe == null)
-            {
-                return NotFound();
-            }
-            ViewData["InventoryId"] = new SelectList(_context.Inventories, "InventoryId", "InventoryId", recipe.InventoryId);
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId", recipe.MenuId);
-            return View(recipe);
+            var inventoryData = await _apiCall.GetAsync("Inventory");
+            var inventories = JsonConvert.DeserializeObject<IEnumerable<InventoryModel>>(inventoryData);
+            ViewData["InventoryId"] = new SelectList(inventories, "InventoryId", "InventoryId");
+
+            var responseData = await _apiCall.GetAsync("Menu");
+            var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
+            ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
+            return View();
         }
 
         // POST: Recipe/Edit/5
@@ -102,7 +95,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("RecipeId,MenuId,InventoryId,QuantityRequired,GUID")] Recipe recipe)
+        public async Task<IActionResult> Edit(int id, [Bind("RecipeId,MenuId,InventoryId,QuantityRequired")] RecipeModel recipe)
         {
             if (id != recipe.RecipeId)
             {
@@ -111,26 +104,10 @@ namespace RMS_FRONTEND.Controllers.Finance
 
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _context.Update(recipe);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!RecipeExists(recipe.RecipeId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+                var responseData = await _apiCall.PostAsync("Recipe", recipe);
+                var recipes = JsonConvert.DeserializeObject<IEnumerable<RecipeModel>>(responseData);
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["InventoryId"] = new SelectList(_context.Inventories, "InventoryId", "InventoryId", recipe.InventoryId);
-            ViewData["MenuId"] = new SelectList(_context.Menus, "MenuId", "MenuId", recipe.MenuId);
             return View(recipe);
         }
 
@@ -146,24 +123,5 @@ namespace RMS_FRONTEND.Controllers.Finance
             return View(recipe);
         }
 
-        // POST: Recipe/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var recipe = await _context.Recipes.FindAsync(id);
-            if (recipe != null)
-            {
-                _context.Recipes.Remove(recipe);
-            }
-
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
-
-        private bool RecipeExists(int id)
-        {
-            return _context.Recipes.Any(e => e.RecipeId == id);
-        }
     }
 }
