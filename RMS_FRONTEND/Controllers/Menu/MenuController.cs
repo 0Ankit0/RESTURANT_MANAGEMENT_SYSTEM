@@ -7,8 +7,6 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Menu;
 using RMS_FRONTEND.Models.Menu;
 using RMS_FRONTEND.Models.Users;
 
@@ -16,12 +14,10 @@ namespace RMS_FRONTEND.Controllers.Menu
 {
     public class MenuController : Controller
     {
-        private readonly DummyDbContext _context;
 		private readonly IApiCall _apiCall;
 
-		public MenuController(DummyDbContext context,IApiCall apiCall)
+		public MenuController(IApiCall apiCall)
         {
-            _context = context;
             _apiCall = apiCall;
         }
 
@@ -41,15 +37,9 @@ namespace RMS_FRONTEND.Controllers.Menu
                 return NotFound();
             }
 
-            var menuMaster = await _context.Menus
-                .Include(m => m.Category)
-                .FirstOrDefaultAsync(m => m.MenuId == id);
-            if (menuMaster == null)
-            {
-                return NotFound();
-            }
-
-            return View(menuMaster);
+            var Menu = await _apiCall.GetAsync("Menu/", $"{id}");
+            var menuModel = JsonConvert.DeserializeObject<MenuModel>(Menu);
+            return View(menuModel);
         }
         [HttpGet]
         public async Task<IActionResult> MenuList()
