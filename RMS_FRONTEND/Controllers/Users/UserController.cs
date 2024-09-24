@@ -8,21 +8,17 @@ using Microsoft.DotNet.MSIdentity.Shared;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RMS_FRONTEND.Classes;
-using RMS_FRONTEND.Data;
-using RMS_FRONTEND.Data.Users;
 using RMS_FRONTEND.Models.Users;
 
 namespace RMS_FRONTEND.Controllers.Users
 {
     public class UserController : Controller
     {
-        private readonly DummyDbContext _context;
         private readonly ICustomFunctions _customFunctions;
         private readonly IApiCall _apiCall;
 
-        public UserController(DummyDbContext context, ICustomFunctions customFunctions,IApiCall apiCall)
+        public UserController( ICustomFunctions customFunctions,IApiCall apiCall)
         {
-            _context = context;
 			_customFunctions = customFunctions;
             _apiCall = apiCall;
         }
@@ -102,24 +98,5 @@ namespace RMS_FRONTEND.Controllers.Users
             return RedirectToAction(nameof(Index));
         }
 
-        // POST: User/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var userMaster = await _context.UserMasters.FindAsync(id);
-            if (userMaster != null)
-            {
-                _context.UserMasters.Remove(userMaster);
-            }
-
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
-
-        private bool UserMasterExists(int id)
-        {
-            return _context.UserMasters.Any(e => e.UserId == id);
-        }
     }
 }
