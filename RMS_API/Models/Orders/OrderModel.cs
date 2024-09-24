@@ -10,6 +10,6 @@ namespace RMS_API.Models.Orders
         public string? OrderStatus { get; set; } = "Created";
         public decimal? TotalPrice { get; set; }
 
-        public List<OrderDetailsModel> OrderDetails { get; set; }
+        public List<OrderDetailsModel>? OrderDetails { get; set; }
     }
 }
