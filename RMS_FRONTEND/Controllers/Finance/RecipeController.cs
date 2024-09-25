@@ -25,8 +25,8 @@ namespace RMS_FRONTEND.Controllers.Finance
         // GET: Recipe
         public async Task<IActionResult> Index()
         {
-			var responseData = await _apiCall.GetAsync("User");
-			var recipe = JsonConvert.DeserializeObject<IEnumerable<RecipeModel>>(responseData);
+			var responseData = await _apiCall.GetAsync("Recipe");
+			var recipe = JsonConvert.DeserializeObject<IEnumerable<RecipeData>>(responseData);
             return View(recipe);
 		}
 
@@ -48,7 +48,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         {
             var inventoryData = await _apiCall.GetAsync("Inventory");
             var inventories = JsonConvert.DeserializeObject<IEnumerable<InventoryModel>>(inventoryData);
-            ViewData["InventoryId"] = new SelectList(inventories, "InventoryId", "InventoryId");
+            ViewData["InventoryId"] = new SelectList(inventories, "InventoryId", "ItemName");
 
             var responseData = await _apiCall.GetAsync("Menu");
             var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
@@ -61,7 +61,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("RecipeId,MenuId,InventoryId,QuantityRequired")] RecipeModel recipe)
+        public async Task<IActionResult> Create([FromForm] RecipeModelWithMenu recipe)
         {
             if (ModelState.IsValid)
             {
@@ -87,7 +87,10 @@ namespace RMS_FRONTEND.Controllers.Finance
             var responseData = await _apiCall.GetAsync("Menu");
             var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
             ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
-            return View();
+
+            var recipeData = await _apiCall.GetAsync("Recipe", $"{id}");
+            var recipeModel = JsonConvert.DeserializeObject<RecipeModel>(recipeData);
+            return View(recipeModel);
         }
 
         // POST: Recipe/Edit/5
@@ -118,7 +121,7 @@ namespace RMS_FRONTEND.Controllers.Finance
             {
                 return NotFound();
             }
-             var recipe = await _apiCall.DeleteAsync("Recipe/Delete",$"{id}");
+             var recipe = await _apiCall.DeleteAsync("Recipe/",$"{id}");
 
             return View(recipe);
         }

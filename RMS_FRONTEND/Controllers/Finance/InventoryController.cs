@@ -15,10 +15,12 @@ namespace RMS_FRONTEND.Controllers.Finance
     public class InventoryController : Controller
     {
         private readonly IApiCall _apiCall;
+        private readonly ICustomFunctions _customFunctions;
 
-        public InventoryController(IApiCall apiCall)
+        public InventoryController(IApiCall apiCall, ICustomFunctions customFunctions)
         {
             _apiCall = apiCall;
+            _customFunctions = customFunctions;
         }
 
         // GET: Inventory
@@ -45,6 +47,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         // GET: Inventory/Create
         public IActionResult Create()
         {
+            ViewData["Unit"] = _customFunctions.EnumToSelectList<WeightUnitEnum>();
             return View();
         }
 
@@ -57,6 +60,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         {
             if (ModelState.IsValid)
             {
+                
                 var inventoryMaster = await _apiCall.PostAsync("Inventory/",inventory);
                 var inventoryModel = JsonConvert.DeserializeObject<InventoryModel>(inventoryMaster);
                 return View(inventoryModel);

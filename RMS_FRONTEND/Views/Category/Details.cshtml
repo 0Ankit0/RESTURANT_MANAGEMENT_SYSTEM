@@ -1,7 +1,7 @@
 ﻿@model RMS_FRONTEND.Models.Menu.CategoryModel
 
 @{
-    ViewData["Title"] = "Details";
+    ViewData["Title"] = "MenuList";
     Layout = "~/Views/Shared/_Dashboard.cshtml";
 }
 
@@ -11,28 +11,35 @@
     <h4>CategoryMaster</h4>
     <hr />
     <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.CategoryName)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.CategoryName)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.GUID)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.GUID)
-        </dd>
-        
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Active)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Active)
-        </dd>
+           @*  <dt class="col-sm-2">
+                @Html.DisplayNameFor(model => Model.CategoryName)
+            </dt> *@
+            <dd class="col-sm-10 fs-2">
+                @Html.DisplayFor(model => Model.CategoryName)
+            </dd>
+
+            @foreach (var item in Model.Menu)
+            {
+                <dd class="col-sm-6">
+                <div asp-for="item.MenuName" class="fs-4">
+                    @item.MenuName
+                </div>
+                    @Html.DisplayFor(model => item.Description)
+                </dd>
+                <dd class="col-sm-6">
+                    @Html.DisplayFor(model => item.Price)
+                </dd>
+                <dt class="col-sm-2">
+                    @Html.DisplayNameFor(model => item.IsAvailable)
+                </dt>
+                <dd class="col-sm-10">
+                    @Html.DisplayFor(model => item.IsAvailable)
+                </dd>
+
+
+            }
     </dl>
 </div>
 <div>
-    <a asp-action="Edit" asp-route-id="@Model?.CategoryId">Edit</a> |
     <a asp-action="Index">Back to List</a>
 </div>

@@ -38,7 +38,7 @@ namespace RMS_FRONTEND.Controllers.Menu
                 return NotFound();
             }
 
-            var responseData = await _apiCall.GetAsync("Category");
+            var responseData = await _apiCall.GetAsync("Category",$"{id}");
             var categoryMaster = JsonConvert.DeserializeObject<CategoryModel>(responseData);
             return View(categoryMaster);
         }
