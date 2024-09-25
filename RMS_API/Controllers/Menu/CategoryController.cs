@@ -49,27 +49,29 @@ namespace RMS_API.Controllers.Menu
         {
             try
             {
-
                 var categories = await _context.Categories
                              .Include(c => c.Menus)  // Includes related Menu items for each Category
-                             .Where(c => c.CategoryId == id)
+                              .Where(c=>c.CategoryId==id)
                              .Select(c => new CategoryModel
                              {
                                  CategoryId = c.CategoryId,
                                  CategoryName = c.CategoryName,
                                  GUID = c.GUID,
                                  Active = c.Active,
+                                 // Map Menu details for each category
+                                 Menu = c.Menus.Select(m => new MenuModel
+                                 {
+                                     MenuId = m.MenuId,
+                                     MenuName = m.MenuName,
+                                     Description = m.Description,
+                                     Price = m.Price,
+                                     IsAvailable = m.IsAvailable,
+                                     GUID = m.GUID,
+                                     Active = m.Active
+                                 }).ToList()
                              })
                              .FirstOrDefaultAsync();
-                if (categories is not null)
-                {
-                    return Ok(categories);
-                }
-                else
-                {
-                    return NotFound();
-                }
-
+                return Ok(categories);
             }
             catch (Exception ex)
             {

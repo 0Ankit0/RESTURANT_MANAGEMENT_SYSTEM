@@ -53,7 +53,8 @@ namespace RMS_API.Controllers.Menu
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-      [HttpGet]
+     
+        [HttpGet]
         public async Task<ActionResult<IEnumerable<MenuModel>>> Get()
         {
             try

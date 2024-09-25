@@ -21,11 +21,19 @@ namespace RMS_API.Controllers.Finance
         }
         // GET: api/<RecipeController>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RecipeModel>>> Get()
+        public async Task<ActionResult<IEnumerable<RecipeData>>> Get()
         {
             try
             {
-                var recipes =await _context.Recipes.Include(r => r.Inventory).Include(r => r.Menu).ToListAsync();
+                var recipes =await _context.Recipes.Include(r => r.Inventory).Include(r => r.Menu)
+                    .Select(r=>new RecipeData
+                    {
+                        Menu=r.Menu.MenuName,
+                        Inventory=r.Inventory.ItemName,
+                        QuantityRequired=r.QuantityRequired,
+                        RecipeId=r.RecipeId
+                    })
+                    .ToListAsync();
                 return Ok(recipes);
 
             }
