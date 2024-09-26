@@ -39,7 +39,7 @@ namespace RMS_FRONTEND.Controllers.Orders
             }
 
             var orderDetails = await _apiCall.GetAsync("Order/", $"{id}");
-            var orderModel = JsonConvert.DeserializeObject<OrderModel>(orderDetails);
+            var orderModel = JsonConvert.DeserializeObject<OrderWithDetails>(orderDetails);
             return View(orderModel);
         }
 

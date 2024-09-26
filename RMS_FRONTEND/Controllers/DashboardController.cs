@@ -8,7 +8,6 @@ namespace RMS_FRONTEND.Controllers
 	public class DashboardController : Controller
 	{
 		[AutoValidateAntiforgeryToken]
-		[Authorize(Policy = "AdminPolicy")]
 		// GET: DashboardController
 		public ActionResult Index()
 		{
