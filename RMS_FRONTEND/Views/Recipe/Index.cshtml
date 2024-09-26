@@ -16,12 +16,6 @@
             <th>
                 @Html.DisplayNameFor(model => model.Menu)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.Inventory)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.QuantityRequired)
-            </th>
             <th></th>
         </tr>
     </thead>
@@ -32,13 +26,7 @@
                 @Html.DisplayFor(modelItem => item.Menu)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.Inventory)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.QuantityRequired)
-            </td>
-            <td>
-                <a asp-action="Edit" asp-route-id="@item.RecipeId">Edit</a> |
+                 <a asp-action="Edit" asp-route-id="@item.MenuId">Edit</a> |
                 <a asp-action="Details" asp-route-id="@item.RecipeId">Details</a> |
                 <a asp-action="Delete" asp-route-id="@item.RecipeId">Delete</a>
             </td>

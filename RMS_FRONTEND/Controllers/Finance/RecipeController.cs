@@ -82,14 +82,14 @@ namespace RMS_FRONTEND.Controllers.Finance
 
             var inventoryData = await _apiCall.GetAsync("Inventory");
             var inventories = JsonConvert.DeserializeObject<IEnumerable<InventoryModel>>(inventoryData);
-            ViewData["InventoryId"] = new SelectList(inventories, "InventoryId", "InventoryId");
+            ViewData["InventoryId"] = new SelectList(inventories, "InventoryId", "ItemName");
 
             var responseData = await _apiCall.GetAsync("Menu");
             var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
             ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
 
             var recipeData = await _apiCall.GetAsync("Recipe", $"{id}");
-            var recipeModel = JsonConvert.DeserializeObject<RecipeModel>(recipeData);
+            var recipeModel = JsonConvert.DeserializeObject<RecipeModelWithMenu>(recipeData);
             return View(recipeModel);
         }
 
@@ -98,17 +98,11 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("RecipeId,MenuId,InventoryId,QuantityRequired")] RecipeModel recipe)
+        public async Task<IActionResult> Edit([FromForm] RecipeModelWithMenu recipe)
         {
-            if (id != recipe.RecipeId)
-            {
-                return NotFound();
-            }
-
             if (ModelState.IsValid)
             {
-                var responseData = await _apiCall.PostAsync("Recipe", recipe);
-                var recipes = JsonConvert.DeserializeObject<IEnumerable<RecipeModel>>(responseData);
+                var responseData = await _apiCall.PutAsync("Recipe", recipe);
                 return RedirectToAction(nameof(Index));
             }
             return View(recipe);

@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Models.Finance.RecipeModel
+﻿@model RMS_FRONTEND.Models.Finance.RecipeModelWithMenu
 
 @{
     ViewData["Title"] = "Edit";
@@ -12,22 +12,34 @@
 <div class="row">
     <div class="col-md-4">
         <form asp-action="Edit" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <input type="hidden" name="RecipeId" value="@Model.RecipeId" asp-for="RecipeId" />
+
+            <div id="inputRowsContainer">
             <div class="form-group">
                 <label asp-for="MenuId" class="control-label"></label>
                 <select asp-for="MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
                 <span asp-validation-for="MenuId" class="text-danger"></span>
             </div>
-            <div class="form-group">
-                <label asp-for="InventoryId" class="control-label"></label>
-                <select asp-for="InventoryId" class="form-control" asp-items="ViewBag.InventoryId"></select>
-                <span asp-validation-for="InventoryId" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="QuantityRequired" class="control-label"></label>
-                <input asp-for="QuantityRequired" class="form-control" />
-                <span asp-validation-for="QuantityRequired" class="text-danger"></span>
+                @for (int i = 0; i < Model.Recipes.Count; i++)
+                {
+                    <input type="hidden" asp-for="Recipes[i].RecipeId" value="@Model.Recipes[i].RecipeId" />
+                    <div class="row mb-2 form-row">
+                        <div class="col-md-5">
+                            <label asp-for="Recipes[i].InventoryId" class="control-label"></label>
+                            <select asp-for="Recipes[i].InventoryId" class="form-control" asp-items="ViewBag.InventoryId"></select>
+                            <span asp-validation-for="Recipes[i].InventoryId" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-5">
+                            <label asp-for="Recipes[i].QuantityRequired" class="control-label"></label>
+                            <input asp-for="Recipes[i].QuantityRequired" class="form-control" />
+                            <span asp-validation-for="Recipes[i].QuantityRequired" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-success add-row me-2">+</button>
+                            <button type="button" class="btn btn-danger remove-row">-</button>
+                        </div>
+                    </div>
+                }
+           
             </div>
             <div class="form-group">
                 <input type="submit" value="Save" class="btn btn-primary" />
@@ -42,4 +54,39 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // Add new row on clicking 'Add' button
+            $(document).on('click', '.add-row', function () {
+                // Find the current number of rows
+                var rowIndex = $('#inputRowsContainer .form-row').length;
+
+                // Clone the first row and append it to the container
+                var newRow = $('.form-row:first').clone();
+                newRow.find('input, select').val('');  // Clear the input values
+
+                // Update the names of the inputs to match the new index
+                newRow.find('select').attr('name', 'Recipes[' + rowIndex + '].MenuId');
+                newRow.find('input').attr('name', 'Recipes[' + rowIndex + '].Quantity');
+
+                $('#inputRowsContainer').append(newRow);
+            });
+
+            // Remove row on clicking 'Remove' button
+            $(document).on('click', '.remove-row', function () {
+                // Remove row only if more than one exists
+                if ($('.form-row').length > 1) {
+                    $(this).closest('.form-row').remove();
+
+                    // After removing, update the names of all remaining rows to ensure correct indexing
+                    $('#inputRowsContainer .form-row').each(function (index) {
+                        $(this).find('select').attr('name', 'Recipes[' + index + '].MenuId');
+                        $(this).find('input').attr('name', 'Recipes[' + index + '].Quantity');
+                    });
+                }
+            });
+        });
+
+    </script>
 }
