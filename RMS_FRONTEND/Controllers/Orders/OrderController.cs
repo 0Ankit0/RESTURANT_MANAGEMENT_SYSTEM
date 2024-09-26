@@ -80,7 +80,7 @@ namespace RMS_FRONTEND.Controllers.Orders
             var responseData = await _apiCall.GetAsync("Menu");
             var menus = JsonConvert.DeserializeObject<IEnumerable<MenuModel>>(responseData) ?? Enumerable.Empty<MenuModel>();
             ViewData["MenuId"] = new SelectList(menus, "MenuId", "MenuName");
-            var orderModel= JsonConvert.DeserializeObject<OrderModel>(order);
+            var orderModel= JsonConvert.DeserializeObject<OrderWithDetails>(order);
             return View(orderModel);
         }
 
@@ -89,14 +89,14 @@ namespace RMS_FRONTEND.Controllers.Orders
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit([FromBody] OrderModel orderDetails)
+        public async Task<IActionResult> Edit([FromForm] OrderWithDetails orders)
         {
             if (ModelState.IsValid)
             {
-                var orders = await _apiCall.PutAsync("Order", orderDetails);
+                var orderModel = await _apiCall.PutAsync("Order", orders);
                 return RedirectToAction(nameof(Index));
             }
-            return View(orderDetails);
+            return View(orders);
         }
 
         // GET: Order/Delete/5

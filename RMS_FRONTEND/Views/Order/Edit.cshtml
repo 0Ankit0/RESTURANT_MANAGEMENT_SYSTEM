@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Models.Orders.OrderModel
+﻿@model RMS_FRONTEND.Models.Orders.OrderWithDetails
 
 @{
     ViewData["Title"] = "Edit";
@@ -20,31 +20,28 @@
                     <label>Table Number</label>
                     <input type="number" asp-for="TableNumber" name="TableNumber" class="form-control" />
                 </div>
-                @{
-                    var i = 0;
-                }
-                @foreach (var item in Model.OrderDetails)
+                @for (int i = 0; i < Model.OrderDetails.Count; i++)
                 {
+                    @* <input type="hidden" asp-for="OrderDetails[i].OrderDetailId" value="@Model.OrderDetails[i].OrderDetailId" /> *@
                     <div class="row mb-2 form-row">
                         <div class="col-md-5">
                             <label>Menu</label>
-                            <select asp-for="OrderDetails[@i].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
+                            <select asp-for="OrderDetails[i].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
                         </div>
                         <div class="col-md-5">
                             <label>Quantity</label>
-                            <input asp-for="OrderDetails[@i].Quantity" class="form-control" />
+                            <input asp-for="OrderDetails[i].Quantity" class="form-control" />
                         </div>
                         <div class="col-md-2 d-flex align-items-end">
                             <button type="button" class="btn btn-success add-row me-2">+</button>
                             <button type="button" class="btn btn-danger remove-row">-</button>
                         </div>
                     </div>
-                    i++;
                 }
             </div>
 
             <div class="form-group">
-                <button type="button" id="submitButton" class="btn btn-primary">Save</button>
+                <button type="submit" id="submitButton" class="btn btn-primary">Save</button>
             </div>
         </form>
     </div>
@@ -90,52 +87,6 @@
                 }
             });
 
-                    // Handle form submission
-                $('#submitButton').on('click', function () {
-                            submitFormAjax();
-                    });
-
-                    // Submit form using AJAX
-                     function submitFormAjax() {
-                        var data = {
-                            OrderId: parseInt($('input[name="OrderId"]').val()),
-                            TableNumber: parseInt($('input[name="TableNumber"]').val()),
-                            OrderDetails: []
-                        };
-
-                        $('#inputRowsContainer .form-row').each(function () {
-                            var menuId = parseInt($(this).find('select').val());
-                            var quantity = parseInt($(this).find('input').val());
-                            data.OrderDetails.push({
-                                MenuId: menuId,
-                                Quantity: quantity
-                            });
-                        });
-                        // Get anti-forgery token from form
-                         var antiForgeryToken = $('input[name="__RequestVerificationToken"]').val();
-
-                        $.ajax({
-                            url: $('#orderForm').attr('action'),
-                            type: 'POST',
-                            contentType: 'application/json',
-                            headers: {
-                                'RequestVerificationToken': antiForgeryToken // Include anti-forgery token in headers
-                            },
-                            data: JSON.stringify(data),
-                            success: function (response) {
-                                // Handle success response
-                                console.log('Form submitted successfully');
-                                // Optionally, redirect or update the UI
-                                window.location.href = '/Order/Index';
-                            },
-                            error: function (xhr, status, error) {
-                                // Handle error response
-                                console.error('Form submission failed: ' + error);
-                            }
-                        });
-                    }
-
-
-                });
+                  
     </script>
 }

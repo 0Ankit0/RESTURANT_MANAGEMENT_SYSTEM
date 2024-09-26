@@ -10,4 +10,10 @@ namespace RMS_FRONTEND.Models.Orders
         public decimal? TotalPrice { get; set; }
         public List<OrderDetailsModel> OrderDetails { get; set; }
     }
+    public class OrderWithDetails
+    {
+        public int? OrderId { get; set; }
+        public int TableNumber { get; set; }
+        public required List<OrderDetailsModel> OrderDetails { get; set; }
+    }
 }
