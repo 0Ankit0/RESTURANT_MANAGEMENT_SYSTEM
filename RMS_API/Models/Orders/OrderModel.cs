@@ -12,4 +12,10 @@ namespace RMS_API.Models.Orders
 
         public List<OrderDetailsModel>? OrderDetails { get; set; }
     }
+    public class OrderWithDetails
+    {
+        public int? OrderId { get; set; }
+        public int TableNumber { get; set; }
+        public List<OrderDetailsModel> OrderDetails { get; set; }
+    }
 }

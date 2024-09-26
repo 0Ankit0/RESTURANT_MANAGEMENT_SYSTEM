@@ -56,7 +56,7 @@ namespace RMS_API.Controllers.Orders
         {
                 var orderDetails = await _context.Orders
                                     .Include(o => o.OrderDetails)
-                                    .Select(o => new OrderModel
+                                    .Select(o => new OrderWithDetails
                                     {
                                         OrderId = o.OrderId,
                                         TableNumber=o.TableNumber,
