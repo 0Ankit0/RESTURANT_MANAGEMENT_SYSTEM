@@ -25,15 +25,17 @@ namespace RMS_API.Controllers.Finance
         {
             try
             {
-                var recipes =await _context.Recipes.Include(r => r.Inventory).Include(r => r.Menu)
-                    .Select(r=>new RecipeData
+                var recipes = await _context.Recipes
+                    .Include(r => r.Menu)
+                    .Where(r => r.Menu != null && r.Menu.Recipes.Any())
+                    .Select(r => new RecipeData
                     {
-                        Menu=r.Menu.MenuName,
-                        Inventory=r.Inventory.ItemName,
-                        QuantityRequired=r.QuantityRequired,
-                        RecipeId=r.RecipeId
+                        MenuId = r.Menu.MenuId,
+                        Menu = r.Menu.MenuName ?? "",
+                        RecipeId = r.RecipeId
                     })
                     .ToListAsync();
+
                 return Ok(recipes);
 
             }
@@ -49,11 +51,19 @@ namespace RMS_API.Controllers.Finance
         {
             try
             {
-                var recipes = await _context.Recipes
-                             .Include(r => r.Inventory)
-                             .Include(r => r.Menu)
-                             .Where(r => r.MenuId == id)
-                             .ToListAsync();
+                var recipes = await _context.Menus.Include(r => r.Recipes).ThenInclude(r=>r.Inventory)
+                    .Where(m=>m.MenuId==id)
+                    .Select(r => new RecipeModelWithMenu
+                    {
+                       MenuId=r.MenuId,
+                       Recipes=r.Recipes.Select(r=>new RecipeModel
+                       {
+                           RecipeId=r.RecipeId,
+                           InventoryId= (int)r.InventoryId,
+                           QuantityRequired= r.QuantityRequired
+                       }).ToList()
+                    })
+                    .FirstOrDefaultAsync();
 
                 if (recipes == null )
                     return NotFound();
@@ -95,18 +105,19 @@ namespace RMS_API.Controllers.Finance
         }
 
         // PUT api/<RecipeController>/5
-        [HttpPut("Recipe/{menuId}")]
-        public async Task<IActionResult> Put(int menuId, [FromBody] RecipeModelWithMenu recipeWithMenu)
+        [HttpPut]
+        public async Task<IActionResult> Put([FromBody] RecipeModelWithMenu recipeWithMenu)
         {
             using (var transaction = await _context.Database.BeginTransactionAsync())
             {
                 try
                 {
+                    var id = recipeWithMenu.MenuId;
                     // Retrieve the menu from the database
-                    var curMenu = await _context.Menus.Include(m => m.Recipes).FirstOrDefaultAsync(m => m.MenuId == menuId);
+                    var curMenu = await _context.Menus.Include(m => m.Recipes).FirstOrDefaultAsync(m => m.MenuId == id);
                     if (curMenu == null)
                     {
-                        return NotFound($"Menu with ID {menuId} not found.");
+                        return NotFound($"Menu with ID {id} not found.");
                     }
 
                     // Remove recipes that are not in the incoming model
@@ -122,7 +133,6 @@ namespace RMS_API.Controllers.Finance
                             // Update existing recipe
                             existingRecipe.InventoryId = recipe.InventoryId;
                             existingRecipe.QuantityRequired = recipe.QuantityRequired;
-                            existingRecipe.GUID = recipe.GUID;
                         }
                         else
                         {
@@ -132,7 +142,7 @@ namespace RMS_API.Controllers.Finance
                                 MenuId = curMenu.MenuId,
                                 InventoryId = recipe.InventoryId,
                                 QuantityRequired = recipe.QuantityRequired,
-                                GUID = recipe.GUID
+                                GUID = Guid.NewGuid().ToString()
                             });
                         }
                     }
