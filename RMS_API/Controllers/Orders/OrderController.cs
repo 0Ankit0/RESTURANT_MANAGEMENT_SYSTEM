@@ -56,6 +56,7 @@ namespace RMS_API.Controllers.Orders
         {
                 var orderDetails = await _context.Orders
                                     .Include(o => o.OrderDetails)
+                                    .Where(o=> o.OrderId==id)
                                     .Select(o => new OrderWithDetails
                                     {
                                         OrderId = o.OrderId,
@@ -211,13 +212,15 @@ namespace RMS_API.Controllers.Orders
 
                             if (existingOrderDetail == null)
                             {
-                                // New order item - add it and reduce inventory
-                                var newOrderDetail = new OrderDetails
+                            var menu = await _context.Menus.FindAsync(item.MenuId);
+                            var price = menu.Price * item.Quantity;
+                            // New order item - add it and reduce inventory
+                            var newOrderDetail = new OrderDetails
                                 {
                                     OrderId = orderMaster.OrderId,
                                     MenuId = item.MenuId,
                                     Quantity = item.Quantity,
-                                    Price = (decimal)item.Price
+                                    Price = price
                                 };
                                 _context.OrderDetails.Add(newOrderDetail);
 
@@ -248,10 +251,7 @@ namespace RMS_API.Controllers.Orders
                             }
                         }
 
-                        // Update the order status (if it's changed)
-                        //orderMaster.OrderStatus = order.OrderStatus;
-                        //_context.Orders.Update(orderMaster);
-                    
+                     
 
                     // Save the changes and commit the transaction
                     await _context.SaveChangesAsync();
@@ -275,7 +275,8 @@ namespace RMS_API.Controllers.Orders
             {
                 using (var transaction = await _context.Database.BeginTransactionAsync())
                 {
-                    var order = await _context.Orders.FindAsync(id);
+                    var order = await _context.Orders.Include(o => o.OrderDetails)
+                                                    .FirstOrDefaultAsync(o => o.OrderId == id);
                     if (order == null)
                     {
                         return NotFound($"Order with ID {id} not found.");
@@ -313,14 +314,31 @@ namespace RMS_API.Controllers.Orders
                     }
                     else if (newStatus == "completed")
                     {
-                        var billingDetails = new Billing
-                        {
-                            OrderId = order.OrderId,
-                            TotalAmount = order.OrderDetails.Sum(od => od.Price * od.Quantity),
-                            Paid = false
-                        };
-                        _context.Billings.Add(billingDetails);
+                        var existingBilling = await _context.Billings.FirstOrDefaultAsync(b => b.OrderId == order.OrderId);
 
+                        if (existingBilling != null)
+                        {
+                            // Update the existing billing record
+                            existingBilling.TotalAmount = order.OrderDetails?.Sum(od => od.Price * od.Quantity) ?? 0;
+                            existingBilling.BillingDate = DateTime.Now;
+                            existingBilling.Paid = false;
+
+                            _context.Billings.Update(existingBilling);
+                        }
+                        else
+                        {
+                            // If no billing record exists, create a new one
+                            var billingDetails = new Billing
+                            {
+                                OrderId = order.OrderId,
+                                TotalAmount = order.OrderDetails?.Sum(od => od.Price * od.Quantity) ?? 0,
+                                BillingDate = DateTime.Now,
+                                Paid = false
+                            };
+
+                            _context.Billings.Add(billingDetails);
+
+                        }
                     }
 
                     await _context.SaveChangesAsync();

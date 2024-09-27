@@ -4,6 +4,7 @@ using RMS_API.Data;
 using RMS_API.Data.Finance;
 using RMS_API.Data.Orders;
 using RMS_API.Models.Finance;
+using RMS_API.Models.Orders;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -42,42 +43,25 @@ namespace RMS_API.Controllers.Finance
         {
             try
             {
-                // Fetch the Billing record
-                var billing = await _context.Billings
-                    .Include(b => b.Order) // Include the related Order
-                    .ThenInclude(o => o.OrderDetails) // Include the OrderDetails of the Order
-                    .ThenInclude(od => od.Menu) // Include the Menu details for each OrderDetail
-                    .FirstOrDefaultAsync(b => b.BillingId == id);
+                var billingModel = await _context.Billings
+                                   .Where(b => b.BillingId == id)
+                                   .Select(b => new BillingModel
+                                   {
+                                       BillingId = b.BillingId,
+                                       BillingDate = b.BillingDate,
+                                       OrderId = b.OrderId,
+                                       TotalAmount = b.TotalAmount,
+                                       Paid = b.Paid,
+                                       OrderDetails = b.Order.OrderDetails.Select(od => new OrderDetailsModel
+                                       {
+                                           MenuId = od.Menu.MenuId,
+                                           Quantity = od.Quantity,
+                                           Price = od.Price
+                                       }).ToList()
+                                   })
+                                   .FirstOrDefaultAsync();
 
-                if (billing == null)
-                {
-                    return NotFound($"Billing with ID {id} not found.");
-                }
-
-                // Fetch the order details related to the billing's OrderId
-                var orderDetails = billing.Order?.OrderDetails
-                    .Select(od => new
-                    {
-                        od.Menu.MenuName,
-                        od.Quantity,
-                        od.Price,
-                        TotalPrice = od.Quantity * od.Price
-                    })
-                    .ToList();
-
-                if (orderDetails == null || orderDetails.Count == 0)
-                {
-                    return NotFound($"No order details found for the Billing with ID {id}.");
-                }
-
-                return Ok(new
-                {
-                    billing.OrderId,
-                    billing.TotalAmount,
-                    billing.Paid,
-                    billing.BillingDate,
-                    OrderDetails = orderDetails
-                });
+                return Ok(billingModel);
             }
             catch (Exception ex)
             {
