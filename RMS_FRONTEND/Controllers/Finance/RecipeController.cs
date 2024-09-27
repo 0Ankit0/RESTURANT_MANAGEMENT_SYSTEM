@@ -66,7 +66,6 @@ namespace RMS_FRONTEND.Controllers.Finance
             if (ModelState.IsValid)
             {
                 var responseData = await _apiCall.PostAsync("Recipe",recipe);
-                var recipes = JsonConvert.DeserializeObject<RecipeModel>(responseData);
                 return RedirectToAction(nameof(Index));
             }
             return View(recipe);
