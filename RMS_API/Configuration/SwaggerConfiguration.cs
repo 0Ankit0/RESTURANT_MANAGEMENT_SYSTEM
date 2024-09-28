@@ -1,4 +1,6 @@
-﻿using Asp.Versioning;
+﻿//dotnet add package Swashbuckle.AspNetCore.Annotations
+//to add data annotations for the api endpoint
+using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.OpenApi.Models;
 
@@ -24,7 +26,7 @@ namespace RMS_API.Configuration
             })
             .AddApiExplorer(options =>
             {
-                options.GroupNameFormat = "'v'VVV";
+                options.GroupNameFormat = "VV";
                 options.SubstituteApiVersionInUrl = true;
             });
 
@@ -35,6 +37,9 @@ namespace RMS_API.Configuration
                 // Use the IServiceProvider to resolve IApiVersionDescriptionProvider
                 var serviceProvider = services.BuildServiceProvider();
                 var apiVersionDescriptionProvider = serviceProvider.GetRequiredService<IApiVersionDescriptionProvider>();
+
+                //To add data annotations using washbuckle.AspNetCore.Annotations
+                options.EnableAnnotations();
 
                 foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
                 {

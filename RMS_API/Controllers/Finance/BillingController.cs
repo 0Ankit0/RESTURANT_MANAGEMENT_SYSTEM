@@ -11,7 +11,7 @@ using RMS_API.Models.Orders;
 
 namespace RMS_API.Controllers.Finance
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
     [Authorize]
     public class BillingController : ControllerBase

@@ -10,7 +10,7 @@ using RMS_API.Models.Orders;
 
 namespace RMS_API.Controllers.Menu
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
     [Authorize]
     public class MenuController : ControllerBase

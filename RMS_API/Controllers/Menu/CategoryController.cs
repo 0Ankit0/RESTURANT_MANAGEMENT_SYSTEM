@@ -4,12 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using RMS_API.Data;
 using RMS_API.Data.Menu;
 using RMS_API.Models.Menu;
+using Swashbuckle.AspNetCore.Annotations;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace RMS_API.Controllers.Menu
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
     [Authorize]
     public class CategoryController : ControllerBase
@@ -20,8 +21,10 @@ namespace RMS_API.Controllers.Menu
         {
             _context = context;
         }
+       
         // GET: api/<CategoryController>
         [HttpGet]
+        [SwaggerOperation(Summary = "Get all Categories", Description = "Retrieves a list of all Categories.")]
         public async Task<ActionResult<IEnumerable<CategoryModel>>> Get()
         {
             try

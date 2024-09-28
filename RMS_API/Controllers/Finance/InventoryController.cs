@@ -10,7 +10,7 @@ using RMS_API.Models.Users;
 
 namespace RMS_API.Controllers.Finance
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
     [Authorize]
     public class InventoryController : ControllerBase

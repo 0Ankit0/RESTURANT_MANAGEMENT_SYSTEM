@@ -14,7 +14,7 @@ using System.Security.Claims;
 
 namespace RMS_API.Controllers.Orders
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
     [Authorize]
     public class OrderController : Controller

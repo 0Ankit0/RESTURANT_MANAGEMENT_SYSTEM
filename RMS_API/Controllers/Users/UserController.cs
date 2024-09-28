@@ -11,7 +11,7 @@ using System.Data;
 
 namespace RMS_API.Controllers.Users
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
     public class UserController : ControllerBase
     {
