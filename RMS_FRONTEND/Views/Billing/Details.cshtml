@@ -35,6 +35,38 @@
         <dd class = "col-sm-10">
             @Html.DisplayFor(model => model.OrderId)
         </dd>
+        <br />
+        <table class = "table table-bordered">
+			<thead>
+				<tr>
+					<th>
+						Menu
+					</th>
+					<th>
+						Quantity
+					</th>
+					<th>
+						Price
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+                @foreach (var item in Model.OrderDetails)
+                {
+                    <tr>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.MenuId)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Quantity)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Price)
+                        </td>
+                    </tr>
+                }
+            </tbody>
+
     </dl>
 </div>
 <div>
