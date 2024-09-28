@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RMS_API.CustomClass;
@@ -29,6 +30,7 @@ namespace RMS_API.Controllers.Users
         }
 
         [HttpGet]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<UserModel>>> Get()
         {
             try
@@ -55,6 +57,7 @@ namespace RMS_API.Controllers.Users
             }
         }
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<UserModel>>> Get(int id)
         {
             try
@@ -176,6 +179,7 @@ namespace RMS_API.Controllers.Users
         }
 
         [HttpPut("Update")]
+        [Authorize]
         public IActionResult Put([Bind("UserId,UserName,UserEmail,Phone,Address,Role")] UserModel user)
         {
             try
@@ -204,6 +208,7 @@ namespace RMS_API.Controllers.Users
         }
 
         [HttpDelete("Delete/{id}")]
+        [Authorize]
         public IActionResult Delete(int id)
         {
             try

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RMS_API.Data;
 using RMS_API.Data.Finance;
@@ -12,6 +13,7 @@ namespace RMS_API.Controllers.Finance
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class BillingController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

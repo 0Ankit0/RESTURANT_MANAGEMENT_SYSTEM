@@ -16,6 +16,7 @@ namespace RMS_API.Controllers.Orders
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class OrderController : Controller
     {
         private readonly ApplicationDbContext _context;

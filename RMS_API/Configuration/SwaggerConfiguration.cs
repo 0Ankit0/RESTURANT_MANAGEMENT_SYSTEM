@@ -12,66 +12,78 @@ namespace RMS_API.Configuration
         {
             _configuration = configuration;
         }
+
         public void ConfigureServices(IServiceCollection services)
         {
-                // Configure API versioning  more info https://dev.to/azzdcl/aspnet-core-web-api-with-swagger-api-versioning-for-dotnet-8-3c9j
-                services.AddApiVersioning(options =>
-                {
-                    options.AssumeDefaultVersionWhenUnspecified = true; // Assumes the default version if none is specified
-                    options.DefaultApiVersion = new ApiVersion(1, 0);   // Set the default API version to 1.0
-                    options.ReportApiVersions = true;
-                    //options.ApiVersionReader = ApiVersionReader.Combine(
-                    //new UrlSegmentApiVersionReader(),  //reads the API version from a segment in the URL path.
-                    //new QueryStringApiVersionReader("api-version"), //this is for query parameter based versioning
-                    //new HeaderApiVersionReader("X-Version"), //allows clients to specify the API version in a custom HTTP header. 
-                    //new MediaTypeApiVersionReader("ver"));//allows clients to specify the API version in the Content-Type or Accept HTTP headers by including a version parameter. 
-                })
-                    .AddApiExplorer(
-                    options =>
-                    {
-                        options.GroupNameFormat = "'v'VVV";
-                        options.SubstituteApiVersionInUrl = true;
-                    });
+            // Configure API versioning
+            services.AddApiVersioning(options =>
+            {
+                options.AssumeDefaultVersionWhenUnspecified = true;
+                options.DefaultApiVersion = new ApiVersion(1, 0);
+                options.ReportApiVersions = true;
+            })
+            .AddApiExplorer(options =>
+            {
+                options.GroupNameFormat = "'v'VVV";
+                options.SubstituteApiVersionInUrl = true;
+            });
 
-                // Add Swagger and configure SwaggerGen
-                services.AddEndpointsApiExplorer();
-                services.AddSwaggerGen(options =>
-                {
-                    // Use the IServiceProvider to resolve IApiVersionDescriptionProvider
-                    var serviceProvider = services.BuildServiceProvider();
-                    var apiVersionDescriptionProvider = serviceProvider.GetRequiredService<IApiVersionDescriptionProvider>();
+            // Add Swagger and configure SwaggerGen
+            services.AddEndpointsApiExplorer();
+            services.AddSwaggerGen(options =>
+            {
+                // Use the IServiceProvider to resolve IApiVersionDescriptionProvider
+                var serviceProvider = services.BuildServiceProvider();
+                var apiVersionDescriptionProvider = serviceProvider.GetRequiredService<IApiVersionDescriptionProvider>();
 
-                    foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+                foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+                {
+                    options.SwaggerDoc(description.GroupName, CreateInfoForApiVersion(description));
+                }
+
+                // Add Bearer Token Authentication support
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    In = ParameterLocation.Header,
+                    Description = "Please enter JWT token",
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    BearerFormat = "JWT",
+                    Scheme = "bearer"
+                });
+
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
                     {
-                        options.SwaggerDoc(description.GroupName, CreateInfoForApiVersion(description));
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        new string[] {}
                     }
                 });
-            
+            });
         }
+
         private OpenApiInfo CreateInfoForApiVersion(ApiVersionDescription description)
         {
-            try
+            var info = new OpenApiInfo
             {
-                var info = new OpenApiInfo
-                {
-                    Title = "API Title",
-                    Version = description.ApiVersion.ToString(),
-                    Description = $"API Description for version {description.ApiVersion}"
-                };
+                Title = "My API",
+                Version = description.ApiVersion.ToString(),
+                Description = $"API Description for version {description.ApiVersion}"
+            };
 
-                return info;
-            }
-            catch (Exception ex)
+            if (description.IsDeprecated)
             {
-                var info = new OpenApiInfo
-                {
-                    Title = "Exception",
-                    Version = description.ApiVersion.ToString(),
-                    Description = ex.ToString()
-                };
-
-                return info;
+                info.Description += " (This version is deprecated)";
             }
+
+            return info;
         }
     }
 }
