@@ -1,16 +1,19 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RMS_API.Data;
 using RMS_API.Data.Users;
 using RMS_API.Models.Users;
+using Swashbuckle.AspNetCore.Annotations;
 using System;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace RMS_API.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/{version:apiVersion}/[controller]")]
     [ApiController]
+    [Authorize]
     public class UserRoleController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -22,6 +25,7 @@ namespace RMS_API.Controllers
 
         // GET: api/<UserRoleController>
         [HttpGet]
+        [SwaggerOperation(Summary = "Get all Roles", Description = "Retrieves a list of all User Roles.")]
         public async Task<ActionResult<IEnumerable<RoleModel>>> Get()
         {
             try

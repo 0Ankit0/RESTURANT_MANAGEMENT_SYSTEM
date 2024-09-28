@@ -12,7 +12,7 @@ using RMS_API.Data.Users;
 
 namespace RMS_API.Controllers
 {
-    [Route("api/User")]
+    [Route("api/{version:apiVersion}/User")]
     [ApiController]
     public class LoginController : ControllerBase
     {
