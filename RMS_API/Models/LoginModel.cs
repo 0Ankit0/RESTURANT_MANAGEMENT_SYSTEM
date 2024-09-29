@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Swashbuckle.AspNetCore.Annotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace RMS_API.Models
 {
@@ -6,10 +7,12 @@ namespace RMS_API.Models
     {
         [Required(ErrorMessage = "Please enter your username or email address")]
         [StringLength(50, ErrorMessage = "Username or email cannot be longer than 50 characters")]
+        [SwaggerSchema(Description ="The email or username of the user")]
         public string UsernameOrEmail { get; set; }
 
         [Required(ErrorMessage = "Please enter your password")]
         [DataType(DataType.Password)]
+        [SwaggerSchema(Description ="Password for the provided user name or email")]
         public string Password { get; set; }
 
       
