@@ -38,6 +38,23 @@ namespace RMS_API.Controllers.Finance
 
             }
         }
+        // GET: api/<BillingController>/report
+        [HttpGet("report")]
+        public async Task<ActionResult<decimal>> GetTotalAmountReceived([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        {
+            try
+            {
+                var totalAmount = await _context.Billings
+                    .Where(b => b.BillingDate >= startDate && b.BillingDate <= endDate && b.Paid)
+                    .SumAsync(b => b.TotalAmount);
+
+                return Ok(totalAmount);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
 
         // GET api/<BillingController>/5
         [HttpGet("{id}")]
