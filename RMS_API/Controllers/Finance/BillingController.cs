@@ -64,16 +64,16 @@ namespace RMS_API.Controllers.Finance
             {
                 var billingModel = await _context.Billings
                                    .Where(b => b.BillingId == id)
-                                   .Select(b => new BillingModel
+                                   .Select(b => new BillingData
                                    {
                                        BillingId = b.BillingId,
                                        BillingDate = b.BillingDate,
                                        OrderId = b.OrderId,
                                        TotalAmount = b.TotalAmount,
                                        Paid = b.Paid,
-                                       OrderDetails = b.Order.OrderDetails.Select(od => new OrderDetailsModel
+                                       OrderDetails = b.Order.OrderDetails.Select(od => new OrderDetailsData
                                        {
-                                           MenuId = od.Menu.MenuId,
+                                           Menu = od.Menu.MenuName,
                                            Quantity = od.Quantity,
                                            Price = od.Price
                                        }).ToList()

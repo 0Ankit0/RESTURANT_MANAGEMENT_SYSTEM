@@ -56,6 +56,39 @@ namespace RMS_API.Controllers.Users
                 return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
             }
         }
+        [HttpGet("report/users-by-role")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<object>>> GetUsersByRole()
+        {
+            try
+            {
+                var usersByRole = await _context.UserMasters
+                    .GroupBy(u => u.Role)
+                    .Select(g => new
+                    {
+                        Role = g.Key,
+                        Users = g.Select(u => new UserModel
+                        {
+                            UserId = u.UserId,
+                            UserName = u.UserName,
+                            UserEmail = u.UserEmail,
+                            Phone = u.Phone,
+                            Address = u.Address,
+                            GUID = u.GUID,
+                            Role = u.Role
+                        }).ToList()
+                    })
+                    .ToListAsync();
+
+                return Ok(usersByRole);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
         [HttpGet("{id}")]
         [Authorize]
         public async Task<ActionResult<IEnumerable<UserModel>>> Get(int id)

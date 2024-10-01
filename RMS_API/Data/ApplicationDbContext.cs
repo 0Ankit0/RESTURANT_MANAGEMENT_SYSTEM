@@ -23,6 +23,8 @@ namespace RMS_API.Data
         public DbSet<OrderMaster> Orders { get; set; }
         public DbSet<OrderDetails> OrderDetails { get; set; }
         public DbSet<Billing> Billings { get; set; }
+        public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

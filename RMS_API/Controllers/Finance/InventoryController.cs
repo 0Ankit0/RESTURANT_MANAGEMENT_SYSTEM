@@ -46,6 +46,8 @@ namespace RMS_API.Controllers.Finance
             }
         }
 
+
+
         // GET api/<InventoryController>/5
         [HttpGet("{id}")]
         public async Task<ActionResult<IEnumerable<InventoryModel>>> Get(int id)
@@ -81,12 +83,24 @@ namespace RMS_API.Controllers.Finance
                     Quantity = inventoryModel.Quantity,
                     GUID = Guid.NewGuid().ToString(),
                     CreatedAt = DateTime.Now
-                    
                 };
+
                 _context.Inventories.Add(inventory);
                 await _context.SaveChangesAsync();
-                return Ok(inventory);
 
+                InventoryTransaction transaction = new InventoryTransaction
+                {
+                    InventoryId = inventory.InventoryId,
+                    TransactionDate = DateTime.Now,
+                    Quantity = inventory.Quantity,
+                    TransactionType = TransactionType.Addition,
+                    Description = "Initial addition"
+                };
+
+                _context.InventoryTransactions.Add(transaction);
+                await _context.SaveChangesAsync();
+
+                return Ok(inventory);
             }
             catch (Exception ex)
             {
@@ -105,19 +119,96 @@ namespace RMS_API.Controllers.Finance
                 {
                     return NotFound();
                 }
+
+                decimal quantityDifference = im.Quantity - inventory.Quantity;
+
                 inventory.Quantity = im.Quantity;
                 inventory.ItemName = im.ItemName;
                 inventory.Unit = im.Unit;
                 _context.Inventories.Update(inventory);
                 await _context.SaveChangesAsync();
-                return Ok(inventory);
 
+                InventoryTransaction transaction = new InventoryTransaction
+                {
+                    InventoryId = inventory.InventoryId,
+                    TransactionDate = DateTime.Now,
+                    Quantity = quantityDifference,
+                    TransactionType = quantityDifference > 0 ? TransactionType.Addition : TransactionType.Subtraction,
+                    Description = "Update inventory"
+                };
+
+                _context.InventoryTransactions.Add(transaction);
+                await _context.SaveChangesAsync();
+
+                return Ok(inventory);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        [HttpGet("report/total-value")]
+        public async Task<ActionResult> GetTotalInventoryValue()
+        {
+            var totalValue = await _context.Inventories
+                .SumAsync(i => i.Quantity * i.Recipes.Sum(r => r.QuantityRequired));
+
+            return Ok(new { TotalValue = totalValue });
+        }
+
+        [HttpGet("report/transactions")]
+        public async Task<ActionResult> GetInventoryTransactions(DateTime startDate, DateTime endDate)
+        {
+            var transactions = await _context.InventoryTransactions
+                .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                .Select(t => new
+                {
+                    t.TransactionId,
+                    t.InventoryId,
+                    t.TransactionDate,
+                    t.Quantity,
+                    t.TransactionType,
+                    t.Description
+                })
+                .ToListAsync();
+
+            return Ok(transactions);
+        }
+
+        [HttpGet("report/low-stock")]
+        public async Task<ActionResult> GetLowStockItems(decimal threshold)
+        {
+            var lowStockItems = await _context.Inventories
+                .Where(i => i.Quantity < threshold)
+                .Select(i => new
+                {
+                    i.InventoryId,
+                    i.ItemName,
+                    i.Quantity,
+                    i.Unit
+                })
+                .ToListAsync();
+
+            return Ok(lowStockItems);
+        }
+
+        [HttpGet("report/changes-over-time")]
+        public async Task<ActionResult> GetInventoryChangesOverTime(DateTime startDate, DateTime endDate)
+        {
+            var changes = await _context.InventoryTransactions
+                .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                .GroupBy(t => t.TransactionDate.Date)
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    TotalChange = g.Sum(t => t.Quantity)
+                })
+                .ToListAsync();
+
+            return Ok(changes);
+        }
+
 
         // DELETE api/<InventoryController>/5
         [HttpDelete("{id}")]

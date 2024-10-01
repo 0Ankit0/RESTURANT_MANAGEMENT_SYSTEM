@@ -87,10 +87,9 @@ namespace RMS_API.Controllers.Orders
         }
     }
 
-        
+
         [HttpPost]
         [Authorize]
-        // POST: OrderController/Post
         public async Task<IActionResult> Post([FromBody] OrderModel order)
         {
             try
@@ -101,7 +100,7 @@ namespace RMS_API.Controllers.Orders
                     {
                         var authenticatedUser = HttpContext.Items["User"] as AuthenticatedUser;
                         var userId = Convert.ToInt32(authenticatedUser?.UserId);
-                        
+
                         var orderMaster = new OrderMaster
                         {
                             OrderStatus = "Created",
@@ -135,17 +134,25 @@ namespace RMS_API.Controllers.Orders
                                 {
                                     inventory.Quantity -= recipeItem.QuantityRequired * item.Quantity;
                                     _context.Inventories.Update(inventory);
+
+                                    var inventoryTransaction = new InventoryTransaction
+                                    {
+                                        InventoryId = inventory.InventoryId,
+                                        TransactionDate = DateTime.Now,
+                                        Quantity = -recipeItem.QuantityRequired * item.Quantity,
+                                        TransactionType = TransactionType.Subtraction,
+                                        Description = $"Order {orderMaster.OrderId} created"
+                                    };
+                                    _context.InventoryTransactions.Add(inventoryTransaction);
                                 }
                                 else
                                 {
-                                    throw new InvalidOperationException($"Insufficient quantity for menu sith id {recipeItem.MenuId}");
+                                    throw new InvalidOperationException($"Insufficient quantity for menu with ID {recipeItem.MenuId}");
                                 }
                             }
                         }
 
-
                         await _context.SaveChangesAsync();
-
                         await transaction.CommitAsync();
                         return Ok(orderMaster);
                     }
@@ -158,7 +165,6 @@ namespace RMS_API.Controllers.Orders
             }
             catch (Exception ex)
             {
-                // Log the exception
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while processing the order: {ex.Message}");
             }
         }
@@ -172,7 +178,6 @@ namespace RMS_API.Controllers.Orders
                 try
                 {
                     var orderId = order.OrderId;
-                    // Fetch the existing order with its details
                     var orderMaster = await _context.Orders.Include(o => o.OrderDetails)
                                                            .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
@@ -181,11 +186,9 @@ namespace RMS_API.Controllers.Orders
                         return NotFound($"Order with ID {orderId} not found.");
                     }
 
-                    // Identify the order details that are removed in the updated order
                     var updatedMenuIds = order.OrderDetails.Select(od => od.MenuId).ToList();
                     var removedOrderDetails = orderMaster.OrderDetails.Where(od => !updatedMenuIds.Contains((int)od.MenuId)).ToList();
 
-                    // Add back the inventory for the removed order items
                     foreach (var removedItem in removedOrderDetails)
                     {
                         var recipeItems = await _context.Recipes.Where(r => r.MenuId == removedItem.MenuId).ToListAsync();
@@ -195,66 +198,105 @@ namespace RMS_API.Controllers.Orders
                             var inventory = await _context.Inventories.FindAsync(recipeItem.InventoryId);
                             if (inventory != null)
                             {
-                                // Add back the quantity to the inventory
                                 inventory.Quantity += recipeItem.QuantityRequired * removedItem.Quantity;
                                 _context.Inventories.Update(inventory);
+
+                                var inventoryTransaction = new InventoryTransaction
+                                {
+                                    InventoryId = inventory.InventoryId,
+                                    TransactionDate = DateTime.Now,
+                                    Quantity = recipeItem.QuantityRequired * removedItem.Quantity,
+                                    TransactionType = TransactionType.Addition,
+                                    Description = $"Order {orderMaster.OrderId} updated - item removed"
+                                };
+                                _context.InventoryTransactions.Add(inventoryTransaction);
                             }
                         }
 
-                        // Remove the order detail
                         _context.OrderDetails.Remove(removedItem);
                     }
 
-                    
-                        // Process the updated order details
-                        foreach (var item in order.OrderDetails)
-                        {
-                            var existingOrderDetail = orderMaster.OrderDetails.FirstOrDefault(od => od.MenuId == item.MenuId);
+                    foreach (var item in order.OrderDetails)
+                    {
+                        var existingOrderDetail = orderMaster.OrderDetails.FirstOrDefault(od => od.MenuId == item.MenuId);
 
-                            if (existingOrderDetail == null)
-                            {
+                        if (existingOrderDetail == null)
+                        {
                             var menu = await _context.Menus.FindAsync(item.MenuId);
                             var price = menu.Price * item.Quantity;
-                            // New order item - add it and reduce inventory
-                            var newOrderDetail = new OrderDetails
-                                {
-                                    OrderId = orderMaster.OrderId,
-                                    MenuId = item.MenuId,
-                                    Quantity = item.Quantity,
-                                    Price = price
-                                };
-                                _context.OrderDetails.Add(newOrderDetail);
 
-                                // Reduce inventory for new items
-                                var recipeItems = await _context.Recipes.Where(r => r.MenuId == item.MenuId).ToListAsync();
-                                foreach (var recipeItem in recipeItems)
+                            var newOrderDetail = new OrderDetails
+                            {
+                                OrderId = orderMaster.OrderId,
+                                MenuId = item.MenuId,
+                                Quantity = item.Quantity,
+                                Price = price
+                            };
+                            _context.OrderDetails.Add(newOrderDetail);
+
+                            var recipeItems = await _context.Recipes.Where(r => r.MenuId == item.MenuId).ToListAsync();
+                            foreach (var recipeItem in recipeItems)
+                            {
+                                var inventory = await _context.Inventories.FindAsync(recipeItem.InventoryId);
+                                if (inventory != null && inventory.Quantity >= recipeItem.QuantityRequired * item.Quantity)
                                 {
-                                    var inventory = await _context.Inventories.FindAsync(recipeItem.InventoryId);
-                                    if (inventory != null && inventory.Quantity >= recipeItem.QuantityRequired * item.Quantity)
+                                    inventory.Quantity -= recipeItem.QuantityRequired * item.Quantity;
+                                    _context.Inventories.Update(inventory);
+
+                                    var inventoryTransaction = new InventoryTransaction
                                     {
-                                        inventory.Quantity -= recipeItem.QuantityRequired * item.Quantity;
-                                        _context.Inventories.Update(inventory);
-                                    }
-                                    else
-                                    {
-                                        throw new InvalidOperationException($"Insufficient quantity for menu with ID {recipeItem.MenuId}");
-                                    }
+                                        InventoryId = inventory.InventoryId,
+                                        TransactionDate = DateTime.Now,
+                                        Quantity = -recipeItem.QuantityRequired * item.Quantity,
+                                        TransactionType = TransactionType.Subtraction,
+                                        Description = $"Order {orderMaster.OrderId} updated - new item added"
+                                    };
+                                    _context.InventoryTransactions.Add(inventoryTransaction);
+                                }
+                                else
+                                {
+                                    throw new InvalidOperationException($"Insufficient quantity for menu with ID {recipeItem.MenuId}");
                                 }
                             }
-                            else
-                            {
+                        }
+                        else
+                        {
                             var menu = await _context.Menus.FindAsync(item.MenuId);
                             var price = menu.Price * item.Quantity;
-                            // Update existing order item (optional)
+
+                            var quantityDifference = item.Quantity - existingOrderDetail.Quantity;
+
                             existingOrderDetail.Quantity = item.Quantity;
-                                existingOrderDetail.Price = price;
-                                _context.OrderDetails.Update(existingOrderDetail);
+                            existingOrderDetail.Price = price;
+                            _context.OrderDetails.Update(existingOrderDetail);
+
+                            var recipeItems = await _context.Recipes.Where(r => r.MenuId == item.MenuId).ToListAsync();
+                            foreach (var recipeItem in recipeItems)
+                            {
+                                var inventory = await _context.Inventories.FindAsync(recipeItem.InventoryId);
+                                if (inventory != null && inventory.Quantity >= recipeItem.QuantityRequired * quantityDifference)
+                                {
+                                    inventory.Quantity -= recipeItem.QuantityRequired * quantityDifference;
+                                    _context.Inventories.Update(inventory);
+
+                                    var inventoryTransaction = new InventoryTransaction
+                                    {
+                                        InventoryId = inventory.InventoryId,
+                                        TransactionDate = DateTime.Now,
+                                        Quantity = -recipeItem.QuantityRequired * quantityDifference,
+                                        TransactionType = TransactionType.Subtraction,
+                                        Description = $"Order {orderMaster.OrderId} updated - item quantity changed"
+                                    };
+                                    _context.InventoryTransactions.Add(inventoryTransaction);
+                                }
+                                else
+                                {
+                                    throw new InvalidOperationException($"Insufficient quantity for menu with ID {recipeItem.MenuId}");
+                                }
                             }
                         }
+                    }
 
-                     
-
-                    // Save the changes and commit the transaction
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
@@ -262,7 +304,6 @@ namespace RMS_API.Controllers.Orders
                 }
                 catch (Exception ex)
                 {
-                    // Rollback the transaction in case of an error
                     await transaction.RollbackAsync();
                     return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while updating the order: {ex.Message}");
                 }
@@ -277,16 +318,14 @@ namespace RMS_API.Controllers.Orders
                 using (var transaction = await _context.Database.BeginTransactionAsync())
                 {
                     var order = await _context.Orders.Include(o => o.OrderDetails)
-                                                    .FirstOrDefaultAsync(o => o.OrderId == id);
+                                                     .FirstOrDefaultAsync(o => o.OrderId == id);
                     if (order == null)
                     {
                         return NotFound($"Order with ID {id} not found.");
                     }
 
-                    // Change the order status
                     order.OrderStatus = newStatus;
 
-                    // If the new status is 'Cancelled', add inventory back
                     if (newStatus == "Cancelled")
                     {
                         var orderDetails = await _context.OrderDetails
@@ -306,9 +345,18 @@ namespace RMS_API.Controllers.Orders
 
                                 if (inventory != null)
                                 {
-                                    // Add back the quantity to inventory
                                     inventory.Quantity += recipeItem.QuantityRequired * orderDetail.Quantity;
                                     _context.Inventories.Update(inventory);
+
+                                    var inventoryTransaction = new InventoryTransaction
+                                    {
+                                        InventoryId = inventory.InventoryId,
+                                        TransactionDate = DateTime.Now,
+                                        Quantity = recipeItem.QuantityRequired * orderDetail.Quantity,
+                                        TransactionType = TransactionType.Addition,
+                                        Description = $"Order {order.OrderId} cancelled"
+                                    };
+                                    _context.InventoryTransactions.Add(inventoryTransaction);
                                 }
                             }
                         }
@@ -319,7 +367,6 @@ namespace RMS_API.Controllers.Orders
 
                         if (existingBilling != null)
                         {
-                            // Update the existing billing record
                             existingBilling.TotalAmount = order.OrderDetails?.Sum(od => od.Price * od.Quantity) ?? 0;
                             existingBilling.BillingDate = DateTime.Now;
                             existingBilling.Paid = false;
@@ -328,7 +375,6 @@ namespace RMS_API.Controllers.Orders
                         }
                         else
                         {
-                            // If no billing record exists, create a new one
                             var billingDetails = new Billing
                             {
                                 OrderId = order.OrderId,
@@ -338,7 +384,6 @@ namespace RMS_API.Controllers.Orders
                             };
 
                             _context.Billings.Add(billingDetails);
-
                         }
                     }
 
@@ -352,6 +397,73 @@ namespace RMS_API.Controllers.Orders
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred: {ex.Message}");
             }
+        }
+        [HttpGet("report/top-menus")]
+        public async Task<ActionResult> GetTopMenusReport(DateTime startDate, DateTime endDate)
+        {
+            var topMenus = await _context.OrderDetails
+                .Where(od => od.Order.OrderDate >= startDate && od.Order.OrderDate <= endDate)
+                .GroupBy(od => od.MenuId)
+                .Select(g => new
+                {
+                    MenuId = g.Key,
+                    MenuName = g.FirstOrDefault().Menu.MenuName,
+                    TotalQuantity = g.Sum(od => od.Quantity)
+                })
+                .OrderByDescending(g => g.TotalQuantity)
+                .Take(5)
+                .ToListAsync();
+
+            return Ok(topMenus);
+        }
+
+        [HttpGet("report/waiter-performance")]
+        public async Task<ActionResult> GetWaiterPerformanceReport(DateTime startDate, DateTime endDate)
+        {
+            var waiterPerformance = await _context.Orders
+                .Where(o => o.OrderDate >= startDate && o.OrderDate <= endDate)
+                .GroupBy(o => o.WaiterId)
+                .Select(g => new
+                {
+                    WaiterId = g.Key,
+                    WaiterName = g.FirstOrDefault().Waiter.UserName,
+                    OrderCount = g.Count()
+                })
+                .ToListAsync();
+
+            return Ok(waiterPerformance);
+        }
+
+
+        [HttpGet("report/daily-orders")]
+        public async Task<ActionResult> GetDailyOrdersReport(DateTime startDate, DateTime endDate)
+        {
+            var dailyOrders = await _context.Orders
+                .Where(o => o.OrderDate >= startDate && o.OrderDate <= endDate)
+                .GroupBy(o => o.OrderDate.Date)
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    OrderCount = g.Count()
+                })
+                .ToListAsync();
+
+            return Ok(dailyOrders);
+        }
+        [HttpGet("report/monthly-revenue")]
+        public async Task<ActionResult> GetMonthlyRevenueReport(int year)
+        {
+            var monthlyRevenue = await _context.Orders
+                .Where(o => o.OrderDate.Year == year)
+                .GroupBy(o => o.OrderDate.Month)
+                .Select(g => new
+                {
+                    Month = g.Key,
+                    TotalRevenue = g.Sum(o => o.OrderDetails.Sum(od => od.Quantity * od.Price))
+                })
+                .ToListAsync();
+
+            return Ok(monthlyRevenue);
         }
 
 
