@@ -10,12 +10,13 @@
 <h4>Billing</h4>
 <hr />
 <div class="row">
-    <div class="col-md-4">
-        <form asp-action="Create">
+    <div class="col-md-12">
+        <form asp-action="Create" method="post">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
             <div class="form-group">
                 <label asp-for="OrderId" class="control-label"></label>
-                <select asp-for="OrderId" class ="form-control" asp-items="ViewBag.OrderId"></select>
+                <select asp-for="OrderId" class="form-control" asp-items="ViewBag.OrderId"></select>
             </div>
             <div class="form-group">
                 <label asp-for="TotalAmount" class="control-label"></label>
@@ -32,6 +33,24 @@
                     <input class="form-check-input" asp-for="Paid" /> @Html.DisplayNameFor(model => model.Paid)
                 </label>
             </div>
+
+            <div id="inputRowsContainer">
+                <div class="row mb-2 form-row">
+                    <div class="col-md-5">
+                        <label>Menu</label>
+                        <select name="OrderDetails[0].MenuId" class="form-control" asp-items="ViewBag.MenuId"></select>
+                    </div>
+                    <div class="col-md-5">
+                        <label>Quantity</label>
+                        <input name="OrderDetails[0].Quantity" class="form-control" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-success add-row me-2">+</button>
+                        <button type="button" class="btn btn-danger remove-row">-</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group">
                 <input type="submit" value="Create" class="btn btn-primary" />
             </div>
@@ -44,5 +63,40 @@
 </div>
 
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // Add new row on clicking 'Add' button
+            $(document).on('click', '.add-row', function () {
+                // Find the current number of rows
+                var rowIndex = $('#inputRowsContainer .form-row').length;
+
+                // Clone the first row and append it to the container
+                var newRow = $('.form-row:first').clone();
+                newRow.find('input, select').val('');  // Clear the input values
+
+                // Update the names of the inputs to match the new index
+                newRow.find('select').attr('name', 'OrderDetails[' + rowIndex + '].MenuId');
+                newRow.find('input').attr('name', 'OrderDetails[' + rowIndex + '].Quantity');
+
+                $('#inputRowsContainer').append(newRow);
+            });
+
+            // Remove row on clicking 'Remove' button
+            $(document).on('click', '.remove-row', function () {
+                // Remove row only if more than one exists
+                if ($('.form-row').length > 1) {
+                    $(this).closest('.form-row').remove();
+
+                    // After removing, update the names of all remaining rows to ensure correct indexing
+                    $('#inputRowsContainer .form-row').each(function (index) {
+                        $(this).find('select').attr('name', 'OrderDetails[' + index + '].MenuId');
+                        $(this).find('input').attr('name', 'OrderDetails[' + index + '].Quantity');
+                    });
+                }
+            });
+        });
+    </script>
 }

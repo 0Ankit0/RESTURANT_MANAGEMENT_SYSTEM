@@ -39,7 +39,7 @@ namespace RMS_FRONTEND.Controllers.Finance
             }
 
             var responseData = await _apiCall.GetAsync("Billing/",$"{id}");
-            var billings = JsonConvert.DeserializeObject<BillingModel>(responseData);
+            var billings = JsonConvert.DeserializeObject<BillingData>(responseData);
             return View(billings);
         }
 
@@ -57,7 +57,7 @@ namespace RMS_FRONTEND.Controllers.Finance
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("OrderId,TotalAmount,BillingDate,Paid")] BillingModel billing)
+        public async Task<IActionResult> Create([FromForm] BillingModel billing)
         {
             if (ModelState.IsValid)
             {

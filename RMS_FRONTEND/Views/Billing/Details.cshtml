@@ -1,4 +1,4 @@
-﻿@model RMS_FRONTEND.Models.Finance.BillingModel
+﻿@model RMS_FRONTEND.Models.Finance.BillingData
 
 @{
     ViewData["Title"] = "Details";
@@ -35,7 +35,7 @@
         <dd class = "col-sm-10">
             @Html.DisplayFor(model => model.OrderId)
         </dd>
-        <br />
+        </dl>
         <table class = "table table-bordered">
 			<thead>
 				<tr>
@@ -55,7 +55,7 @@
                 {
                     <tr>
                         <td>
-                            @Html.DisplayFor(modelItem => item.MenuId)
+                            @Html.DisplayFor(modelItem => item.Menu)
                         </td>
                         <td>
                             @Html.DisplayFor(modelItem => item.Quantity)
@@ -66,8 +66,7 @@
                     </tr>
                 }
             </tbody>
-
-    </dl>
+        </table>
 </div>
 <div>
     <a asp-action="Edit" asp-route-id="@Model?.BillingId">Edit</a> |
