@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New IP Address Login Attempt</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .ip-info {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 15px 0;
+        }
+        .button-container {
+            margin: 25px 0;
+            text-align: center;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 10px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .button-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .button-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>New IP Address Detected</h1>
+    
+    <p>Hi {{user.first_name or user.email}},</p>
+    
+    <div class="warning">
+        <strong>⚠️ Security Alert</strong><br>
+        A login attempt was made to your account from a new IP address.
+    </div>
+    
+    <div class="container">
+        <p><strong>IP Address:</strong></p>
+        <div class="ip-info">{{ip_address}}</div>
+        
+        <p>If this was you, please confirm by clicking the button below to whitelist this IP address for future logins:</p>
+        
+        <div class="button-container">
+            <a href="{{whitelist_url}}" class="button button-success">✓ Yes, That Was Me</a>
+        </div>
+        
+        <p>If this was <strong>NOT</strong> you, please secure your account immediately by clicking the button below to blacklist this IP:</p>
+        
+        <div class="button-container">
+            <a href="{{blacklist_url}}" class="button button-danger">✗ No, That Wasn't Me</a>
+        </div>
+    </div>
+    
+    <p>For your security, this IP address will remain blocked until you take action.</p>
+    
+    <div class="footer">
+        <p><strong>Security Tip:</strong> If you don't recognize this activity, we recommend changing your password immediately and reviewing your account security settings.</p>
+        <p>This link will expire in 24 hours.</p>
+        <p>If you didn't request this, please ignore this email or contact our support team.</p>
+    </div>
+</body>
+</html>

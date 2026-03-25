@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://backend:8000/api
+      - NEXT_PUBLIC_WS_URL=ws://backend:8000/ws
+    depends_on:
+      - backend
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../Fastapi-template-backend
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
+    environment:
+      - FASTAPI_SECRET_KEY=${FASTAPI_SECRET_KEY:-change-me-in-production}
+      - FASTAPI_DEBUG=False
+      - FASTAPI_ALLOWED_HOSTS=localhost,backend
+      - DB_CONNECTION={"dbname":"ecommerce","username":"postgres","password":"postgres","host":"db","port":"5432"}
+      - REDIS_CONNECTION=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  celery:
+    build:
+      context: ../Fastapi-template-backend
+      dockerfile: Dockerfile
+    command: celery -A tasks worker -l info
+    environment:
+      - FASTAPI_SECRET_KEY=${FASTAPI_SECRET_KEY:-change-me-in-production}
+      - DB_CONNECTION={"dbname":"ecommerce","username":"postgres","password":"postgres","host":"db","port":"5432"}
+      - REDIS_CONNECTION=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - backend
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: ../Fastapi-template-backend
+      dockerfile: Dockerfile
+    command: celery -A tasks beat -l info --scheduler Fastapi_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      - FASTAPI_SECRET_KEY=${FASTAPI_SECRET_KEY:-change-me-in-production}
+      - DB_CONNECTION={"dbname":"ecommerce","username":"postgres","password":"postgres","host":"db","port":"5432"}
+      - REDIS_CONNECTION=redis://redis:6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - backend
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=ecommerce
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - '5432:5432'
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
