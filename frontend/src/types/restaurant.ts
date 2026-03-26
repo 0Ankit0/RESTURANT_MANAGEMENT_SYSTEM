@@ -1,0 +1,84 @@
+export type TableStatus = 'available' | 'occupied' | 'reserved' | 'out_of_service';
+export type WaitlistStatus = 'waiting' | 'seated' | 'cancelled';
+export type OrderStatus = 'draft' | 'submitted' | 'in_progress' | 'ready' | 'served' | 'cancelled';
+
+export interface RestaurantBranch {
+  id: number;
+  name: string;
+  tax_rate: number;
+  service_charge_rate: number;
+  is_active: boolean;
+}
+
+export interface RestaurantTable {
+  id: number;
+  branch_id: number;
+  code: string;
+  seats: number;
+  status: TableStatus;
+}
+
+export interface MenuItem {
+  id: number;
+  branch_id: number;
+  name: string;
+  price: number;
+  is_available: boolean;
+}
+
+export interface Reservation {
+  id: number;
+  branch_id: number;
+  guest_name: string;
+  guest_phone: string;
+  party_size: number;
+  reservation_time: string;
+  table_id: number | null;
+  status: string;
+  notes?: string | null;
+}
+
+export interface WaitlistEntry {
+  id: number;
+  branch_id: number;
+  guest_name: string;
+  guest_phone: string;
+  party_size: number;
+  status: WaitlistStatus;
+  notes?: string | null;
+}
+
+export interface KitchenTicket {
+  id: number;
+  order_item_id: number;
+  station: string;
+  status: string;
+  priority: number;
+  updated_at: string;
+}
+
+export interface CursorPage<T> {
+  items: T[];
+  next_cursor: number | null;
+}
+
+export interface RestaurantOrder {
+  id: number;
+  branch_id: number;
+  table_id: number | null;
+  waiter_id: number | null;
+  order_source: string;
+  status: OrderStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BranchOperationsReport {
+  branch_id: number;
+  orders_count: number;
+  open_tickets: number;
+  gross_sales: number;
+  collected_sales: number;
+  low_stock_count: number;
+  generated_at: string;
+}

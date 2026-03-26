@@ -40,6 +40,7 @@ async def init_db():
     import src.apps.finance.models  # noqa: F401
     import src.apps.websocket.models  # noqa: F401
     import src.apps.observability.models  # noqa: F401
+    import src.apps.restaurant.models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)

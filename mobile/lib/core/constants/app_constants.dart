@@ -16,6 +16,7 @@ class AppConstants {
   static const String profileRoute = '/home/profile';
   static const String tokensRoute = '/home/settings/tokens';
   static const String paymentsRoute = '/home/payments';
+  static const String restaurantRoute = '/home/restaurant';
 
   // Social auth — the backend redirects here after OAuth; the WebView intercepts it
   static const String socialAuthCallbackPrefix = '/auth-callback';
