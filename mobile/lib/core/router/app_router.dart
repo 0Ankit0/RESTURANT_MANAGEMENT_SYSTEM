@@ -10,6 +10,7 @@ import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/payments/presentation/pages/payments_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/restaurant/presentation/pages/restaurant_page.dart';
 import '../../features/profile/presentation/pages/tokens_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../constants/app_constants.dart';
@@ -83,6 +84,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'payments',
                     builder: (context, state) => const PaymentsPage(),
+                  ),
+                  GoRoute(
+                    path: 'restaurant',
+                    builder: (context, state) => const RestaurantPage(),
                   ),
                 ],
               ),

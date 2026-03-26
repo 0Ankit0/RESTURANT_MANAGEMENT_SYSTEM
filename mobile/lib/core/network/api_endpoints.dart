@@ -48,4 +48,15 @@ class ApiEndpoints {
   static const String paymentProviders = '/payments/providers/';
   static const String paymentInitiate = '/payments/initiate/';
   static const String paymentVerify = '/payments/verify/';
+
+  // Restaurant
+  static const String restaurantBranches = '/branches';
+  static String restaurantTables(int branchId) => '/branches/$branchId/tables';
+  static const String restaurantOrders = '/orders';
+  static const String restaurantReservations = '/reservations';
+  static const String restaurantWaitlist = '/waitlist';
+  static const String restaurantMenuItems = '/menu-items';
+  static const String restaurantBranchReport = '/reports/branch-operations';
+  static String restaurantSeatTable(int tableId) => '/tables/$tableId/seat';
+  static String restaurantPromoteWaitlist(int waitlistId) => '/waitlist/$waitlistId/promote';
 }

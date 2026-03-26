@@ -12,6 +12,7 @@ import {
   Key,
   ArrowRight,
   Map,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { OrgSwitcher } from './org-switcher';
 import { useSystemCapabilities } from '@/hooks/use-system';
@@ -24,6 +25,7 @@ const mainNavigation = [
   { name: 'Payments', href: '/finances', icon: CreditCard, feature: 'finance' },
   { name: 'Notifications', href: '/notifications', icon: Bell, feature: 'notifications' },
   { name: 'Maps', href: '/maps', icon: Map, feature: 'maps' },
+  { name: 'Restaurant Ops', href: '/restaurant', icon: UtensilsCrossed },
   { name: 'Active Sessions', href: '/tokens', icon: Key, feature: 'auth' },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

@@ -36,6 +36,14 @@ class HomeTab extends StatelessWidget {
             color: Colors.teal,
             onTap: () => context.go('/home/settings/tokens'),
           ),
+          const SizedBox(height: 8),
+          _QuickAccessCard(
+            icon: Icons.restaurant,
+            title: 'Restaurant Ops',
+            subtitle: 'FOH · Kitchen · Billing metrics',
+            color: Colors.deepOrange,
+            onTap: () => context.go('/home/restaurant'),
+          ),
         ],
       ),
     );

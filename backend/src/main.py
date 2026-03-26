@@ -28,6 +28,7 @@ from src.apps.analytics.middleware import AnalyticsMiddleware
 from src.apps.system.api import router as system_router
 from src.apps.observability.api import router as observability_router
 from src.apps.observability.service import prune_old_log_entries
+from src.apps.restaurant.api import restaurant_router
 from src.apps.core.storage import storage_uses_local_filesystem
 
 configure_logging()
@@ -126,6 +127,7 @@ if not settings.DEBUG and not settings.TESTING:
     )
 
 app.include_router(system_router, prefix=settings.API_V1_STR)
+app.include_router(restaurant_router, prefix=settings.API_V1_STR)
 app.include_router(observability_router, prefix=settings.API_V1_STR)
 
 if settings.FEATURE_AUTH:

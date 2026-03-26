@@ -9,3 +9,4 @@ export * from './tokens';
 export * from './websocket';
 export * from './system';
 export * from './observability';
+export * from './restaurant';
