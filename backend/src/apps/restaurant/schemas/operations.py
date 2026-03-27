@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from src.apps.restaurant.models import (
     AccountingExportStatus,
     BillStatus,
+    DayCloseStatus,
     DrawerStatus,
     KitchenTicketStatus,
     OrderSource,
@@ -37,6 +38,33 @@ class TableCreate(BaseModel):
     seats: int = Field(default=2, ge=1)
 
 
+class ServiceZoneCreate(BaseModel):
+    name: str
+
+
+class ServiceZoneRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class TableGroupCreate(BaseModel):
+    name: str
+    table_ids: list[int] = Field(default_factory=list)
+
+
+class TableGroupRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    table_ids_csv: str
+
+    model_config = {"from_attributes": True}
+
+
 class TableRead(BaseModel):
     id: int
     branch_id: int
@@ -50,6 +78,54 @@ class TableRead(BaseModel):
 class MenuItemCreate(BaseModel):
     name: str
     price: float = Field(ge=0)
+
+
+class MenuCategoryCreate(BaseModel):
+    name: str
+    display_order: int = 0
+
+
+class MenuCategoryRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    display_order: int
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class ModifierGroupCreate(BaseModel):
+    name: str
+    min_select: int = Field(default=0, ge=0)
+    max_select: int = Field(default=1, ge=1)
+    is_required: bool = False
+
+
+class ModifierGroupRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    min_select: int
+    max_select: int
+    is_required: bool
+
+    model_config = {"from_attributes": True}
+
+
+class ModifierOptionCreate(BaseModel):
+    name: str
+    extra_price: float = Field(default=0, ge=0)
+
+
+class ModifierOptionRead(BaseModel):
+    id: int
+    modifier_group_id: int
+    name: str
+    extra_price: float
+    is_active: bool
+
+    model_config = {"from_attributes": True}
 
 
 class MenuItemRead(BaseModel):
@@ -76,6 +152,43 @@ class IngredientRead(BaseModel):
     unit: str
     quantity_on_hand: float
     reorder_threshold: float
+
+    model_config = {"from_attributes": True}
+
+
+class VendorCreate(BaseModel):
+    name: str
+    contact_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+
+class VendorRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    contact_name: str | None
+    phone: str | None
+    email: str | None
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class GoodsReceiptCreate(BaseModel):
+    branch_id: int
+    purchase_order_id: int | None = None
+    vendor_id: int | None = None
+    notes: str | None = None
+
+
+class GoodsReceiptRead(BaseModel):
+    id: int
+    branch_id: int
+    purchase_order_id: int | None
+    vendor_id: int | None
+    notes: str | None
+    received_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -117,6 +230,25 @@ class AccountingExportRead(BaseModel):
     business_date: datetime
     payload_json: str
     status: AccountingExportStatus
+
+    model_config = {"from_attributes": True}
+
+
+class TaxRuleCreate(BaseModel):
+    branch_id: int
+    name: str
+    rate: float = Field(default=0, ge=0)
+    effective_from: datetime | None = None
+
+
+class TaxRuleRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    rate: float
+    version: int
+    is_active: bool
+    effective_from: datetime
 
     model_config = {"from_attributes": True}
 
@@ -202,6 +334,53 @@ class InventoryAdjustmentCreate(BaseModel):
     reason: str
 
 
+class RecipeItemCreate(BaseModel):
+    ingredient_id: int
+    quantity: float = Field(gt=0)
+
+
+class RecipeCreate(BaseModel):
+    branch_id: int
+    name: str
+    items: list[RecipeItemCreate]
+
+
+class RecipeRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    version: int
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class StockTransferCreate(BaseModel):
+    from_branch_id: int
+    to_branch_id: int
+    from_ingredient_id: int
+    to_ingredient_id: int
+    quantity: float = Field(gt=0)
+
+
+class StockTransferAction(BaseModel):
+    approved_by: int
+    status: str = "approved"
+
+
+class StockTransferRead(BaseModel):
+    id: int
+    from_branch_id: int
+    to_branch_id: int
+    from_ingredient_id: int
+    to_ingredient_id: int
+    quantity: float
+    status: str
+    approved_by: int | None
+
+    model_config = {"from_attributes": True}
+
+
 class PurchaseLineCreate(BaseModel):
     ingredient_id: int
     ordered_qty: float = Field(ge=0)
@@ -251,6 +430,29 @@ class ShiftCreate(BaseModel):
     status: ShiftStatus = ShiftStatus.SCHEDULED
 
 
+class AttendanceCreate(BaseModel):
+    branch_id: int
+    staff_user_id: int
+    shift_id: int | None = None
+    notes: str | None = None
+
+
+class AttendanceCheckout(BaseModel):
+    notes: str | None = None
+
+
+class AttendanceRead(BaseModel):
+    id: int
+    branch_id: int
+    staff_user_id: int
+    shift_id: int | None
+    check_in_at: datetime
+    check_out_at: datetime | None
+    notes: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class BranchPolicyCreate(BaseModel):
     key: str
     value: str
@@ -258,6 +460,32 @@ class BranchPolicyCreate(BaseModel):
 
 class BranchPolicyPatch(BaseModel):
     value: str
+
+
+class DiscountApprovalCreate(BaseModel):
+    branch_id: int
+    bill_id: int
+    requested_by: int
+    discount_amount: float = Field(default=0, ge=0)
+    reason: str
+
+
+class DiscountApprovalAction(BaseModel):
+    approved_by: int
+    status: str = "approved"
+
+
+class DiscountApprovalRead(BaseModel):
+    id: int
+    branch_id: int
+    bill_id: int
+    requested_by: int
+    approved_by: int | None
+    discount_amount: float
+    reason: str
+    status: str
+
+    model_config = {"from_attributes": True}
 
 
 class PurchaseOrderResponse(BaseModel):
@@ -311,3 +539,48 @@ class ReservationUpdate(BaseModel):
     status: ReservationStatus | None = None
     notes: str | None = None
     table_id: int | None = None
+
+
+class RefundCreate(BaseModel):
+    branch_id: int
+    bill_id: int
+    settlement_id: int | None = None
+    amount: float = Field(gt=0)
+    reason: str | None = None
+    approved_by: int | None = None
+
+
+class RefundRead(BaseModel):
+    id: int
+    branch_id: int
+    bill_id: int
+    settlement_id: int | None
+    amount: float
+    reason: str | None
+    approved_by: int | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DayCloseCreate(BaseModel):
+    branch_id: int
+    business_date: datetime
+    notes: str | None = None
+
+
+class DayCloseFinalize(BaseModel):
+    closed_by: int | None = None
+    notes: str | None = None
+
+
+class DayCloseRead(BaseModel):
+    id: int
+    branch_id: int
+    business_date: datetime
+    status: DayCloseStatus
+    closed_by: int | None
+    notes: str | None
+    closed_at: datetime | None
+
+    model_config = {"from_attributes": True}

@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: restaurant_dev
+      POSTGRES_USER: restaurant
+      POSTGRES_PASSWORD: restaurant
+    ports: ["5432:5432"]
+    volumes: ["postgres_dev:/var/lib/postgresql/data"]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio_dev:/data"]
+
+volumes:
+  postgres_dev:
+  minio_dev:

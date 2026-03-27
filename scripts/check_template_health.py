@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the template starter is operational after bootstrap."""
+"""Verify that the restaurant system services are operational after bootstrap."""
 
 from __future__ import annotations
 
@@ -55,12 +55,12 @@ def main() -> int:
             errors.append(f"{check.path} should return a list")
 
     if errors:
-        print("Template health check failed:")
+        print("Restaurant system health check failed:")
         for error in errors:
             print(f"- {error}")
         return 1
 
-    print("Template health check passed.")
+    print("Restaurant system health check passed.")
     return 0
 
 

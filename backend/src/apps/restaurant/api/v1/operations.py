@@ -8,45 +8,71 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import delete, func, select
 
 from src.apps.iam.api.deps import get_db
+from src.apps.restaurant.access import require_restaurant_access
 from src.apps.restaurant.models import (
     AccountingExport,
     AccountingExportStatus,
+    AttendanceRecord,
     Bill,
     BillStatus,
     Branch,
     BranchPolicy,
     CashDrawerSession,
+    DayClose,
+    DayCloseStatus,
+    DiscountApproval,
     DrawerStatus,
+    GoodsReceipt,
     Ingredient,
     IdempotencyRecord,
     KitchenTicket,
     KitchenTicketStatus,
     MenuItem,
+    MenuCategory,
+    ModifierGroup,
+    ModifierOption,
     Order,
     OrderItem,
     OrderStatus,
     PurchaseOrder,
     PurchaseOrderLine,
     PurchaseOrderStatus,
+    Recipe,
+    RecipeItem,
     Reservation,
     ReservationStatus,
+    Refund,
     RestaurantTable,
+    ServiceZone,
     Settlement,
     Shift,
     StockLedgerEntry,
     TableStatus,
+    TableGroup,
+    TaxRule,
+    StockTransfer,
+    Vendor,
     WaitlistEntry,
     WaitlistStatus,
 )
 from src.apps.restaurant.schemas.operations import (
     AccountingExportCreate,
     AccountingExportRead,
+    AttendanceCheckout,
+    AttendanceCreate,
+    AttendanceRead,
     BillRead,
     BillSettlementCreate,
     BranchCreate,
     BranchPolicyCreate,
     BranchPolicyPatch,
     BranchRead,
+    DayCloseCreate,
+    DayCloseFinalize,
+    DayCloseRead,
+    DiscountApprovalAction,
+    DiscountApprovalCreate,
+    DiscountApprovalRead,
     DrawerCloseRequest,
     DrawerSessionCreate,
     DrawerSessionRead,
@@ -56,21 +82,44 @@ from src.apps.restaurant.schemas.operations import (
     KitchenTicketPatch,
     KitchenTicketRead,
     MenuItemCreate,
+    MenuCategoryCreate,
+    MenuCategoryRead,
     MenuItemRead,
+    ModifierGroupCreate,
+    ModifierGroupRead,
+    ModifierOptionCreate,
+    ModifierOptionRead,
     OrderCreate,
     OrderPatch,
     OrderRead,
     PurchaseOrderCreate,
     PurchaseOrderResponse,
     PurchaseReceiptCreate,
+    RecipeCreate,
+    RecipeRead,
     ReservationCreate,
     ReservationRead,
     ReservationUpdate,
     SeatTableRequest,
+    ServiceZoneCreate,
+    ServiceZoneRead,
     ShiftCreate,
     ShiftStatusPatch,
+    StockTransferAction,
+    StockTransferCreate,
+    StockTransferRead,
     TableCreate,
+    TableGroupCreate,
+    TableGroupRead,
     TableRead,
+    TaxRuleCreate,
+    TaxRuleRead,
+    VendorCreate,
+    VendorRead,
+    GoodsReceiptCreate,
+    GoodsReceiptRead,
+    RefundCreate,
+    RefundRead,
     WaitlistCreate,
     WaitlistCursorPage,
     WaitlistRead,
@@ -78,7 +127,7 @@ from src.apps.restaurant.schemas.operations import (
     KitchenTicketCursorPage,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_restaurant_access)])
 
 
 async def _get_branch_or_404(branch_id: int, db: AsyncSession) -> Branch:
@@ -184,6 +233,44 @@ async def list_tables(branch_id: int, status_filter: TableStatus | None = None, 
     return (await db.execute(statement.order_by(RestaurantTable.id.asc()))).scalars().all()
 
 
+@router.post("/branches/{branch_id}/service-zones", response_model=ServiceZoneRead, status_code=status.HTTP_201_CREATED)
+async def create_service_zone(branch_id: int, payload: ServiceZoneCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    zone = ServiceZone(branch_id=branch_id, **payload.model_dump())
+    db.add(zone)
+    await db.commit()
+    await db.refresh(zone)
+    return zone
+
+
+@router.get("/branches/{branch_id}/service-zones", response_model=list[ServiceZoneRead])
+async def list_service_zones(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (await db.execute(select(ServiceZone).where(ServiceZone.branch_id == branch_id).order_by(ServiceZone.id.asc()))).scalars().all()
+
+
+@router.post("/branches/{branch_id}/table-groups", response_model=TableGroupRead, status_code=status.HTTP_201_CREATED)
+async def create_table_group(branch_id: int, payload: TableGroupCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    if payload.table_ids:
+        tables = (
+            await db.execute(select(RestaurantTable).where(RestaurantTable.branch_id == branch_id, RestaurantTable.id.in_(payload.table_ids)))
+        ).scalars().all()
+        if len(tables) != len(set(payload.table_ids)):
+            raise HTTPException(status_code=400, detail="Table group includes invalid branch table IDs")
+    group = TableGroup(branch_id=branch_id, name=payload.name, table_ids_csv=",".join(str(item) for item in payload.table_ids))
+    db.add(group)
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+@router.get("/branches/{branch_id}/table-groups", response_model=list[TableGroupRead])
+async def list_table_groups(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (await db.execute(select(TableGroup).where(TableGroup.branch_id == branch_id).order_by(TableGroup.id.asc()))).scalars().all()
+
+
 @router.post("/branches/{branch_id}/menu-items", response_model=MenuItemRead, status_code=status.HTTP_201_CREATED)
 async def create_menu_item(branch_id: int, payload: MenuItemCreate, db: AsyncSession = Depends(get_db)):
     await _get_branch_or_404(branch_id, db)
@@ -194,6 +281,91 @@ async def create_menu_item(branch_id: int, payload: MenuItemCreate, db: AsyncSes
     return item
 
 
+@router.post("/branches/{branch_id}/menu-categories", response_model=MenuCategoryRead, status_code=status.HTTP_201_CREATED)
+async def create_menu_category(branch_id: int, payload: MenuCategoryCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    category = MenuCategory(branch_id=branch_id, **payload.model_dump())
+    db.add(category)
+    await db.commit()
+    await db.refresh(category)
+    return category
+
+
+@router.get("/branches/{branch_id}/menu-categories", response_model=list[MenuCategoryRead])
+async def list_menu_categories(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(select(MenuCategory).where(MenuCategory.branch_id == branch_id).order_by(MenuCategory.display_order.asc()))
+    ).scalars().all()
+
+
+@router.post("/branches/{branch_id}/modifier-groups", response_model=ModifierGroupRead, status_code=status.HTTP_201_CREATED)
+async def create_modifier_group(branch_id: int, payload: ModifierGroupCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    group = ModifierGroup(branch_id=branch_id, **payload.model_dump())
+    db.add(group)
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+@router.post("/modifier-groups/{group_id}/options", response_model=ModifierOptionRead, status_code=status.HTTP_201_CREATED)
+async def create_modifier_option(group_id: int, payload: ModifierOptionCreate, db: AsyncSession = Depends(get_db)):
+    group = await db.get(ModifierGroup, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Modifier group not found")
+    option = ModifierOption(modifier_group_id=group_id, **payload.model_dump())
+    db.add(option)
+    await db.commit()
+    await db.refresh(option)
+    return option
+
+
+@router.get("/modifier-groups/{group_id}/options", response_model=list[ModifierOptionRead])
+async def list_modifier_options(group_id: int, db: AsyncSession = Depends(get_db)):
+    return (
+        await db.execute(
+            select(ModifierOption).where(ModifierOption.modifier_group_id == group_id).order_by(ModifierOption.id.asc())
+        )
+    ).scalars().all()
+
+
+@router.post("/tax-rules", response_model=TaxRuleRead, status_code=status.HTTP_201_CREATED)
+async def create_tax_rule(payload: TaxRuleCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    latest = (
+        await db.execute(
+            select(TaxRule)
+            .where(TaxRule.branch_id == payload.branch_id, TaxRule.name == payload.name)
+            .order_by(TaxRule.version.desc())
+        )
+    ).scalars().first()
+    next_version = (latest.version + 1) if latest else 1
+    if latest:
+        latest.is_active = False
+        db.add(latest)
+    rule = TaxRule(
+        branch_id=payload.branch_id,
+        name=payload.name,
+        rate=payload.rate,
+        version=next_version,
+        is_active=True,
+        effective_from=payload.effective_from or datetime.utcnow(),
+    )
+    db.add(rule)
+    await db.commit()
+    await db.refresh(rule)
+    return rule
+
+
+@router.get("/tax-rules", response_model=list[TaxRuleRead])
+async def list_tax_rules(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(select(TaxRule).where(TaxRule.branch_id == branch_id).order_by(TaxRule.name.asc(), TaxRule.version.desc()))
+    ).scalars().all()
+
+
 @router.post("/branches/{branch_id}/ingredients", response_model=IngredientRead, status_code=status.HTTP_201_CREATED)
 async def create_ingredient(branch_id: int, payload: IngredientCreate, db: AsyncSession = Depends(get_db)):
     await _get_branch_or_404(branch_id, db)
@@ -202,6 +374,22 @@ async def create_ingredient(branch_id: int, payload: IngredientCreate, db: Async
     await db.commit()
     await db.refresh(ingredient)
     return ingredient
+
+
+@router.post("/branches/{branch_id}/vendors", response_model=VendorRead, status_code=status.HTTP_201_CREATED)
+async def create_vendor(branch_id: int, payload: VendorCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    vendor = Vendor(branch_id=branch_id, **payload.model_dump())
+    db.add(vendor)
+    await db.commit()
+    await db.refresh(vendor)
+    return vendor
+
+
+@router.get("/branches/{branch_id}/vendors", response_model=list[VendorRead])
+async def list_vendors(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (await db.execute(select(Vendor).where(Vendor.branch_id == branch_id).order_by(Vendor.id.asc()))).scalars().all()
 
 
 @router.post("/branches/{branch_id}/drawer-sessions", response_model=DrawerSessionRead, status_code=status.HTTP_201_CREATED)
@@ -513,6 +701,100 @@ async def adjust_inventory(payload: InventoryAdjustmentCreate, db: AsyncSession 
     return {"ingredient": ingredient, "ledger_entry": ledger}
 
 
+@router.post("/recipes", response_model=RecipeRead, status_code=status.HTTP_201_CREATED)
+async def create_recipe(payload: RecipeCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Recipe items are required")
+    ingredient_ids = [item.ingredient_id for item in payload.items]
+    ingredients = (
+        await db.execute(select(Ingredient).where(Ingredient.branch_id == payload.branch_id, Ingredient.id.in_(ingredient_ids)))
+    ).scalars().all()
+    if len(ingredients) != len(set(ingredient_ids)):
+        raise HTTPException(status_code=400, detail="Recipe includes ingredients outside the branch")
+
+    latest = (
+        await db.execute(
+            select(Recipe).where(Recipe.branch_id == payload.branch_id, Recipe.name == payload.name).order_by(Recipe.version.desc())
+        )
+    ).scalars().first()
+    next_version = (latest.version + 1) if latest else 1
+    if latest:
+        latest.is_active = False
+        db.add(latest)
+    recipe = Recipe(branch_id=payload.branch_id, name=payload.name, version=next_version, is_active=True)
+    db.add(recipe)
+    await db.flush()
+    for item in payload.items:
+        db.add(RecipeItem(recipe_id=recipe.id, ingredient_id=item.ingredient_id, quantity=item.quantity))
+    await db.commit()
+    await db.refresh(recipe)
+    return recipe
+
+
+@router.get("/recipes", response_model=list[RecipeRead])
+async def list_recipes(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(select(Recipe).where(Recipe.branch_id == branch_id).order_by(Recipe.name.asc(), Recipe.version.desc()))
+    ).scalars().all()
+
+
+@router.post("/stock-transfers", response_model=StockTransferRead, status_code=status.HTTP_201_CREATED)
+async def create_stock_transfer(payload: StockTransferCreate, db: AsyncSession = Depends(get_db)):
+    from_ingredient = await db.get(Ingredient, payload.from_ingredient_id)
+    to_ingredient = await db.get(Ingredient, payload.to_ingredient_id)
+    if not from_ingredient or from_ingredient.branch_id != payload.from_branch_id:
+        raise HTTPException(status_code=400, detail="From ingredient does not belong to from_branch")
+    if not to_ingredient or to_ingredient.branch_id != payload.to_branch_id:
+        raise HTTPException(status_code=400, detail="To ingredient does not belong to to_branch")
+    transfer = StockTransfer(**payload.model_dump(), status="pending")
+    db.add(transfer)
+    await db.commit()
+    await db.refresh(transfer)
+    return transfer
+
+
+@router.patch("/stock-transfers/{transfer_id}", response_model=StockTransferRead)
+async def action_stock_transfer(transfer_id: int, payload: StockTransferAction, db: AsyncSession = Depends(get_db)):
+    transfer = await db.get(StockTransfer, transfer_id)
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Stock transfer not found")
+    if transfer.status != "pending":
+        raise HTTPException(status_code=409, detail="Stock transfer already resolved")
+    transfer.status = payload.status
+    transfer.approved_by = payload.approved_by
+    if payload.status == "approved":
+        from_ingredient = await db.get(Ingredient, transfer.from_ingredient_id)
+        to_ingredient = await db.get(Ingredient, transfer.to_ingredient_id)
+        if not from_ingredient or not to_ingredient:
+            raise HTTPException(status_code=400, detail="Transfer ingredients are missing")
+        if from_ingredient.quantity_on_hand < transfer.quantity:
+            raise HTTPException(status_code=400, detail="Insufficient stock for transfer")
+        from_ingredient.quantity_on_hand -= transfer.quantity
+        to_ingredient.quantity_on_hand += transfer.quantity
+        from_ingredient.updated_at = datetime.utcnow()
+        to_ingredient.updated_at = datetime.utcnow()
+        db.add(from_ingredient)
+        db.add(to_ingredient)
+    db.add(transfer)
+    await db.commit()
+    await db.refresh(transfer)
+    return transfer
+
+
+@router.get("/stock-transfers", response_model=list[StockTransferRead])
+async def list_stock_transfers(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(
+            select(StockTransfer)
+            .where((StockTransfer.from_branch_id == branch_id) | (StockTransfer.to_branch_id == branch_id))
+            .order_by(StockTransfer.id.desc())
+        )
+    ).scalars().all()
+
+
 @router.post("/purchase-orders", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_purchase_order(payload: PurchaseOrderCreate, db: AsyncSession = Depends(get_db)):
     await _get_branch_or_404(payload.branch_id, db)
@@ -586,6 +868,35 @@ async def receive_purchase_order(po_id: int, payload: PurchaseReceiptCreate, req
     return payload_out
 
 
+@router.post("/goods-receipts", response_model=GoodsReceiptRead, status_code=status.HTTP_201_CREATED)
+async def create_goods_receipt(payload: GoodsReceiptCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    if payload.purchase_order_id is not None:
+        purchase_order = await db.get(PurchaseOrder, payload.purchase_order_id)
+        if not purchase_order or purchase_order.branch_id != payload.branch_id:
+            raise HTTPException(status_code=400, detail="Purchase order not found for branch")
+    if payload.vendor_id is not None:
+        vendor = await db.get(Vendor, payload.vendor_id)
+        if not vendor or vendor.branch_id != payload.branch_id:
+            raise HTTPException(status_code=400, detail="Vendor not found for branch")
+
+    receipt = GoodsReceipt(**payload.model_dump(), received_at=datetime.utcnow())
+    db.add(receipt)
+    await db.commit()
+    await db.refresh(receipt)
+    return receipt
+
+
+@router.get("/goods-receipts", response_model=list[GoodsReceiptRead])
+async def list_goods_receipts(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(
+            select(GoodsReceipt).where(GoodsReceipt.branch_id == branch_id).order_by(GoodsReceipt.received_at.desc())
+        )
+    ).scalars().all()
+
+
 @router.post("/bills/{bill_id}/settlements", response_model=BillRead)
 async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Request, db: AsyncSession = Depends(get_db)):
     replay = await _idempotency_replay(request, db)
@@ -611,6 +922,67 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
     await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
     await db.commit()
     return payload_out
+
+
+@router.post("/discount-approvals", response_model=DiscountApprovalRead, status_code=status.HTTP_201_CREATED)
+async def create_discount_approval(payload: DiscountApprovalCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    bill = await db.get(Bill, payload.bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    approval = DiscountApproval(**payload.model_dump(), status="pending")
+    db.add(approval)
+    await db.commit()
+    await db.refresh(approval)
+    return approval
+
+
+@router.patch("/discount-approvals/{approval_id}", response_model=DiscountApprovalRead)
+async def action_discount_approval(approval_id: int, payload: DiscountApprovalAction, db: AsyncSession = Depends(get_db)):
+    approval = await db.get(DiscountApproval, approval_id)
+    if not approval:
+        raise HTTPException(status_code=404, detail="Discount approval not found")
+    if approval.status != "pending":
+        raise HTTPException(status_code=409, detail="Discount approval already resolved")
+    approval.status = payload.status
+    approval.approved_by = payload.approved_by
+    if payload.status == "approved":
+        bill = await db.get(Bill, approval.bill_id)
+        if bill:
+            bill.total_amount = max(0.0, round(bill.total_amount - approval.discount_amount, 2))
+            if bill.paid_amount > bill.total_amount:
+                bill.paid_amount = bill.total_amount
+            bill.status = BillStatus.PAID if bill.paid_amount == bill.total_amount else BillStatus.PARTIALLY_PAID
+            db.add(bill)
+    db.add(approval)
+    await db.commit()
+    await db.refresh(approval)
+    return approval
+
+
+@router.post("/refunds", response_model=RefundRead, status_code=status.HTTP_201_CREATED)
+async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    bill = await db.get(Bill, payload.bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    if payload.amount > bill.paid_amount:
+        raise HTTPException(status_code=400, detail="Refund exceeds paid amount")
+
+    refund = Refund(**payload.model_dump(), created_at=datetime.utcnow())
+    bill.paid_amount = round(bill.paid_amount - payload.amount, 2)
+    bill.status = BillStatus.PAID if bill.paid_amount == bill.total_amount else BillStatus.PARTIALLY_PAID
+    db.add(refund)
+    db.add(bill)
+    await db.commit()
+    await db.refresh(refund)
+    return refund
+
+
+@router.get("/refunds", response_model=list[RefundRead])
+async def list_refunds(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (await db.execute(select(Refund).where(Refund.branch_id == branch_id).order_by(Refund.id.desc()))).scalars().all()
 
 
 @router.post("/drawer-sessions/{session_id}/close", response_model=DrawerSessionRead)
@@ -640,6 +1012,48 @@ async def create_shift(payload: ShiftCreate, db: AsyncSession = Depends(get_db))
     await db.commit()
     await db.refresh(shift)
     return shift
+
+
+@router.post("/attendance", response_model=AttendanceRead, status_code=status.HTTP_201_CREATED)
+async def create_attendance(payload: AttendanceCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    if payload.shift_id is not None:
+        shift = await db.get(Shift, payload.shift_id)
+        if not shift or shift.branch_id != payload.branch_id:
+            raise HTTPException(status_code=400, detail="Shift not found for branch")
+
+    attendance = AttendanceRecord(**payload.model_dump(), check_in_at=datetime.utcnow())
+    db.add(attendance)
+    await db.commit()
+    await db.refresh(attendance)
+    return attendance
+
+
+@router.patch("/attendance/{attendance_id}/checkout", response_model=AttendanceRead)
+async def checkout_attendance(attendance_id: int, payload: AttendanceCheckout, db: AsyncSession = Depends(get_db)):
+    attendance = await db.get(AttendanceRecord, attendance_id)
+    if not attendance:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+    if attendance.check_out_at is not None:
+        raise HTTPException(status_code=409, detail="Attendance already checked out")
+
+    attendance.check_out_at = datetime.utcnow()
+    if payload.notes is not None:
+        attendance.notes = payload.notes
+    db.add(attendance)
+    await db.commit()
+    await db.refresh(attendance)
+    return attendance
+
+
+@router.get("/attendance", response_model=list[AttendanceRead])
+async def list_attendance(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(
+            select(AttendanceRecord).where(AttendanceRecord.branch_id == branch_id).order_by(AttendanceRecord.check_in_at.desc())
+        )
+    ).scalars().all()
 
 
 
@@ -785,6 +1199,70 @@ async def list_accounting_exports(branch_id: int, db: AsyncSession = Depends(get
         await db.execute(
             select(AccountingExport).where(AccountingExport.branch_id == branch_id).order_by(AccountingExport.created_at.desc())
         )
+    ).scalars().all()
+
+
+@router.post("/day-close", response_model=DayCloseRead, status_code=status.HTTP_201_CREATED)
+async def open_day_close(payload: DayCloseCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    existing = (
+        await db.execute(
+            select(DayClose).where(DayClose.branch_id == payload.branch_id, DayClose.business_date == payload.business_date)
+        )
+    ).scalars().first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Day-close already exists for business date")
+    record = DayClose(**payload.model_dump(), status=DayCloseStatus.OPEN)
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return record
+
+
+@router.patch("/day-close/{day_close_id}/finalize", response_model=DayCloseRead)
+async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: AsyncSession = Depends(get_db)):
+    record = await db.get(DayClose, day_close_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    if record.status == DayCloseStatus.CLOSED:
+        raise HTTPException(status_code=409, detail="Day-close already finalized")
+
+    open_drawers = (
+        await db.execute(
+            select(func.count(CashDrawerSession.id)).where(
+                CashDrawerSession.branch_id == record.branch_id,
+                CashDrawerSession.status == DrawerStatus.OPEN,
+            )
+        )
+    ).one()[0]
+    open_bills = (
+        await db.execute(
+            select(func.count(Bill.id))
+            .join(Order, Order.id == Bill.order_id)
+            .where(Order.branch_id == record.branch_id, Bill.status != BillStatus.PAID)
+        )
+    ).one()[0]
+    if open_drawers or open_bills:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Day-close blocked: open_drawers={open_drawers}, open_bills={open_bills}",
+        )
+
+    record.status = DayCloseStatus.CLOSED
+    record.closed_by = payload.closed_by
+    record.notes = payload.notes or record.notes
+    record.closed_at = datetime.utcnow()
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return record
+
+
+@router.get("/day-close", response_model=list[DayCloseRead])
+async def list_day_close(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(select(DayClose).where(DayClose.branch_id == branch_id).order_by(DayClose.business_date.desc()))
     ).scalars().all()
 
 
