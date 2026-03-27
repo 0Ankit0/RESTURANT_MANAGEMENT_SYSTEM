@@ -65,3 +65,18 @@ dev:
 	@echo "  make mobile-dev"
 
 ci: docs lint test
+
+compose-dev:
+	docker compose -f deploy/compose.dev.yml up -d
+
+compose-staging:
+	docker compose -f deploy/compose.staging.yml up -d
+
+compose-prod:
+	docker compose -f deploy/compose.prod.yml up -d
+
+backup-db:
+	./scripts/ops/backup_postgres.sh
+
+restore-db:
+	./scripts/ops/restore_postgres.sh

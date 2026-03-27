@@ -35,7 +35,9 @@ Restaurant Management System/
 ├── infrastructure/
 │   ├── deployment-diagram.md
 │   ├── network-infrastructure.md
-│   └── cloud-architecture.md
+│   ├── cloud-architecture.md
+│   ├── docker-vps-release-runbook.md
+│   └── backup-restore-operations.md
 ├── edge-cases/
 │   ├── README.md
 │   ├── table-service-and-ordering.md
@@ -49,7 +51,9 @@ Restaurant Management System/
 └── implementation/
     ├── code-guidelines.md
     ├── c4-code-diagram.md
-    └── implementation-playbook.md
+    ├── implementation-playbook.md
+    ├── restaurant-delivery-phases.md
+    └── missing-implementation-checklist.md
 ```
 
 ## Key Features

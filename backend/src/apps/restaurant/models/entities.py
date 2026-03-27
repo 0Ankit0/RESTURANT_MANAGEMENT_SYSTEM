@@ -79,6 +79,11 @@ class AccountingExportStatus(str, Enum):
     SENT = "sent"
 
 
+class DayCloseStatus(str, Enum):
+    OPEN = "open"
+    CLOSED = "closed"
+
+
 
 class Branch(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -260,4 +265,147 @@ class IdempotencyRecord(SQLModel, table=True):
     endpoint: str = Field(max_length=200, index=True)
     status_code: int = Field(default=200)
     response_json: str = Field(max_length=12000)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ServiceZone(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TableGroup(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120)
+    table_ids_csv: str = Field(max_length=500, default="")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AttendanceRecord(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    staff_user_id: int
+    shift_id: Optional[int] = Field(default=None, foreign_key="shift.id")
+    check_in_at: datetime = Field(default_factory=datetime.utcnow)
+    check_out_at: Optional[datetime] = None
+    notes: Optional[str] = Field(default=None, max_length=300)
+
+
+class DayClose(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    business_date: datetime
+    status: DayCloseStatus = Field(default=DayCloseStatus.OPEN)
+    closed_by: Optional[int] = None
+    notes: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    closed_at: Optional[datetime] = None
+
+
+class Vendor(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120, index=True)
+    contact_name: Optional[str] = Field(default=None, max_length=120)
+    phone: Optional[str] = Field(default=None, max_length=40)
+    email: Optional[str] = Field(default=None, max_length=120)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GoodsReceipt(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    purchase_order_id: Optional[int] = Field(default=None, foreign_key="purchaseorder.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
+    notes: Optional[str] = Field(default=None, max_length=500)
+    received_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MenuCategory(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120)
+    display_order: int = Field(default=0)
+    is_active: bool = Field(default=True)
+
+
+class ModifierGroup(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120)
+    min_select: int = Field(default=0, ge=0)
+    max_select: int = Field(default=1, ge=1)
+    is_required: bool = Field(default=False)
+
+
+class ModifierOption(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    modifier_group_id: int = Field(foreign_key="modifiergroup.id", index=True)
+    name: str = Field(max_length=120)
+    extra_price: float = Field(default=0, ge=0)
+    is_active: bool = Field(default=True)
+
+
+class TaxRule(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120)
+    rate: float = Field(default=0, ge=0)
+    version: int = Field(default=1, ge=1)
+    is_active: bool = Field(default=True)
+    effective_from: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DiscountApproval(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    bill_id: int = Field(foreign_key="bill.id", index=True)
+    requested_by: int
+    approved_by: Optional[int] = None
+    discount_amount: float = Field(default=0, ge=0)
+    reason: str = Field(max_length=300)
+    status: str = Field(default="pending", max_length=30)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Refund(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    bill_id: int = Field(foreign_key="bill.id", index=True)
+    settlement_id: Optional[int] = Field(default=None, foreign_key="settlement.id")
+    amount: float = Field(default=0, ge=0)
+    reason: Optional[str] = Field(default=None, max_length=300)
+    approved_by: Optional[int] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Recipe(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=120)
+    version: int = Field(default=1, ge=1)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RecipeItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    recipe_id: int = Field(foreign_key="recipe.id", index=True)
+    ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
+    quantity: float = Field(gt=0)
+
+
+class StockTransfer(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    from_branch_id: int = Field(foreign_key="branch.id", index=True)
+    to_branch_id: int = Field(foreign_key="branch.id", index=True)
+    from_ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
+    to_ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
+    quantity: float = Field(gt=0)
+    status: str = Field(default="pending", max_length=20)
+    approved_by: Optional[int] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

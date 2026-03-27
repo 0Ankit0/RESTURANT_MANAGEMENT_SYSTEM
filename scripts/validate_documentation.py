@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate template documentation completeness and minimum quality."""
+"""Validate restaurant system documentation completeness and minimum quality."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = REPO_ROOT / "docs"
+DOCS_ROOT = REPO_ROOT / "docs" / "system-design"
 
 REQUIRED_README_HEADINGS = [
     "Documentation Structure",
@@ -18,94 +18,58 @@ REQUIRED_README_HEADINGS = [
 ]
 
 REQUIRED_FILES = {
-    "requirements": ["requirements.md", "user-stories.md"],
+    "requirements": ["requirements-document.md", "user-stories.md"],
     "analysis": [
         "use-case-diagram.md",
         "use-case-descriptions.md",
         "system-context-diagram.md",
-        "activity-diagrams.md",
-        "swimlane-diagrams.md",
+        "activity-diagram.md",
+        "bpmn-swimlane-diagram.md",
         "data-dictionary.md",
         "business-rules.md",
         "event-catalog.md",
     ],
     "high-level-design": [
-        "system-sequence-diagrams.md",
+        "system-sequence-diagram.md",
         "domain-model.md",
-        "data-flow-diagrams.md",
+        "data-flow-diagram.md",
         "architecture-diagram.md",
-        "c4-diagrams.md",
+        "c4-context-container.md",
     ],
     "detailed-design": [
-        "class-diagrams.md",
-        "sequence-diagrams.md",
-        "state-machine-diagrams.md",
+        "class-diagram.md",
+        "sequence-diagram.md",
+        "state-machine-diagram.md",
         "erd-database-schema.md",
-        "component-diagrams.md",
+        "component-diagram.md",
         "api-design.md",
-        "c4-component-diagram.md",
+        "c4-component.md",
     ],
     "infrastructure": [
         "deployment-diagram.md",
         "network-infrastructure.md",
         "cloud-architecture.md",
-        "environment-configuration.md",
-        "ci-cd.md",
-        "production-hardening-checklist.md",
+        "docker-vps-release-runbook.md",
+        "backup-restore-operations.md",
     ],
     "edge-cases": [
         "README.md",
-        "authentication-and-sessions.md",
-        "multi-tenancy.md",
-        "notifications.md",
-        "payments.md",
-        "websockets.md",
+        "table-service-and-ordering.md",
+        "kitchen-and-preparation.md",
+        "inventory-and-procurement.md",
+        "billing-and-accounting.md",
+        "delivery-and-channel-integration.md",
         "api-and-ui.md",
         "security-and-compliance.md",
         "operations.md",
     ],
     "implementation": [
-        "working-principles.md",
-        "implementation-guidelines.md",
-        "communications-provider-matrix.md",
+        "code-guidelines.md",
         "c4-code-diagram.md",
         "implementation-playbook.md",
-        "test-strategy.md",
-        "release-checklist.md",
-    ],
-    "onboarding": [
-        "local-setup.md",
-        "provider-configuration.md",
-        "configuration-management.md",
-        "environment-profiles.md",
-        "deployment.md",
-        "project-orientation.md",
-        "start-a-new-project.md",
-        "modifying-the-template.md",
-        "template-finalization-checklist.md",
-    ],
-}
-
-REQUIRED_DOC_HEADINGS = {
-    "docs/onboarding/project-orientation.md": [
-        "What This Template Is",
-        "The Configuration Flow",
-        "Recommended Reading Order",
-    ],
-    "docs/onboarding/local-setup.md": [
-        "Bootstrap Workflow",
-        "Run The Applications",
-        "Validate The Starter",
-    ],
-    "docs/onboarding/template-finalization-checklist.md": [
-        "Before You Rename Anything",
-        "Configuration Review",
-        "Production Readiness Review",
-    ],
-    "docs/infrastructure/production-hardening-checklist.md": [
-        "Secrets",
-        "Network and Proxy Trust",
-        "Providers and Callbacks",
+        "restaurant-implementation-summary.md",
+        "restaurant-delivery-phases.md",
+        "missing-implementation-checklist.md",
     ],
 }
 
@@ -119,35 +83,27 @@ def main() -> int:
 
     readme = DOCS_ROOT / "README.md"
     if is_empty(readme):
-        errors.append("Missing or empty docs/README.md")
+        errors.append("Missing or empty docs/system-design/README.md")
     else:
         readme_text = readme.read_text(encoding="utf-8")
         for heading in REQUIRED_README_HEADINGS:
             if f"## {heading}" not in readme_text:
-                errors.append(f"docs/README.md missing heading: {heading}")
+                errors.append(f"docs/system-design/README.md missing heading: {heading}")
 
     for directory, filenames in REQUIRED_FILES.items():
         dir_path = DOCS_ROOT / directory
         if not dir_path.exists():
-            errors.append(f"Missing directory: docs/{directory}")
+            errors.append(f"Missing directory: docs/system-design/{directory}")
             continue
+
         for filename in filenames:
             path = dir_path / filename
             if is_empty(path):
-                errors.append(f"Missing or empty file: docs/{directory}/{filename}")
-            if "diagram" in filename or filename.startswith("c4-"):
-                if path.exists() and "```mermaid" not in path.read_text(encoding="utf-8"):
-                    errors.append(f"Diagram file missing Mermaid content: docs/{directory}/{filename}")
+                errors.append(f"Missing or empty file: docs/system-design/{directory}/{filename}")
 
-    for relative_path, headings in REQUIRED_DOC_HEADINGS.items():
-        path = REPO_ROOT / relative_path
-        if not path.exists():
-            errors.append(f"Missing file required for heading validation: {relative_path}")
-            continue
-        text = path.read_text(encoding="utf-8")
-        for heading in headings:
-            if f"## {heading}" not in text:
-                errors.append(f"{relative_path} missing heading: {heading}")
+            if ("diagram" in filename or filename.startswith("c4-")) and path.exists():
+                if "```mermaid" not in path.read_text(encoding="utf-8"):
+                    errors.append(f"Diagram file missing Mermaid content: docs/system-design/{directory}/{filename}")
 
     if errors:
         print("Documentation validation failed:")

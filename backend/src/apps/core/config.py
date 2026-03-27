@@ -122,9 +122,9 @@ class Settings(BaseSettings):
         enable_decoding=False,
     )
 
-    PROJECT_NAME: str = "FastAPI Template"
+    PROJECT_NAME: str = "Restaurant Management System"
     APP_ENV: str = "development"
-    APP_INSTANCE_NAME: str = "fastapi-template"
+    APP_INSTANCE_NAME: str = "restaurant-management-system"
     APP_REGION: str = "local"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "supersecretkey"

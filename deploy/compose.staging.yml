@@ -1,0 +1,46 @@
+services:
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/staging.conf:/etc/nginx/conf.d/default.conf:ro
+    ports: ["80:80"]
+    depends_on: [web, api]
+
+  web:
+    image: ghcr.io/example/restaurant-web:staging
+    env_file: [../frontend/.env.staging]
+
+  api:
+    image: ghcr.io/example/restaurant-api:staging
+    env_file: [../backend/.env.staging]
+    depends_on: [postgres, redis, minio]
+
+  worker:
+    image: ghcr.io/example/restaurant-api:staging
+    command: uv run celery -A src.apps.core.celery_app worker --loglevel=info
+    env_file: [../backend/.env.staging]
+    depends_on: [api]
+
+  scheduler:
+    image: ghcr.io/example/restaurant-api:staging
+    command: uv run celery -A src.apps.core.celery_app beat --loglevel=info
+    env_file: [../backend/.env.staging]
+    depends_on: [api]
+
+  postgres:
+    image: postgres:16-alpine
+    env_file: [../backend/.env.staging]
+    volumes: ["postgres_staging:/var/lib/postgresql/data"]
+
+  redis:
+    image: redis:7-alpine
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    env_file: [../backend/.env.staging]
+    volumes: ["minio_staging:/data"]
+
+volumes:
+  postgres_staging:
+  minio_staging:
