@@ -236,9 +236,19 @@ async def test_restaurant_flow(client, db_session):
     assert res.status_code == 201
     transfer_id = res.json()["id"]
 
-    res = await client.patch(f"/api/v1/stock-transfers/{transfer_id}", json={"approved_by": 1, "status": "approved"})
+    res = await client.patch(
+        f"/api/v1/stock-transfers/{transfer_id}",
+        json={"approved_by": 1, "action": "mark_in_transit", "shipped_qty": 1.0},
+    )
     assert res.status_code == 200
-    assert res.json()["status"] == "approved"
+    assert res.json()["status"] == "in_transit"
+
+    res = await client.patch(
+        f"/api/v1/stock-transfers/{transfer_id}",
+        json={"approved_by": 1, "action": "mark_received", "received_qty": 1.0},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "received"
 
     res = await client.get(f"/api/v1/stock-transfers?branch_id={branch['id']}")
     assert res.status_code == 200
@@ -324,6 +334,7 @@ async def test_restaurant_flow(client, db_session):
         headers={"Idempotency-Key": "exp-1"},
     )
     assert res.status_code == 201
+    export_id = res.json()["id"]
 
     replay = await client.post(
         "/api/v1/accounting-exports",
@@ -338,11 +349,34 @@ async def test_restaurant_flow(client, db_session):
     assert len(res.json()) >= 1
 
     res = await client.post(
+        f"/api/v1/accounting-exports/{export_id}/retry",
+        json={"requested_by": 1, "reason": "network timeout"},
+    )
+    assert res.status_code == 201
+
+    res = await client.get(f"/api/v1/accounting-exports/retries?export_id={export_id}")
+    assert res.status_code == 200
+    assert len(res.json()) >= 1
+
+    res = await client.post(
         "/api/v1/day-close",
         json={"branch_id": branch["id"], "business_date": "2026-03-25T00:00:00Z", "notes": "closing"},
     )
     assert res.status_code == 201
     day_close_id = res.json()["id"]
+
+    res = await client.post(
+        f"/api/v1/day-close/{day_close_id}/checklist-items",
+        json={"item_key": "drawer_reconciled", "is_required": True},
+    )
+    assert res.status_code == 201
+    checklist_item_id = res.json()["id"]
+
+    res = await client.patch(
+        f"/api/v1/day-close/checklist-items/{checklist_item_id}",
+        json={"checked_by": 1, "is_checked": True},
+    )
+    assert res.status_code == 200
 
     res = await client.patch(f"/api/v1/day-close/{day_close_id}/finalize", json={"closed_by": 1, "notes": "all clear"})
     assert res.status_code == 200
@@ -356,6 +390,10 @@ async def test_restaurant_flow(client, db_session):
     assert res.status_code == 200
     assert res.json()["orders_count"] >= 1
     assert res.json()["collected_sales"] >= 34.5
+
+    res = await client.get(f"/api/v1/drawer-reconciliation?branch_id={branch['id']}")
+    assert res.status_code == 200
+    assert len(res.json()["rows"]) >= 1
 
     res = await client.patch(f"/api/v1/admin/branch-policies/{policy['id']}", json={"value": "15"})
     assert res.status_code == 200

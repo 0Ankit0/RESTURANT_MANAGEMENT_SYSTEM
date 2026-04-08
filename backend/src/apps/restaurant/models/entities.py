@@ -84,6 +84,26 @@ class DayCloseStatus(str, Enum):
     CLOSED = "closed"
 
 
+class StockCountSessionStatus(str, Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class StockTransferLifecycleStatus(str, Enum):
+    REQUESTED = "requested"
+    IN_TRANSIT = "in_transit"
+    RECEIVED = "received"
+    REJECTED = "rejected"
+
+
+class AccountingExportRetryStatus(str, Enum):
+    QUEUED = "queued"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 
 class Branch(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -405,7 +425,73 @@ class StockTransfer(SQLModel, table=True):
     to_branch_id: int = Field(foreign_key="branch.id", index=True)
     from_ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
     to_ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
-    quantity: float = Field(gt=0)
-    status: str = Field(default="pending", max_length=20)
+    quantity: float = Field(gt=0)  # requested quantity
+    shipped_qty: float = Field(default=0, ge=0)
+    received_qty: float = Field(default=0, ge=0)
+    discrepancy_notes: Optional[str] = Field(default=None, max_length=400)
+    status: str = Field(default=StockTransferLifecycleStatus.REQUESTED, max_length=20)
     approved_by: Optional[int] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class StockCountSession(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    status: StockCountSessionStatus = Field(default=StockCountSessionStatus.DRAFT)
+    opened_by: Optional[int] = None
+    submitted_by: Optional[int] = None
+    approved_by: Optional[int] = None
+    rejection_reason: Optional[str] = Field(default=None, max_length=300)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+
+
+class StockCountLine(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="stockcountsession.id", index=True)
+    ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
+    expected_qty: float = Field(default=0, ge=0)
+    counted_qty: float = Field(default=0, ge=0)
+    variance_qty: float = Field(default=0)
+    notes: Optional[str] = Field(default=None, max_length=300)
+
+
+class DayCloseChecklistItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    day_close_id: int = Field(foreign_key="dayclose.id", index=True)
+    item_key: str = Field(max_length=120)
+    is_required: bool = Field(default=True)
+    is_checked: bool = Field(default=False)
+    checked_by: Optional[int] = None
+    checked_at: Optional[datetime] = None
+
+
+class AccountingExportRetry(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    accounting_export_id: int = Field(foreign_key="accountingexport.id", index=True)
+    requested_by: Optional[int] = None
+    status: AccountingExportRetryStatus = Field(default=AccountingExportRetryStatus.QUEUED)
+    message: Optional[str] = Field(default=None, max_length=400)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+
+
+class KitchenTicketEvent(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    ticket_id: int = Field(foreign_key="kitchenticket.id", index=True)
+    from_status: KitchenTicketStatus
+    to_status: KitchenTicketStatus
+    updated_by: Optional[int] = None
+    pass_seconds: Optional[int] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OrderEditApproval(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    order_id: int = Field(foreign_key="order.id", index=True)
+    requested_by: int
+    approved_by: Optional[int] = None
+    reason: str = Field(max_length=300)
+    status: str = Field(default="pending", max_length=20)
     created_at: datetime = Field(default_factory=datetime.utcnow)

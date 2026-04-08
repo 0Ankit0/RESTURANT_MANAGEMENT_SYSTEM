@@ -152,3 +152,9 @@ if storage_uses_local_filesystem():
 async def read_root() -> RedirectResponse:
     """Redirect root to the interactive API documentation."""
     return RedirectResponse(url="/docs")
+
+
+@app.get("/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    """Simple health probe endpoint for release rehearsal and orchestration checks."""
+    return {"status": "ok"}

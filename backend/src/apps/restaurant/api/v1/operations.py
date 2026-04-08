@@ -9,7 +9,15 @@ from sqlmodel import delete, func, select
 
 from src.apps.iam.api.deps import get_db
 from src.apps.restaurant.access import require_restaurant_access
+from src.apps.restaurant.domains.billing import apply_settlement, bill_totals
+from src.apps.restaurant.domains.inventory import apply_inventory_delta
+from src.apps.restaurant.domains.kitchen import can_transition_ticket
+from src.apps.restaurant.domains.menu import line_total
+from src.apps.restaurant.domains.seating import evaluate_table_assignment
+from src.apps.restaurant.domains.workforce import validate_shift_window
 from src.apps.restaurant.models import (
+    AccountingExportRetry,
+    AccountingExportRetryStatus,
     AccountingExport,
     AccountingExportStatus,
     AttendanceRecord,
@@ -19,6 +27,7 @@ from src.apps.restaurant.models import (
     BranchPolicy,
     CashDrawerSession,
     DayClose,
+    DayCloseChecklistItem,
     DayCloseStatus,
     DiscountApproval,
     DrawerStatus,
@@ -26,12 +35,14 @@ from src.apps.restaurant.models import (
     Ingredient,
     IdempotencyRecord,
     KitchenTicket,
+    KitchenTicketEvent,
     KitchenTicketStatus,
     MenuItem,
     MenuCategory,
     ModifierGroup,
     ModifierOption,
     Order,
+    OrderEditApproval,
     OrderItem,
     OrderStatus,
     PurchaseOrder,
@@ -47,6 +58,9 @@ from src.apps.restaurant.models import (
     Settlement,
     Shift,
     StockLedgerEntry,
+    StockCountLine,
+    StockCountSession,
+    StockCountSessionStatus,
     TableStatus,
     TableGroup,
     TaxRule,
@@ -56,6 +70,8 @@ from src.apps.restaurant.models import (
     WaitlistStatus,
 )
 from src.apps.restaurant.schemas.operations import (
+    AccountingExportRetryCreate,
+    AccountingExportRetryRead,
     AccountingExportCreate,
     AccountingExportRead,
     AttendanceCheckout,
@@ -68,6 +84,9 @@ from src.apps.restaurant.schemas.operations import (
     BranchPolicyPatch,
     BranchRead,
     DayCloseCreate,
+    DayCloseChecklistCheck,
+    DayCloseChecklistCreate,
+    DayCloseChecklistRead,
     DayCloseFinalize,
     DayCloseRead,
     DiscountApprovalAction,
@@ -90,7 +109,10 @@ from src.apps.restaurant.schemas.operations import (
     ModifierOptionCreate,
     ModifierOptionRead,
     OrderCreate,
-    OrderPatch,
+    OrderPatchWithApproval,
+    OrderEditApprovalAction,
+    OrderEditApprovalCreate,
+    OrderEditApprovalRead,
     OrderRead,
     PurchaseOrderCreate,
     PurchaseOrderResponse,
@@ -108,6 +130,10 @@ from src.apps.restaurant.schemas.operations import (
     StockTransferAction,
     StockTransferCreate,
     StockTransferRead,
+    StockCountSessionCreate,
+    StockCountSessionRead,
+    StockCountLineUpsert,
+    StockCountReviewAction,
     TableCreate,
     TableGroupCreate,
     TableGroupRead,
@@ -188,6 +214,83 @@ async def _store_idempotency(request: Request, db: AsyncSession, status_code: in
 def _cursor_result(items: list, limit: int) -> dict:
     next_cursor = items[-1].id if len(items) == limit and getattr(items[-1], "id", None) else None
     return {"items": items, "next_cursor": next_cursor}
+
+
+async def _apply_recipe_depletion(order: Order, order_items: list[OrderItem], db: AsyncSession) -> None:
+    for order_item in order_items:
+        menu_item = await db.get(MenuItem, order_item.menu_item_id)
+        if not menu_item:
+            continue
+        recipe = (
+            await db.execute(
+                select(Recipe)
+                .where(Recipe.branch_id == order.branch_id, Recipe.name == menu_item.name, Recipe.is_active == True)
+                .order_by(Recipe.version.desc())
+            )
+        ).scalars().first()
+        if not recipe:
+            continue
+
+        recipe_items = (
+            await db.execute(select(RecipeItem).where(RecipeItem.recipe_id == recipe.id))
+        ).scalars().all()
+        for component in recipe_items:
+            ingredient = await db.get(Ingredient, component.ingredient_id)
+            if not ingredient:
+                continue
+            depletion_qty = round(component.quantity * order_item.quantity, 3)
+            if ingredient.quantity_on_hand < depletion_qty:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Insufficient stock for ingredient {ingredient.id} while applying recipe depletion",
+                )
+            ingredient.quantity_on_hand = round(ingredient.quantity_on_hand - depletion_qty, 3)
+            ingredient.updated_at = datetime.utcnow()
+            db.add(ingredient)
+            db.add(
+                StockLedgerEntry(
+                    ingredient_id=ingredient.id,
+                    change_qty=-depletion_qty,
+                    reason="recipe_depletion",
+                    reference_type="order",
+                    reference_id=order.id,
+                )
+            )
+
+
+async def _reverse_recipe_depletion(order: Order, db: AsyncSession) -> None:
+    order_items = (await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))).scalars().all()
+    for order_item in order_items:
+        menu_item = await db.get(MenuItem, order_item.menu_item_id)
+        if not menu_item:
+            continue
+        recipe = (
+            await db.execute(
+                select(Recipe)
+                .where(Recipe.branch_id == order.branch_id, Recipe.name == menu_item.name, Recipe.is_active == True)
+                .order_by(Recipe.version.desc())
+            )
+        ).scalars().first()
+        if not recipe:
+            continue
+        recipe_items = (await db.execute(select(RecipeItem).where(RecipeItem.recipe_id == recipe.id))).scalars().all()
+        for component in recipe_items:
+            ingredient = await db.get(Ingredient, component.ingredient_id)
+            if not ingredient:
+                continue
+            reversal_qty = round(component.quantity * order_item.quantity, 3)
+            ingredient.quantity_on_hand = round(ingredient.quantity_on_hand + reversal_qty, 3)
+            ingredient.updated_at = datetime.utcnow()
+            db.add(ingredient)
+            db.add(
+                StockLedgerEntry(
+                    ingredient_id=ingredient.id,
+                    change_qty=reversal_qty,
+                    reason="recipe_reversal_cancelled",
+                    reference_type="order",
+                    reference_id=order.id,
+                )
+            )
 
 
 @router.get("/branches", response_model=list[BranchRead])
@@ -493,10 +596,13 @@ async def seat_party(table_id: int, payload: SeatTableRequest, db: AsyncSession 
     table = await db.get(RestaurantTable, table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
-    if table.status == TableStatus.OCCUPIED:
-        raise HTTPException(status_code=409, detail="Table already occupied")
-    if payload.party_size > table.seats:
-        raise HTTPException(status_code=400, detail="Party size exceeds table capacity")
+    decision = evaluate_table_assignment(
+        table_seats=table.seats,
+        party_size=payload.party_size,
+        is_occupied=table.status == TableStatus.OCCUPIED,
+    )
+    if not decision.can_seat:
+        raise HTTPException(status_code=409 if decision.reason == "Table already occupied" else 400, detail=decision.reason)
 
     table.status = TableStatus.OCCUPIED
     if payload.reservation_id:
@@ -553,30 +659,35 @@ async def create_order(payload: OrderCreate, request: Request, db: AsyncSession 
     subtotal = 0.0
     for item_payload in payload.items:
         menu_item = menu_items[item_payload.menu_item_id]
-        line_total = round(menu_item.price * item_payload.quantity, 2)
-        subtotal += line_total
+        line_total_amount = line_total(menu_item.price, item_payload.quantity)
+        subtotal += line_total_amount
         order_item = OrderItem(
             order_id=order.id,
             menu_item_id=item_payload.menu_item_id,
             quantity=item_payload.quantity,
             course_no=item_payload.course_no,
             notes=item_payload.notes,
-            line_total=line_total,
+            line_total=line_total_amount,
         )
         db.add(order_item)
         await db.flush()
         db.add(KitchenTicket(order_item_id=order_item.id, status=KitchenTicketStatus.QUEUED))
+    created_items = (await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))).scalars().all()
+    await _apply_recipe_depletion(order, created_items, db)
 
     branch = await _get_branch_or_404(payload.branch_id, db)
-    tax_amount = round(subtotal * branch.tax_rate, 2)
-    service_charge = round(subtotal * branch.service_charge_rate, 2)
+    totals = bill_totals(
+        subtotal=subtotal,
+        tax_rate=branch.tax_rate,
+        service_charge_rate=branch.service_charge_rate,
+    )
 
     bill = Bill(
         order_id=order.id,
-        subtotal=round(subtotal, 2),
-        tax_amount=tax_amount,
-        service_charge=service_charge,
-        total_amount=round(subtotal + tax_amount + service_charge, 2),
+        subtotal=totals["subtotal"],
+        tax_amount=totals["tax_amount"],
+        service_charge=totals["service_charge"],
+        total_amount=totals["total_amount"],
     )
     db.add(bill)
     await db.commit()
@@ -589,16 +700,67 @@ async def create_order(payload: OrderCreate, request: Request, db: AsyncSession 
     return payload_out
 
 
+@router.post("/orders/edit-approvals", response_model=OrderEditApprovalRead, status_code=status.HTTP_201_CREATED)
+async def create_order_edit_approval(payload: OrderEditApprovalCreate, db: AsyncSession = Depends(get_db)):
+    order = await db.get(Order, payload.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    approval = OrderEditApproval(**payload.model_dump())
+    db.add(approval)
+    await db.commit()
+    await db.refresh(approval)
+    return approval
+
+
+@router.patch("/orders/edit-approvals/{approval_id}", response_model=OrderEditApprovalRead)
+async def action_order_edit_approval(approval_id: int, payload: OrderEditApprovalAction, db: AsyncSession = Depends(get_db)):
+    approval = await db.get(OrderEditApproval, approval_id)
+    if not approval:
+        raise HTTPException(status_code=404, detail="Order edit approval not found")
+    if approval.status != "pending":
+        raise HTTPException(status_code=409, detail="Order edit approval already resolved")
+    approval.status = payload.status
+    approval.approved_by = payload.approved_by
+    db.add(approval)
+    await db.commit()
+    await db.refresh(approval)
+    return approval
+
+
 @router.patch("/orders/{order_id}", response_model=OrderRead)
-async def patch_order(order_id: int, payload: OrderPatch, db: AsyncSession = Depends(get_db)):
+async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncSession = Depends(get_db)):
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    previous_status = order.status
+    if previous_status == OrderStatus.CANCELLED and payload.items is not None:
+        raise HTTPException(status_code=409, detail="Cannot edit items on a cancelled order")
 
     if payload.status is not None:
         order.status = payload.status
 
     if payload.items is not None:
+        fired_tickets_count = (
+            await db.execute(
+                select(func.count(KitchenTicket.id))
+                .join(OrderItem, OrderItem.id == KitchenTicket.order_item_id)
+                .where(
+                    OrderItem.order_id == order.id,
+                    KitchenTicket.status != KitchenTicketStatus.QUEUED,
+                )
+            )
+        ).one()[0]
+        if fired_tickets_count:
+            if payload.edit_approval_id is None:
+                raise HTTPException(status_code=409, detail="Post-fire order edits require approval")
+            approval = await db.get(OrderEditApproval, payload.edit_approval_id)
+            if not approval or approval.order_id != order.id or approval.status != "approved":
+                raise HTTPException(status_code=400, detail="Invalid order edit approval")
+        old_item_ids = (
+            await db.execute(select(OrderItem.id).where(OrderItem.order_id == order.id))
+        ).scalars().all()
+        if old_item_ids:
+            await db.execute(delete(KitchenTicket).where(KitchenTicket.order_item_id.in_(old_item_ids)))
         await db.execute(delete(OrderItem).where(OrderItem.order_id == order.id))
         subtotal = 0.0
         for item_payload in payload.items:
@@ -607,8 +769,7 @@ async def patch_order(order_id: int, payload: OrderPatch, db: AsyncSession = Dep
                 raise HTTPException(status_code=400, detail=f"Invalid menu item {item_payload.menu_item_id}")
             line_total = round(menu_item.price * item_payload.quantity, 2)
             subtotal += line_total
-            db.add(
-                OrderItem(
+            order_item = OrderItem(
                     order_id=order.id,
                     menu_item_id=item_payload.menu_item_id,
                     quantity=item_payload.quantity,
@@ -616,7 +777,9 @@ async def patch_order(order_id: int, payload: OrderPatch, db: AsyncSession = Dep
                     notes=item_payload.notes,
                     line_total=line_total,
                 )
-            )
+            db.add(order_item)
+            await db.flush()
+            db.add(KitchenTicket(order_item_id=order_item.id, status=KitchenTicketStatus.QUEUED))
 
         bill = (
             await db.execute(select(Bill).where(Bill.order_id == order.id))
@@ -634,6 +797,8 @@ async def patch_order(order_id: int, payload: OrderPatch, db: AsyncSession = Dep
             else:
                 bill.status = BillStatus.PAID
 
+    if payload.status == OrderStatus.CANCELLED and previous_status != OrderStatus.CANCELLED:
+        await _reverse_recipe_depletion(order, db)
     order.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(order)
@@ -663,11 +828,33 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, db: 
     ticket = await db.get(KitchenTicket, ticket_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+    previous_status = ticket.status
+    elapsed_seconds = max(0, int((datetime.utcnow() - ticket.updated_at).total_seconds()))
+    if not can_transition_ticket(current_status=ticket.status, next_status=payload.status):
+        raise HTTPException(status_code=409, detail="Invalid kitchen ticket status transition")
     ticket.status = payload.status
     ticket.updated_at = datetime.utcnow()
+    db.add(
+        KitchenTicketEvent(
+            ticket_id=ticket.id,
+            from_status=previous_status,
+            to_status=payload.status,
+            updated_by=payload.updated_by,
+            pass_seconds=elapsed_seconds,
+        )
+    )
     await db.commit()
     await db.refresh(ticket)
     return ticket
+
+
+@router.get("/kitchen/events")
+async def list_kitchen_events(ticket_id: int | None = None, db: AsyncSession = Depends(get_db)):
+    statement = select(KitchenTicketEvent)
+    if ticket_id is not None:
+        statement = statement.where(KitchenTicketEvent.ticket_id == ticket_id)
+    rows = (await db.execute(statement.order_by(KitchenTicketEvent.id.desc()).limit(200))).scalars().all()
+    return rows
 
 
 @router.get("/inventory/ingredients", response_model=list[IngredientRead])
@@ -687,7 +874,7 @@ async def adjust_inventory(payload: InventoryAdjustmentCreate, db: AsyncSession 
     if ingredient.quantity_on_hand + payload.change_qty < 0:
         raise HTTPException(status_code=400, detail="Adjustment would produce negative stock")
 
-    ingredient.quantity_on_hand = round(ingredient.quantity_on_hand + payload.change_qty, 3)
+    ingredient.quantity_on_hand = apply_inventory_delta(ingredient.quantity_on_hand, payload.change_qty)
     ingredient.updated_at = datetime.utcnow()
     ledger = StockLedgerEntry(
         ingredient_id=ingredient.id,
@@ -699,6 +886,118 @@ async def adjust_inventory(payload: InventoryAdjustmentCreate, db: AsyncSession 
     await db.commit()
     await db.refresh(ingredient)
     return {"ingredient": ingredient, "ledger_entry": ledger}
+
+
+@router.post("/inventory/stock-count-sessions", response_model=StockCountSessionRead, status_code=status.HTTP_201_CREATED)
+async def create_stock_count_session(payload: StockCountSessionCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(payload.branch_id, db)
+    session = StockCountSession(branch_id=payload.branch_id, opened_by=payload.opened_by)
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+@router.post("/inventory/stock-count-sessions/{session_id}/lines", status_code=status.HTTP_201_CREATED)
+async def upsert_stock_count_line(session_id: int, payload: StockCountLineUpsert, db: AsyncSession = Depends(get_db)):
+    session = await db.get(StockCountSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Stock count session not found")
+    if session.status != StockCountSessionStatus.DRAFT:
+        raise HTTPException(status_code=409, detail="Stock count lines can be edited only in draft state")
+    ingredient = await db.get(Ingredient, payload.ingredient_id)
+    if not ingredient or ingredient.branch_id != session.branch_id:
+        raise HTTPException(status_code=400, detail="Ingredient not found for stock count branch")
+
+    line = (
+        await db.execute(
+            select(StockCountLine).where(
+                StockCountLine.session_id == session_id,
+                StockCountLine.ingredient_id == payload.ingredient_id,
+            )
+        )
+    ).scalars().first()
+    variance = round(payload.counted_qty - ingredient.quantity_on_hand, 3)
+    if line:
+        line.expected_qty = ingredient.quantity_on_hand
+        line.counted_qty = payload.counted_qty
+        line.variance_qty = variance
+        line.notes = payload.notes
+    else:
+        line = StockCountLine(
+            session_id=session_id,
+            ingredient_id=payload.ingredient_id,
+            expected_qty=ingredient.quantity_on_hand,
+            counted_qty=payload.counted_qty,
+            variance_qty=variance,
+            notes=payload.notes,
+        )
+        db.add(line)
+    await db.commit()
+    return line
+
+
+@router.patch("/inventory/stock-count-sessions/{session_id}/submit", response_model=StockCountSessionRead)
+async def submit_stock_count_session(session_id: int, submitted_by: int | None = None, db: AsyncSession = Depends(get_db)):
+    session = await db.get(StockCountSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Stock count session not found")
+    if session.status != StockCountSessionStatus.DRAFT:
+        raise HTTPException(status_code=409, detail="Only draft stock count sessions can be submitted")
+    line_count = (
+        await db.execute(select(func.count(StockCountLine.id)).where(StockCountLine.session_id == session_id))
+    ).one()[0]
+    if line_count == 0:
+        raise HTTPException(status_code=400, detail="Cannot submit stock count session without lines")
+    session.status = StockCountSessionStatus.SUBMITTED
+    session.submitted_by = submitted_by
+    session.submitted_at = datetime.utcnow()
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+@router.patch("/inventory/stock-count-sessions/{session_id}/review", response_model=StockCountSessionRead)
+async def review_stock_count_session(session_id: int, payload: StockCountReviewAction, db: AsyncSession = Depends(get_db)):
+    session = await db.get(StockCountSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Stock count session not found")
+    if session.status != StockCountSessionStatus.SUBMITTED:
+        raise HTTPException(status_code=409, detail="Only submitted stock count sessions can be reviewed")
+
+    if payload.action == "approve":
+        lines = (await db.execute(select(StockCountLine).where(StockCountLine.session_id == session_id))).scalars().all()
+        for line in lines:
+            ingredient = await db.get(Ingredient, line.ingredient_id)
+            if not ingredient:
+                continue
+            ingredient.quantity_on_hand = round(line.counted_qty, 3)
+            ingredient.updated_at = datetime.utcnow()
+            db.add(ingredient)
+            if line.variance_qty != 0:
+                db.add(
+                    StockLedgerEntry(
+                        ingredient_id=ingredient.id,
+                        change_qty=line.variance_qty,
+                        reason="stock_count_variance",
+                        reference_type="stock_count_session",
+                        reference_id=session.id,
+                    )
+                )
+        session.status = StockCountSessionStatus.APPROVED
+        session.approved_by = payload.reviewer_id
+        session.approved_at = datetime.utcnow()
+    elif payload.action == "reject":
+        session.status = StockCountSessionStatus.REJECTED
+        session.rejection_reason = payload.rejection_reason
+        session.approved_by = payload.reviewer_id
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported stock count review action")
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
 
 
 @router.post("/recipes", response_model=RecipeRead, status_code=status.HTTP_201_CREATED)
@@ -742,13 +1041,17 @@ async def list_recipes(branch_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("/stock-transfers", response_model=StockTransferRead, status_code=status.HTTP_201_CREATED)
 async def create_stock_transfer(payload: StockTransferCreate, db: AsyncSession = Depends(get_db)):
+    if payload.from_branch_id == payload.to_branch_id:
+        raise HTTPException(status_code=400, detail="Source and destination branches must be different")
+    if payload.from_ingredient_id == payload.to_ingredient_id:
+        raise HTTPException(status_code=400, detail="Source and destination ingredients must be different")
     from_ingredient = await db.get(Ingredient, payload.from_ingredient_id)
     to_ingredient = await db.get(Ingredient, payload.to_ingredient_id)
     if not from_ingredient or from_ingredient.branch_id != payload.from_branch_id:
         raise HTTPException(status_code=400, detail="From ingredient does not belong to from_branch")
     if not to_ingredient or to_ingredient.branch_id != payload.to_branch_id:
         raise HTTPException(status_code=400, detail="To ingredient does not belong to to_branch")
-    transfer = StockTransfer(**payload.model_dump(), status="pending")
+    transfer = StockTransfer(**payload.model_dump(), status="requested")
     db.add(transfer)
     await db.commit()
     await db.refresh(transfer)
@@ -760,23 +1063,80 @@ async def action_stock_transfer(transfer_id: int, payload: StockTransferAction, 
     transfer = await db.get(StockTransfer, transfer_id)
     if not transfer:
         raise HTTPException(status_code=404, detail="Stock transfer not found")
-    if transfer.status != "pending":
+    if transfer.status in {"received", "rejected"}:
         raise HTTPException(status_code=409, detail="Stock transfer already resolved")
-    transfer.status = payload.status
     transfer.approved_by = payload.approved_by
-    if payload.status == "approved":
+    if payload.action == "mark_in_transit":
+        if transfer.status != "requested":
+            raise HTTPException(status_code=409, detail="Only requested transfers can move to in_transit")
+        shipped_qty = payload.shipped_qty or transfer.quantity
+        if shipped_qty > transfer.quantity:
+            raise HTTPException(status_code=400, detail="Shipped quantity cannot exceed requested quantity")
         from_ingredient = await db.get(Ingredient, transfer.from_ingredient_id)
-        to_ingredient = await db.get(Ingredient, transfer.to_ingredient_id)
-        if not from_ingredient or not to_ingredient:
-            raise HTTPException(status_code=400, detail="Transfer ingredients are missing")
-        if from_ingredient.quantity_on_hand < transfer.quantity:
+        if not from_ingredient:
+            raise HTTPException(status_code=400, detail="Transfer source ingredient is missing")
+        if from_ingredient.quantity_on_hand < shipped_qty:
             raise HTTPException(status_code=400, detail="Insufficient stock for transfer")
-        from_ingredient.quantity_on_hand -= transfer.quantity
-        to_ingredient.quantity_on_hand += transfer.quantity
+        from_ingredient.quantity_on_hand -= shipped_qty
         from_ingredient.updated_at = datetime.utcnow()
-        to_ingredient.updated_at = datetime.utcnow()
+        transfer.shipped_qty = shipped_qty
+        transfer.status = "in_transit"
+        db.add(
+            StockLedgerEntry(
+                ingredient_id=from_ingredient.id,
+                change_qty=-shipped_qty,
+                reason="branch_transfer_shipped",
+                reference_type="stock_transfer",
+                reference_id=transfer.id,
+            )
+        )
         db.add(from_ingredient)
+    elif payload.action == "mark_received":
+        if transfer.status != "in_transit":
+            raise HTTPException(status_code=409, detail="Transfer must be in transit before receive")
+        to_ingredient = await db.get(Ingredient, transfer.to_ingredient_id)
+        if not to_ingredient:
+            raise HTTPException(status_code=400, detail="Transfer destination ingredient is missing")
+        receive_qty = payload.received_qty or transfer.shipped_qty or transfer.quantity
+        if receive_qty > transfer.shipped_qty:
+            raise HTTPException(status_code=400, detail="Received quantity cannot exceed shipped quantity")
+        if receive_qty < transfer.shipped_qty and not payload.discrepancy_notes:
+            raise HTTPException(status_code=400, detail="Discrepancy notes are required for short receipts")
+        transfer.received_qty = receive_qty
+        transfer.discrepancy_notes = payload.discrepancy_notes
+        transfer.status = "received"
+        to_ingredient.quantity_on_hand += receive_qty
+        to_ingredient.updated_at = datetime.utcnow()
+        db.add(
+            StockLedgerEntry(
+                ingredient_id=to_ingredient.id,
+                change_qty=receive_qty,
+                reason="branch_transfer_received",
+                reference_type="stock_transfer",
+                reference_id=transfer.id,
+            )
+        )
         db.add(to_ingredient)
+    elif payload.action == "reject":
+        if transfer.status == "in_transit" and transfer.shipped_qty > 0:
+            from_ingredient = await db.get(Ingredient, transfer.from_ingredient_id)
+            if from_ingredient:
+                from_ingredient.quantity_on_hand += transfer.shipped_qty
+                from_ingredient.updated_at = datetime.utcnow()
+                db.add(from_ingredient)
+                db.add(
+                    StockLedgerEntry(
+                        ingredient_id=from_ingredient.id,
+                        change_qty=transfer.shipped_qty,
+                        reason="branch_transfer_rejected_return",
+                        reference_type="stock_transfer",
+                        reference_id=transfer.id,
+                    )
+                )
+        transfer.status = "rejected"
+        transfer.discrepancy_notes = payload.discrepancy_notes
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported stock transfer action")
     db.add(transfer)
     await db.commit()
     await db.refresh(transfer)
@@ -907,14 +1267,20 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
         raise HTTPException(status_code=404, detail="Bill not found")
 
     total_new = round(sum(item.amount for item in payload.settlements), 2)
-    if bill.paid_amount + total_new > bill.total_amount:
-        raise HTTPException(status_code=400, detail="Settlement exceeds outstanding bill amount")
+    try:
+        next_paid, next_status = apply_settlement(
+            paid_amount=bill.paid_amount,
+            incoming_amount=total_new,
+            total_amount=bill.total_amount,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     for settlement_data in payload.settlements:
         db.add(Settlement(bill_id=bill.id, cashier_id=payload.cashier_id, **settlement_data.model_dump()))
 
-    bill.paid_amount = round(bill.paid_amount + total_new, 2)
-    bill.status = BillStatus.PAID if bill.paid_amount == bill.total_amount else BillStatus.PARTIALLY_PAID
+    bill.paid_amount = next_paid
+    bill.status = BillStatus.PAID if next_status == "paid" else BillStatus.PARTIALLY_PAID
 
     await db.commit()
     await db.refresh(bill)
@@ -1004,7 +1370,7 @@ async def close_drawer_session(session_id: int, payload: DrawerCloseRequest, db:
 @router.post("/shifts", status_code=status.HTTP_201_CREATED)
 async def create_shift(payload: ShiftCreate, db: AsyncSession = Depends(get_db)):
     await _get_branch_or_404(payload.branch_id, db)
-    if payload.ends_at <= payload.starts_at:
+    if not validate_shift_window(starts_at=payload.starts_at, ends_at=payload.ends_at):
         raise HTTPException(status_code=400, detail="Shift end time must be after start time")
 
     shift = Shift(**payload.model_dump())
@@ -1202,6 +1568,34 @@ async def list_accounting_exports(branch_id: int, db: AsyncSession = Depends(get
     ).scalars().all()
 
 
+@router.post("/accounting-exports/{export_id}/retry", response_model=AccountingExportRetryRead, status_code=status.HTTP_201_CREATED)
+async def retry_accounting_export(export_id: int, payload: AccountingExportRetryCreate, db: AsyncSession = Depends(get_db)):
+    export = await db.get(AccountingExport, export_id)
+    if not export:
+        raise HTTPException(status_code=404, detail="Accounting export not found")
+    retry = AccountingExportRetry(
+        accounting_export_id=export_id,
+        requested_by=payload.requested_by,
+        status=AccountingExportRetryStatus.COMPLETED,
+        message=payload.reason or "Manual rerun completed",
+        completed_at=datetime.utcnow(),
+    )
+    export.status = AccountingExportStatus.GENERATED
+    db.add(retry)
+    db.add(export)
+    await db.commit()
+    await db.refresh(retry)
+    return retry
+
+
+@router.get("/accounting-exports/retries", response_model=list[AccountingExportRetryRead])
+async def list_accounting_export_retries(export_id: int | None = None, db: AsyncSession = Depends(get_db)):
+    statement = select(AccountingExportRetry)
+    if export_id is not None:
+        statement = statement.where(AccountingExportRetry.accounting_export_id == export_id)
+    return (await db.execute(statement.order_by(AccountingExportRetry.id.desc()))).scalars().all()
+
+
 @router.post("/day-close", response_model=DayCloseRead, status_code=status.HTTP_201_CREATED)
 async def open_day_close(payload: DayCloseCreate, db: AsyncSession = Depends(get_db)):
     await _get_branch_or_404(payload.branch_id, db)
@@ -1247,6 +1641,17 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
             status_code=409,
             detail=f"Day-close blocked: open_drawers={open_drawers}, open_bills={open_bills}",
         )
+    pending_required_checklist = (
+        await db.execute(
+            select(func.count(DayCloseChecklistItem.id)).where(
+                DayCloseChecklistItem.day_close_id == day_close_id,
+                DayCloseChecklistItem.is_required == True,
+                DayCloseChecklistItem.is_checked == False,
+            )
+        )
+    ).one()[0]
+    if pending_required_checklist:
+        raise HTTPException(status_code=409, detail=f"Day-close blocked: pending_required_checklist={pending_required_checklist}")
 
     record.status = DayCloseStatus.CLOSED
     record.closed_by = payload.closed_by
@@ -1256,6 +1661,55 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
     await db.commit()
     await db.refresh(record)
     return record
+
+
+@router.post("/day-close/{day_close_id}/checklist-items", response_model=DayCloseChecklistRead, status_code=status.HTTP_201_CREATED)
+async def create_day_close_checklist_item(day_close_id: int, payload: DayCloseChecklistCreate, db: AsyncSession = Depends(get_db)):
+    day_close = await db.get(DayClose, day_close_id)
+    if not day_close:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    item = DayCloseChecklistItem(day_close_id=day_close_id, item_key=payload.item_key, is_required=payload.is_required)
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return item
+
+
+@router.patch("/day-close/checklist-items/{item_id}", response_model=DayCloseChecklistRead)
+async def check_day_close_checklist_item(item_id: int, payload: DayCloseChecklistCheck, db: AsyncSession = Depends(get_db)):
+    item = await db.get(DayCloseChecklistItem, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+    item.is_checked = payload.is_checked
+    item.checked_by = payload.checked_by
+    item.checked_at = datetime.utcnow() if payload.is_checked else None
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return item
+
+
+@router.get("/drawer-reconciliation")
+async def drawer_reconciliation_report(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    sessions = (
+        await db.execute(select(CashDrawerSession).where(CashDrawerSession.branch_id == branch_id).order_by(CashDrawerSession.id.desc()))
+    ).scalars().all()
+    rows = []
+    for session in sessions:
+        declared = session.closing_balance if session.closing_balance is not None else session.opening_balance
+        variance = round((declared or 0) - session.opening_balance, 2)
+        rows.append(
+            {
+                "session_id": session.id,
+                "cashier_id": session.cashier_id,
+                "status": session.status,
+                "opening_balance": session.opening_balance,
+                "declared_closing_balance": session.closing_balance,
+                "variance_vs_opening": variance,
+            }
+        )
+    return {"branch_id": branch_id, "rows": rows, "generated_at": datetime.utcnow()}
 
 
 @router.get("/day-close", response_model=list[DayCloseRead])
@@ -1313,6 +1767,27 @@ async def branch_operations_report(branch_id: int, db: AsyncSession = Depends(ge
         "collected_sales": float(collected_sales or 0.0),
         "low_stock_count": low_stock_count,
         "generated_at": datetime.utcnow(),
+    }
+
+
+@router.get("/client/role-shells")
+async def role_shells_manifest():
+    return {
+        "guest_touchpoint": {"surfaces": ["reservation_create", "waitlist_status", "order_status"]},
+        "pos": {"surfaces": ["seat_party", "order_capture", "bill_settlement"]},
+        "kds": {"surfaces": ["kitchen_tickets", "ticket_transition", "pass_time_events"]},
+        "backoffice": {"surfaces": ["inventory", "procurement", "day_close", "accounting_exports"]},
+    }
+
+
+@router.get("/client/mobile-role-flows")
+async def mobile_role_flows_manifest():
+    return {
+        "host": ["reservation_create", "seat_party", "waitlist_promote"],
+        "waiter": ["order_create", "order_patch", "bill_lookup"],
+        "chef": ["kitchen_ticket_list", "kitchen_ticket_patch"],
+        "cashier": ["drawer_open", "bill_settlement", "drawer_close"],
+        "manager": ["day_close_open", "day_close_finalize", "accounting_export_retry"],
     }
 
 

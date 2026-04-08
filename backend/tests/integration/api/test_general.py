@@ -24,3 +24,10 @@ class TestAPIEndpoints:
         """Test API version prefix works."""
         from src.apps.core.config import settings
         assert settings.API_V1_STR == "/api/v1"
+
+    @pytest.mark.asyncio
+    async def test_health_probe(self, client: AsyncClient):
+        """Health endpoint should return service availability payload."""
+        response = await client.get("/health")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"

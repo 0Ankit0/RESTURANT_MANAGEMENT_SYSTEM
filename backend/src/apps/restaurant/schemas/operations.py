@@ -2,6 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from src.apps.restaurant.models import (
+    AccountingExportRetryStatus,
     AccountingExportStatus,
     BillStatus,
     DayCloseStatus,
@@ -11,6 +12,7 @@ from src.apps.restaurant.models import (
     OrderStatus,
     PurchaseOrderStatus,
     ReservationStatus,
+    StockCountSessionStatus,
     ShiftStatus,
     TableStatus,
     WaitlistStatus,
@@ -326,6 +328,7 @@ class KitchenTicketRead(BaseModel):
 
 class KitchenTicketPatch(BaseModel):
     status: KitchenTicketStatus
+    updated_by: int | None = None
 
 
 class InventoryAdjustmentCreate(BaseModel):
@@ -364,8 +367,11 @@ class StockTransferCreate(BaseModel):
 
 
 class StockTransferAction(BaseModel):
-    approved_by: int
-    status: str = "approved"
+    approved_by: int | None = None
+    action: str = "mark_in_transit"
+    shipped_qty: float | None = Field(default=None, gt=0)
+    received_qty: float | None = Field(default=None, gt=0)
+    discrepancy_notes: str | None = None
 
 
 class StockTransferRead(BaseModel):
@@ -375,6 +381,9 @@ class StockTransferRead(BaseModel):
     from_ingredient_id: int
     to_ingredient_id: int
     quantity: float
+    shipped_qty: float
+    received_qty: float
+    discrepancy_notes: str | None
     status: str
     approved_by: int | None
 
@@ -584,3 +593,97 @@ class DayCloseRead(BaseModel):
     closed_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class StockCountSessionCreate(BaseModel):
+    branch_id: int
+    opened_by: int | None = None
+
+
+class StockCountLineUpsert(BaseModel):
+    ingredient_id: int
+    counted_qty: float = Field(ge=0)
+    notes: str | None = None
+
+
+class StockCountReviewAction(BaseModel):
+    reviewer_id: int | None = None
+    action: str = "approve"
+    rejection_reason: str | None = None
+
+
+class StockCountSessionRead(BaseModel):
+    id: int
+    branch_id: int
+    status: StockCountSessionStatus
+    opened_by: int | None
+    submitted_by: int | None
+    approved_by: int | None
+    rejection_reason: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class AccountingExportRetryCreate(BaseModel):
+    requested_by: int | None = None
+    reason: str | None = None
+
+
+class AccountingExportRetryRead(BaseModel):
+    id: int
+    accounting_export_id: int
+    requested_by: int | None
+    status: AccountingExportRetryStatus
+    message: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class DayCloseChecklistCreate(BaseModel):
+    item_key: str
+    is_required: bool = True
+
+
+class DayCloseChecklistRead(BaseModel):
+    id: int
+    day_close_id: int
+    item_key: str
+    is_required: bool
+    is_checked: bool
+    checked_by: int | None
+    checked_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class DayCloseChecklistCheck(BaseModel):
+    checked_by: int | None = None
+    is_checked: bool = True
+
+
+class OrderEditApprovalCreate(BaseModel):
+    order_id: int
+    requested_by: int
+    reason: str
+
+
+class OrderEditApprovalAction(BaseModel):
+    approved_by: int | None = None
+    status: str = "approved"
+
+
+class OrderEditApprovalRead(BaseModel):
+    id: int
+    order_id: int
+    requested_by: int
+    approved_by: int | None
+    reason: str
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class OrderPatchWithApproval(OrderPatch):
+    edit_approval_id: int | None = None
