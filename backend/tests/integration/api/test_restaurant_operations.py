@@ -398,3 +398,44 @@ async def test_restaurant_flow(client, db_session):
     res = await client.patch(f"/api/v1/admin/branch-policies/{policy['id']}", json={"value": "15"})
     assert res.status_code == 200
     assert res.json()["value"] == "15"
+
+
+@pytest.mark.asyncio
+async def test_branch_bootstrap_and_privileged_audit(client):
+    bootstrap = await client.post(
+        "/api/v1/branches/bootstrap",
+        json={
+            "branch_name": "Harbor",
+            "tax_rate": 0.07,
+            "service_charge_rate": 0.05,
+            "zones": ["Dining", "Patio"],
+            "tables": [{"code": "D1", "seats": 4}, {"code": "P1", "seats": 2}],
+            "taxes": [{"name": "City VAT", "rate": 0.07}],
+            "payment_methods": [{"code": "cash", "display_name": "Cash"}, {"code": "card", "display_name": "Card"}],
+            "kitchen_stations": [{"name": "Grill", "code": "grill"}, {"name": "Expo", "code": "expo", "is_expo": True}],
+        },
+    )
+    assert bootstrap.status_code == 201
+    payload = bootstrap.json()
+    branch_id = payload["branch"]["id"]
+    assert len(payload["zones"]) == 2
+    assert len(payload["tables"]) == 2
+    assert len(payload["payment_methods"]) == 2
+    assert len(payload["kitchen_stations"]) == 2
+
+    ingredient = (
+        await client.post(
+            f"/api/v1/branches/{branch_id}/ingredients",
+            json={"name": "Cheese", "unit": "kg", "quantity_on_hand": 10, "reorder_threshold": 1},
+        )
+    ).json()
+
+    adjustment = await client.post(
+        "/api/v1/inventory/adjustments",
+        json={"ingredient_id": ingredient["id"], "change_qty": -0.5, "reason": "manual_count"},
+    )
+    assert adjustment.status_code == 201
+
+    audits = await client.get(f"/api/v1/audit/privileged-actions?branch_id={branch_id}")
+    assert audits.status_code == 200
+    assert any(row["action"] == "inventory.adjustment.manual" for row in audits.json())

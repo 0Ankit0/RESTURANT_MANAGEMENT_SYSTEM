@@ -51,3 +51,31 @@ async def test_admin_cross_branch_allowed(monkeypatch):
     request = _request(headers={"X-Restaurant-Role": "admin"})
 
     await require_restaurant_access(request)
+
+
+@pytest.mark.asyncio
+async def test_cashier_cannot_create_discount_approval(monkeypatch):
+    monkeypatch.setattr("src.apps.restaurant.access.control.settings.TESTING", False)
+    request = _request(
+        method="POST",
+        path="/api/v1/discount-approvals",
+        headers={"X-Restaurant-Role": "cashier", "X-Branch-Id": "1", "content-type": "application/json"},
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await require_restaurant_access(request)
+
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_accountant_org_scope_can_access_reports_without_branch_header(monkeypatch):
+    monkeypatch.setattr("src.apps.restaurant.access.control.settings.TESTING", False)
+    request = _request(
+        method="GET",
+        path="/api/v1/reports/branch-operations",
+        query="branch_id=1",
+        headers={"X-Restaurant-Role": "accountant"},
+    )
+
+    await require_restaurant_access(request)

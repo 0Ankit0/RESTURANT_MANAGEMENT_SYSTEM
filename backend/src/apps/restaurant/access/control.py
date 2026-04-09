@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-from enum import StrEnum
-
 from fastapi import Depends, HTTPException, Request, status
 
 from src.apps.core.config import settings
-
-
-class RestaurantRole(StrEnum):
-    GUEST = "guest"
-    HOST = "host"
-    WAITER = "waiter"
-    CAPTAIN = "captain"
-    CHEF = "chef"
-    CASHIER = "cashier"
-    ACCOUNTANT = "accountant"
-    INVENTORY_MANAGER = "inventory_manager"
-    PURCHASE_MANAGER = "purchase_manager"
-    BRANCH_MANAGER = "branch_manager"
-    ADMIN = "admin"
+from src.apps.restaurant.domains.access import (
+    BRANCH_SCOPED_ROLES,
+    ORG_WIDE_ROLES,
+    RestaurantRole,
+    resolve_action,
+    role_can_access_action,
+)
 
 
 def _extract_effective_branch_id(request: Request) -> int | None:
@@ -51,13 +42,11 @@ async def _capture_json_body(request: Request) -> None:
 
 
 async def require_restaurant_access(request: Request) -> None:
-    """Enforce role + branch scope via lightweight headers.
+    """Enforce branch-scoped RBAC using role + branch headers.
 
     Headers:
     - X-Restaurant-Role: role string
-    - X-Branch-Id: branch scope for non-admin users
-
-    During test runs we skip enforcement to preserve current integration contracts.
+    - X-Branch-Id: branch scope for branch-scoped staff roles
     """
     if settings.TESTING:
         return
@@ -76,20 +65,21 @@ async def require_restaurant_access(request: Request) -> None:
     requested_branch_id = _extract_effective_branch_id(request)
     scope_branch_header = request.headers.get("X-Branch-Id")
 
-    # Admin can access cross-branch resources.
-    if role == RestaurantRole.ADMIN:
-        return
+    if role in BRANCH_SCOPED_ROLES:
+        if not scope_branch_header:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-Branch-Id header")
+        try:
+            scope_branch_id = int(scope_branch_header)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid X-Branch-Id header") from exc
+        if requested_branch_id is not None and scope_branch_id != requested_branch_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Branch scope mismatch")
+    elif role not in ORG_WIDE_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unsupported role scope")
 
-    if not scope_branch_header:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-Branch-Id header")
-
-    try:
-        scope_branch_id = int(scope_branch_header)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid X-Branch-Id header") from exc
-
-    if requested_branch_id is not None and scope_branch_id != requested_branch_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Branch scope mismatch")
+    action = resolve_action(str(request.url.path))
+    if not role_can_access_action(role=role, action=action):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role cannot access this resource")
 
 
 RestaurantAccessDependency = Depends(require_restaurant_access)

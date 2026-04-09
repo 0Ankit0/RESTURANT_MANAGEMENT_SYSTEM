@@ -15,6 +15,7 @@ from src.apps.restaurant.domains.kitchen import can_transition_ticket
 from src.apps.restaurant.domains.menu import line_total
 from src.apps.restaurant.domains.seating import evaluate_table_assignment
 from src.apps.restaurant.domains.workforce import validate_shift_window
+from src.apps.restaurant.domains.access import PRIVILEGED_ACTIONS
 from src.apps.restaurant.models import (
     AccountingExportRetry,
     AccountingExportRetryStatus,
@@ -24,7 +25,9 @@ from src.apps.restaurant.models import (
     Bill,
     BillStatus,
     Branch,
+    BranchPaymentMethod,
     BranchPolicy,
+    BranchPrinter,
     CashDrawerSession,
     DayClose,
     DayCloseChecklistItem,
@@ -34,6 +37,7 @@ from src.apps.restaurant.models import (
     GoodsReceipt,
     Ingredient,
     IdempotencyRecord,
+    KitchenStation,
     KitchenTicket,
     KitchenTicketEvent,
     KitchenTicketStatus,
@@ -45,6 +49,7 @@ from src.apps.restaurant.models import (
     OrderEditApproval,
     OrderItem,
     OrderStatus,
+    PrivilegedActionAudit,
     PurchaseOrder,
     PurchaseOrderLine,
     PurchaseOrderStatus,
@@ -79,7 +84,11 @@ from src.apps.restaurant.schemas.operations import (
     AttendanceRead,
     BillRead,
     BillSettlementCreate,
+    BranchBootstrapCreate,
+    BranchBootstrapRead,
     BranchCreate,
+    BranchPaymentMethodCreate,
+    BranchPaymentMethodRead,
     BranchPolicyCreate,
     BranchPolicyPatch,
     BranchRead,
@@ -90,6 +99,8 @@ from src.apps.restaurant.schemas.operations import (
     DayCloseFinalize,
     DayCloseRead,
     DiscountApprovalAction,
+    BranchPrinterCreate,
+    BranchPrinterRead,
     DiscountApprovalCreate,
     DiscountApprovalRead,
     DrawerCloseRequest,
@@ -98,6 +109,8 @@ from src.apps.restaurant.schemas.operations import (
     IngredientCreate,
     IngredientRead,
     InventoryAdjustmentCreate,
+    KitchenStationCreate,
+    KitchenStationRead,
     KitchenTicketPatch,
     KitchenTicketRead,
     MenuItemCreate,
@@ -114,6 +127,7 @@ from src.apps.restaurant.schemas.operations import (
     OrderEditApprovalCreate,
     OrderEditApprovalRead,
     OrderRead,
+    PrivilegedActionAuditRead,
     PurchaseOrderCreate,
     PurchaseOrderResponse,
     PurchaseReceiptCreate,
@@ -211,6 +225,31 @@ async def _store_idempotency(request: Request, db: AsyncSession, status_code: in
     )
 
 
+async def _audit_privileged_action(
+    *,
+    db: AsyncSession,
+    action: str,
+    branch_id: int,
+    actor_user_id: int | None,
+    resource_type: str,
+    resource_id: int | None,
+    payload: dict | None = None,
+) -> None:
+    if action not in PRIVILEGED_ACTIONS:
+        return
+    db.add(
+        PrivilegedActionAudit(
+            branch_id=branch_id,
+            action=action,
+            actor_user_id=actor_user_id,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            payload_json=json.dumps(payload or {}, default=str),
+        )
+    )
+
+
+
 def _cursor_result(items: list, limit: int) -> dict:
     next_cursor = items[-1].id if len(items) == limit and getattr(items[-1], "id", None) else None
     return {"items": items, "next_cursor": next_cursor}
@@ -305,6 +344,120 @@ async def create_branch(payload: BranchCreate, db: AsyncSession = Depends(get_db
     await db.commit()
     await db.refresh(branch)
     return branch
+
+
+@router.post("/branches/bootstrap", response_model=BranchBootstrapRead, status_code=status.HTTP_201_CREATED)
+async def bootstrap_branch(payload: BranchBootstrapCreate, db: AsyncSession = Depends(get_db)):
+    branch = Branch(name=payload.branch_name, tax_rate=payload.tax_rate, service_charge_rate=payload.service_charge_rate)
+    db.add(branch)
+    await db.flush()
+
+    zones: list[ServiceZone] = []
+    for zone_name in payload.zones:
+        zone = ServiceZone(branch_id=branch.id, name=zone_name)
+        db.add(zone)
+        zones.append(zone)
+
+    tables: list[RestaurantTable] = []
+    for table_payload in payload.tables:
+        table = RestaurantTable(branch_id=branch.id, **table_payload.model_dump())
+        db.add(table)
+        tables.append(table)
+
+    taxes: list[TaxRule] = []
+    for tax_payload in payload.taxes:
+        tax = TaxRule(
+            branch_id=branch.id,
+            name=tax_payload.name,
+            rate=tax_payload.rate,
+            version=1,
+            is_active=True,
+            effective_from=tax_payload.effective_from or datetime.utcnow(),
+        )
+        db.add(tax)
+        taxes.append(tax)
+
+    payment_methods: list[BranchPaymentMethod] = []
+    for pm_payload in payload.payment_methods:
+        payment_method = BranchPaymentMethod(branch_id=branch.id, **pm_payload.model_dump())
+        db.add(payment_method)
+        payment_methods.append(payment_method)
+
+    stations: list[KitchenStation] = []
+    for station_payload in payload.kitchen_stations:
+        station = KitchenStation(branch_id=branch.id, **station_payload.model_dump())
+        db.add(station)
+        stations.append(station)
+
+    await db.commit()
+    await db.refresh(branch)
+    for row in [*zones, *tables, *taxes, *payment_methods, *stations]:
+        await db.refresh(row)
+
+    return {
+        "branch": branch,
+        "zones": zones,
+        "tables": tables,
+        "taxes": taxes,
+        "payment_methods": payment_methods,
+        "kitchen_stations": stations,
+    }
+
+
+@router.post("/branches/{branch_id}/payment-methods", response_model=BranchPaymentMethodRead, status_code=status.HTTP_201_CREATED)
+async def create_branch_payment_method(branch_id: int, payload: BranchPaymentMethodCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    row = BranchPaymentMethod(branch_id=branch_id, **payload.model_dump())
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+@router.get("/branches/{branch_id}/payment-methods", response_model=list[BranchPaymentMethodRead])
+async def list_branch_payment_methods(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(
+            select(BranchPaymentMethod).where(BranchPaymentMethod.branch_id == branch_id).order_by(BranchPaymentMethod.id.asc())
+        )
+    ).scalars().all()
+
+
+@router.post("/branches/{branch_id}/printers", response_model=BranchPrinterRead, status_code=status.HTTP_201_CREATED)
+async def create_branch_printer(branch_id: int, payload: BranchPrinterCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    row = BranchPrinter(branch_id=branch_id, **payload.model_dump())
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+@router.get("/branches/{branch_id}/printers", response_model=list[BranchPrinterRead])
+async def list_branch_printers(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(select(BranchPrinter).where(BranchPrinter.branch_id == branch_id).order_by(BranchPrinter.id.asc()))
+    ).scalars().all()
+
+
+@router.post("/branches/{branch_id}/kitchen-stations", response_model=KitchenStationRead, status_code=status.HTTP_201_CREATED)
+async def create_branch_kitchen_station(branch_id: int, payload: KitchenStationCreate, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    row = KitchenStation(branch_id=branch_id, **payload.model_dump())
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+@router.get("/branches/{branch_id}/kitchen-stations", response_model=list[KitchenStationRead])
+async def list_branch_kitchen_stations(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    return (
+        await db.execute(select(KitchenStation).where(KitchenStation.branch_id == branch_id).order_by(KitchenStation.id.asc()))
+    ).scalars().all()
 
 
 @router.post("/branches/{branch_id}/tables", response_model=TableRead, status_code=status.HTTP_201_CREATED)
@@ -883,6 +1036,15 @@ async def adjust_inventory(payload: InventoryAdjustmentCreate, db: AsyncSession 
         reference_type="manual_adjustment",
     )
     db.add(ledger)
+    await _audit_privileged_action(
+        db=db,
+        action="inventory.adjustment.manual",
+        branch_id=ingredient.branch_id,
+        actor_user_id=None,
+        resource_type="stock_ledger_entry",
+        resource_id=ledger.id,
+        payload={"ingredient_id": ingredient.id, "change_qty": payload.change_qty, "reason": payload.reason},
+    )
     await db.commit()
     await db.refresh(ingredient)
     return {"ingredient": ingredient, "ledger_entry": ledger}
@@ -1320,6 +1482,15 @@ async def action_discount_approval(approval_id: int, payload: DiscountApprovalAc
                 bill.paid_amount = bill.total_amount
             bill.status = BillStatus.PAID if bill.paid_amount == bill.total_amount else BillStatus.PARTIALLY_PAID
             db.add(bill)
+        await _audit_privileged_action(
+            db=db,
+            action="billing.discount.approved",
+            branch_id=approval.branch_id,
+            actor_user_id=payload.approved_by,
+            resource_type="discount_approval",
+            resource_id=approval.id,
+            payload={"bill_id": approval.bill_id, "discount_amount": approval.discount_amount},
+        )
     db.add(approval)
     await db.commit()
     await db.refresh(approval)
@@ -1340,6 +1511,15 @@ async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db
     bill.status = BillStatus.PAID if bill.paid_amount == bill.total_amount else BillStatus.PARTIALLY_PAID
     db.add(refund)
     db.add(bill)
+    await _audit_privileged_action(
+        db=db,
+        action="billing.refund.created",
+        branch_id=payload.branch_id,
+        actor_user_id=payload.approved_by,
+        resource_type="refund",
+        resource_id=refund.id,
+        payload={"bill_id": payload.bill_id, "amount": payload.amount, "reason": payload.reason},
+    )
     await db.commit()
     await db.refresh(refund)
     return refund
@@ -1349,6 +1529,15 @@ async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db
 async def list_refunds(branch_id: int, db: AsyncSession = Depends(get_db)):
     await _get_branch_or_404(branch_id, db)
     return (await db.execute(select(Refund).where(Refund.branch_id == branch_id).order_by(Refund.id.desc()))).scalars().all()
+
+
+@router.get("/audit/privileged-actions", response_model=list[PrivilegedActionAuditRead])
+async def list_privileged_action_audits(branch_id: int, action: str | None = None, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    statement = select(PrivilegedActionAudit).where(PrivilegedActionAudit.branch_id == branch_id)
+    if action is not None:
+        statement = statement.where(PrivilegedActionAudit.action == action)
+    return (await db.execute(statement.order_by(PrivilegedActionAudit.id.desc()).limit(500))).scalars().all()
 
 
 @router.post("/drawer-sessions/{session_id}/close", response_model=DrawerSessionRead)
@@ -1362,6 +1551,16 @@ async def close_drawer_session(session_id: int, payload: DrawerCloseRequest, db:
     session.status = DrawerStatus.CLOSED
     session.closing_balance = payload.closing_balance
     session.closed_at = datetime.utcnow()
+    if payload.override_reason:
+        await _audit_privileged_action(
+            db=db,
+            action="reconciliation.override",
+            branch_id=session.branch_id,
+            actor_user_id=payload.approved_by,
+            resource_type="cash_drawer_session",
+            resource_id=session.id,
+            payload={"override_reason": payload.override_reason, "closing_balance": payload.closing_balance},
+        )
     await db.commit()
     await db.refresh(session)
     return session
