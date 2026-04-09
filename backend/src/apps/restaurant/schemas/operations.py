@@ -428,6 +428,8 @@ class DrawerSessionCreate(BaseModel):
 
 class DrawerCloseRequest(BaseModel):
     closing_balance: float = Field(ge=0)
+    override_reason: str | None = None
+    approved_by: int | None = None
 
 
 class ShiftCreate(BaseModel):
@@ -687,3 +689,91 @@ class OrderEditApprovalRead(BaseModel):
 
 class OrderPatchWithApproval(OrderPatch):
     edit_approval_id: int | None = None
+
+
+class BranchPaymentMethodCreate(BaseModel):
+    code: str
+    display_name: str
+
+
+class BranchPaymentMethodRead(BaseModel):
+    id: int
+    branch_id: int
+    code: str
+    display_name: str
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class BranchPrinterCreate(BaseModel):
+    name: str
+    target: str
+    zone: str | None = None
+
+
+class BranchPrinterRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    target: str
+    zone: str | None
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class KitchenStationCreate(BaseModel):
+    name: str
+    code: str
+    is_expo: bool = False
+
+
+class KitchenStationRead(BaseModel):
+    id: int
+    branch_id: int
+    name: str
+    code: str
+    is_expo: bool
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class BootstrapTaxRuleCreate(BaseModel):
+    name: str
+    rate: float = Field(default=0, ge=0)
+    effective_from: datetime | None = None
+
+
+class BranchBootstrapCreate(BaseModel):
+    branch_name: str
+    tax_rate: float = Field(default=0.0, ge=0)
+    service_charge_rate: float = Field(default=0.0, ge=0)
+    zones: list[str] = Field(default_factory=list)
+    tables: list[TableCreate] = Field(default_factory=list)
+    taxes: list[BootstrapTaxRuleCreate] = Field(default_factory=list)
+    payment_methods: list[BranchPaymentMethodCreate] = Field(default_factory=list)
+    kitchen_stations: list[KitchenStationCreate] = Field(default_factory=list)
+
+
+class BranchBootstrapRead(BaseModel):
+    branch: BranchRead
+    zones: list[ServiceZoneRead]
+    tables: list[TableRead]
+    taxes: list[TaxRuleRead]
+    payment_methods: list[BranchPaymentMethodRead]
+    kitchen_stations: list[KitchenStationRead]
+
+
+class PrivilegedActionAuditRead(BaseModel):
+    id: int
+    branch_id: int
+    action: str
+    actor_user_id: int | None
+    resource_type: str
+    resource_id: int | None
+    payload_json: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

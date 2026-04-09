@@ -259,6 +259,45 @@ class BranchPolicy(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+
+
+class BranchPaymentMethod(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    code: str = Field(max_length=40)
+    display_name: str = Field(max_length=80)
+    is_active: bool = Field(default=True)
+
+
+class BranchPrinter(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=80)
+    target: str = Field(max_length=200)
+    zone: Optional[str] = Field(default=None, max_length=80)
+    is_active: bool = Field(default=True)
+
+
+class KitchenStation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    name: str = Field(max_length=80)
+    code: str = Field(max_length=40)
+    is_expo: bool = Field(default=False)
+    is_active: bool = Field(default=True)
+
+
+class PrivilegedActionAudit(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    action: str = Field(max_length=120, index=True)
+    actor_user_id: Optional[int] = Field(default=None, index=True)
+    resource_type: str = Field(max_length=80)
+    resource_id: Optional[int] = Field(default=None)
+    payload_json: Optional[str] = Field(default=None, max_length=2000)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class WaitlistEntry(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     branch_id: int = Field(foreign_key="branch.id", index=True)
