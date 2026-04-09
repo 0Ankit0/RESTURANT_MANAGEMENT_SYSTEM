@@ -6,6 +6,23 @@
 - Idempotency keys for order submission, bill closure, goods receipt, and accounting export generation.
 - Operational dashboards may use projected reads, but order, bill, and stock decisions should rely on authoritative transactional data.
 
+### Conventions
+- **Pagination**: cursor-based pagination is standard for operational feeds. Supported query parameters: `cursor` and `limit` (default `50`).
+- **Filtering**: list endpoints expose stable, explicit filters (for example `status_filter`, `vendor_id`, `bill_id`, `export_id`) rather than ad-hoc search.
+- **Error envelope**: endpoints return structured HTTP errors with status semantics:
+  - `400` validation/business-rule violation.
+  - `404` missing resource in branch scope.
+  - `409` workflow/state conflict (approval missing, already closed, blocked transition).
+- **Idempotent writes**: write endpoints that can be retried safely support `Idempotency-Key` and replay prior responses with `X-Idempotent-Replay: true`.
+
+### API Families with Cursor + Filter Conventions
+- Waitlist, Orders, Kitchen tickets.
+- Goods receipts (`vendor_id` filter).
+- Stock transfers (`status_filter`).
+- Refunds (`bill_id` filter).
+- Accounting exports (`status_filter`) and export retries (`export_id`, `status_filter`).
+- Day-close records (`status_filter`).
+
 ## Core Endpoints
 
 | Area | Method | Endpoint | Purpose |

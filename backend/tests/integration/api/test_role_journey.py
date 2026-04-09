@@ -78,3 +78,7 @@ async def test_role_journey_guest_to_manager(client):
     flows = await client.get("/api/v1/client/mobile-role-flows")
     assert shells.status_code == 200
     assert flows.status_code == 200
+    assert "web" in shells.json()
+    assert "guest" in shells.json()["web"]
+    assert "backoffice_admin" in shells.json()["web"]
+    assert "inventory" in flows.json()

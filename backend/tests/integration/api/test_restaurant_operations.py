@@ -221,7 +221,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.get(f"/api/v1/goods-receipts?branch_id={branch['id']}")
     assert res.status_code == 200
-    assert any(item["id"] == goods_receipt_id for item in res.json())
+    assert any(item["id"] == goods_receipt_id for item in res.json()["items"])
 
     res = await client.post(
         "/api/v1/stock-transfers",
@@ -252,7 +252,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.get(f"/api/v1/stock-transfers?branch_id={branch['id']}")
     assert res.status_code == 200
-    assert any(item["id"] == transfer_id for item in res.json())
+    assert any(item["id"] == transfer_id for item in res.json()["items"])
 
     res = await client.post(
         f"/api/v1/bills/{bill_id}/settlements",
@@ -289,7 +289,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.get(f"/api/v1/refunds?branch_id={branch['id']}")
     assert res.status_code == 200
-    assert len(res.json()) >= 1
+    assert len(res.json()["items"]) >= 1
 
     res = await client.post(
         f"/api/v1/drawer-sessions/{drawer['id']}/close",
@@ -346,7 +346,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.get(f"/api/v1/accounting-exports?branch_id={branch['id']}")
     assert res.status_code == 200
-    assert len(res.json()) >= 1
+    assert len(res.json()["items"]) >= 1
 
     res = await client.post(
         f"/api/v1/accounting-exports/{export_id}/retry",
@@ -356,7 +356,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.get(f"/api/v1/accounting-exports/retries?export_id={export_id}")
     assert res.status_code == 200
-    assert len(res.json()) >= 1
+    assert len(res.json()["items"]) >= 1
 
     res = await client.post(
         "/api/v1/day-close",
@@ -384,7 +384,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.get(f"/api/v1/day-close?branch_id={branch['id']}")
     assert res.status_code == 200
-    assert any(row["id"] == day_close_id for row in res.json())
+    assert any(row["id"] == day_close_id for row in res.json()["items"])
 
     res = await client.get(f"/api/v1/reports/branch-operations?branch_id={branch['id']}")
     assert res.status_code == 200
@@ -558,9 +558,35 @@ async def test_edge_case_controls_and_audit_trace(client):
         },
     )
     assert refund.status_code == 201
+    refund_id = refund.json()["id"]
+
+    rerun = await client.post(
+        f"/api/v1/refunds/{refund_id}/rerun",
+        json={"requested_by": 1, "reason": "gateway timeout replay"},
+        headers={"Idempotency-Key": "refund-rerun-1"},
+    )
+    assert rerun.status_code == 200
+    assert rerun.json()["status"] == "completed"
+
+    rerun_replay = await client.post(
+        f"/api/v1/refunds/{refund_id}/rerun",
+        json={"requested_by": 1, "reason": "gateway timeout replay"},
+        headers={"Idempotency-Key": "refund-rerun-1"},
+    )
+    assert rerun_replay.status_code == 200
+    assert rerun_replay.headers.get("X-Idempotent-Replay") == "true"
 
     audits = await client.get(f"/api/v1/audit/privileged-actions?branch_id={branch['id']}")
     assert audits.status_code == 200
     actions = [row["action"] for row in audits.json()]
     assert "billing.refund.created" in actions
     assert "reconciliation.override" in actions
+
+    day_close = await client.post(
+        "/api/v1/day-close",
+        json={"branch_id": branch["id"], "business_date": "2026-04-09T00:00:00Z", "notes": "blocker verification"},
+    )
+    assert day_close.status_code == 201
+    blockers = await client.get(f"/api/v1/day-close/{day_close.json()['id']}/blockers")
+    assert blockers.status_code == 200
+    assert any(item.startswith("pending_required_checklist=") for item in blockers.json()["blockers"])

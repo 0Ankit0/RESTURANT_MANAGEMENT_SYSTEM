@@ -547,6 +547,36 @@ class KitchenTicketCursorPage(BaseModel):
     next_cursor: int | None = None
 
 
+class GoodsReceiptCursorPage(BaseModel):
+    items: list[GoodsReceiptRead]
+    next_cursor: int | None = None
+
+
+class StockTransferCursorPage(BaseModel):
+    items: list[StockTransferRead]
+    next_cursor: int | None = None
+
+
+class RefundCursorPage(BaseModel):
+    items: list[RefundRead]
+    next_cursor: int | None = None
+
+
+class AccountingExportCursorPage(BaseModel):
+    items: list[AccountingExportRead]
+    next_cursor: int | None = None
+
+
+class AccountingExportRetryCursorPage(BaseModel):
+    items: list[AccountingExportRetryRead]
+    next_cursor: int | None = None
+
+
+class DayCloseCursorPage(BaseModel):
+    items: list[DayCloseRead]
+    next_cursor: int | None = None
+
+
 class ReservationUpdate(BaseModel):
     status: ReservationStatus | None = None
     notes: str | None = None
@@ -778,3 +808,19 @@ class PrivilegedActionAuditRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DayCloseBlockersRead(BaseModel):
+    day_close_id: int
+    blockers: list[str]
+
+
+class RefundRerunCreate(BaseModel):
+    requested_by: int | None = None
+    reason: str | None = None
+
+
+class RefundRerunRead(BaseModel):
+    refund_id: int
+    status: str
+    message: str

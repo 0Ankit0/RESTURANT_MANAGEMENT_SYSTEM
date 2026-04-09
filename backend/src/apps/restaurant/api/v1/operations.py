@@ -76,8 +76,10 @@ from src.apps.restaurant.models import (
 )
 from src.apps.restaurant.schemas.operations import (
     AccountingExportRetryCreate,
+    AccountingExportRetryCursorPage,
     AccountingExportRetryRead,
     AccountingExportCreate,
+    AccountingExportCursorPage,
     AccountingExportRead,
     AttendanceCheckout,
     AttendanceCreate,
@@ -96,6 +98,8 @@ from src.apps.restaurant.schemas.operations import (
     DayCloseChecklistCheck,
     DayCloseChecklistCreate,
     DayCloseChecklistRead,
+    DayCloseBlockersRead,
+    DayCloseCursorPage,
     DayCloseFinalize,
     DayCloseRead,
     DiscountApprovalAction,
@@ -143,6 +147,7 @@ from src.apps.restaurant.schemas.operations import (
     ShiftStatusPatch,
     StockTransferAction,
     StockTransferCreate,
+    StockTransferCursorPage,
     StockTransferRead,
     StockCountSessionCreate,
     StockCountSessionRead,
@@ -157,8 +162,12 @@ from src.apps.restaurant.schemas.operations import (
     VendorCreate,
     VendorRead,
     GoodsReceiptCreate,
+    GoodsReceiptCursorPage,
     GoodsReceiptRead,
     RefundCreate,
+    RefundCursorPage,
+    RefundRerunCreate,
+    RefundRerunRead,
     RefundRead,
     WaitlistCreate,
     WaitlistCursorPage,
@@ -1321,16 +1330,24 @@ async def action_stock_transfer(transfer_id: int, payload: StockTransferAction, 
     return transfer
 
 
-@router.get("/stock-transfers", response_model=list[StockTransferRead])
-async def list_stock_transfers(branch_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/stock-transfers", response_model=StockTransferCursorPage)
+async def list_stock_transfers(
+    branch_id: int,
+    status_filter: str | None = None,
+    cursor: int | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
     await _get_branch_or_404(branch_id, db)
-    return (
-        await db.execute(
-            select(StockTransfer)
-            .where((StockTransfer.from_branch_id == branch_id) | (StockTransfer.to_branch_id == branch_id))
-            .order_by(StockTransfer.id.desc())
-        )
-    ).scalars().all()
+    statement = select(StockTransfer).where(
+        (StockTransfer.from_branch_id == branch_id) | (StockTransfer.to_branch_id == branch_id)
+    )
+    if status_filter is not None:
+        statement = statement.where(StockTransfer.status == status_filter)
+    if cursor:
+        statement = statement.where(StockTransfer.id < cursor)
+    rows = (await db.execute(statement.order_by(StockTransfer.id.desc()).limit(limit))).scalars().all()
+    return _cursor_result(rows, limit)
 
 
 @router.post("/purchase-orders", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED)
@@ -1425,14 +1442,22 @@ async def create_goods_receipt(payload: GoodsReceiptCreate, db: AsyncSession = D
     return receipt
 
 
-@router.get("/goods-receipts", response_model=list[GoodsReceiptRead])
-async def list_goods_receipts(branch_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/goods-receipts", response_model=GoodsReceiptCursorPage)
+async def list_goods_receipts(
+    branch_id: int,
+    vendor_id: int | None = None,
+    cursor: int | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
     await _get_branch_or_404(branch_id, db)
-    return (
-        await db.execute(
-            select(GoodsReceipt).where(GoodsReceipt.branch_id == branch_id).order_by(GoodsReceipt.received_at.desc())
-        )
-    ).scalars().all()
+    statement = select(GoodsReceipt).where(GoodsReceipt.branch_id == branch_id)
+    if vendor_id is not None:
+        statement = statement.where(GoodsReceipt.vendor_id == vendor_id)
+    if cursor:
+        statement = statement.where(GoodsReceipt.id < cursor)
+    rows = (await db.execute(statement.order_by(GoodsReceipt.id.desc()).limit(limit))).scalars().all()
+    return _cursor_result(rows, limit)
 
 
 @router.post("/bills/{bill_id}/settlements", response_model=BillRead)
@@ -1559,10 +1584,49 @@ async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db
     return refund
 
 
-@router.get("/refunds", response_model=list[RefundRead])
-async def list_refunds(branch_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/refunds", response_model=RefundCursorPage)
+async def list_refunds(
+    branch_id: int,
+    bill_id: int | None = None,
+    cursor: int | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
     await _get_branch_or_404(branch_id, db)
-    return (await db.execute(select(Refund).where(Refund.branch_id == branch_id).order_by(Refund.id.desc()))).scalars().all()
+    statement = select(Refund).where(Refund.branch_id == branch_id)
+    if bill_id is not None:
+        statement = statement.where(Refund.bill_id == bill_id)
+    if cursor:
+        statement = statement.where(Refund.id < cursor)
+    rows = (await db.execute(statement.order_by(Refund.id.desc()).limit(limit))).scalars().all()
+    return _cursor_result(rows, limit)
+
+
+@router.post("/refunds/{refund_id}/rerun", response_model=RefundRerunRead)
+async def rerun_refund(refund_id: int, payload: RefundRerunCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
+    refund = await db.get(Refund, refund_id)
+    if not refund:
+        raise HTTPException(status_code=404, detail="Refund not found")
+    response_payload = {
+        "refund_id": refund_id,
+        "status": "completed",
+        "message": payload.reason or "Refund rerun completed",
+    }
+    await _audit_privileged_action(
+        db=db,
+        action="billing.refund.created",
+        branch_id=refund.branch_id,
+        actor_user_id=payload.requested_by,
+        resource_type="refund",
+        resource_id=refund.id,
+        payload={"rerun": True, "reason": payload.reason},
+    )
+    await _store_idempotency(request, db, status.HTTP_200_OK, response_payload)
+    await db.commit()
+    return response_payload
 
 
 @router.get("/audit/privileged-actions", response_model=list[PrivilegedActionAuditRead])
@@ -1793,14 +1857,22 @@ async def create_accounting_export(payload: AccountingExportCreate, request: Req
     return payload_out
 
 
-@router.get("/accounting-exports", response_model=list[AccountingExportRead])
-async def list_accounting_exports(branch_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/accounting-exports", response_model=AccountingExportCursorPage)
+async def list_accounting_exports(
+    branch_id: int,
+    status_filter: AccountingExportStatus | None = None,
+    cursor: int | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
     await _get_branch_or_404(branch_id, db)
-    return (
-        await db.execute(
-            select(AccountingExport).where(AccountingExport.branch_id == branch_id).order_by(AccountingExport.created_at.desc())
-        )
-    ).scalars().all()
+    statement = select(AccountingExport).where(AccountingExport.branch_id == branch_id)
+    if status_filter is not None:
+        statement = statement.where(AccountingExport.status == status_filter)
+    if cursor:
+        statement = statement.where(AccountingExport.id < cursor)
+    rows = (await db.execute(statement.order_by(AccountingExport.id.desc()).limit(limit))).scalars().all()
+    return _cursor_result(rows, limit)
 
 
 @router.post("/accounting-exports/{export_id}/retry", response_model=AccountingExportRetryRead, status_code=status.HTTP_201_CREATED)
@@ -1823,12 +1895,23 @@ async def retry_accounting_export(export_id: int, payload: AccountingExportRetry
     return retry
 
 
-@router.get("/accounting-exports/retries", response_model=list[AccountingExportRetryRead])
-async def list_accounting_export_retries(export_id: int | None = None, db: AsyncSession = Depends(get_db)):
+@router.get("/accounting-exports/retries", response_model=AccountingExportRetryCursorPage)
+async def list_accounting_export_retries(
+    export_id: int | None = None,
+    status_filter: AccountingExportRetryStatus | None = None,
+    cursor: int | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
     statement = select(AccountingExportRetry)
     if export_id is not None:
         statement = statement.where(AccountingExportRetry.accounting_export_id == export_id)
-    return (await db.execute(statement.order_by(AccountingExportRetry.id.desc()))).scalars().all()
+    if status_filter is not None:
+        statement = statement.where(AccountingExportRetry.status == status_filter)
+    if cursor:
+        statement = statement.where(AccountingExportRetry.id < cursor)
+    rows = (await db.execute(statement.order_by(AccountingExportRetry.id.desc()).limit(limit))).scalars().all()
+    return _cursor_result(rows, limit)
 
 
 @router.post("/day-close", response_model=DayCloseRead, status_code=status.HTTP_201_CREATED)
@@ -1898,6 +1981,36 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
     return record
 
 
+@router.get("/day-close/{day_close_id}/blockers", response_model=DayCloseBlockersRead)
+async def get_day_close_blockers(day_close_id: int, db: AsyncSession = Depends(get_db)):
+    record = await db.get(DayClose, day_close_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    blockers: list[str] = []
+    open_drawers = (
+        await db.execute(
+            select(func.count(CashDrawerSession.id)).where(
+                CashDrawerSession.branch_id == record.branch_id,
+                CashDrawerSession.status == DrawerStatus.OPEN,
+            )
+        )
+    ).one()[0]
+    if open_drawers:
+        blockers.append(f"open_drawers={open_drawers}")
+    pending_required_checklist = (
+        await db.execute(
+            select(func.count(DayCloseChecklistItem.id)).where(
+                DayCloseChecklistItem.day_close_id == day_close_id,
+                DayCloseChecklistItem.is_required == True,
+                DayCloseChecklistItem.is_checked == False,
+            )
+        )
+    ).one()[0]
+    if pending_required_checklist:
+        blockers.append(f"pending_required_checklist={pending_required_checklist}")
+    return {"day_close_id": day_close_id, "blockers": blockers}
+
+
 @router.post("/day-close/{day_close_id}/checklist-items", response_model=DayCloseChecklistRead, status_code=status.HTTP_201_CREATED)
 async def create_day_close_checklist_item(day_close_id: int, payload: DayCloseChecklistCreate, db: AsyncSession = Depends(get_db)):
     day_close = await db.get(DayClose, day_close_id)
@@ -1947,12 +2060,22 @@ async def drawer_reconciliation_report(branch_id: int, db: AsyncSession = Depend
     return {"branch_id": branch_id, "rows": rows, "generated_at": datetime.utcnow()}
 
 
-@router.get("/day-close", response_model=list[DayCloseRead])
-async def list_day_close(branch_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/day-close", response_model=DayCloseCursorPage)
+async def list_day_close(
+    branch_id: int,
+    status_filter: DayCloseStatus | None = None,
+    cursor: int | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
     await _get_branch_or_404(branch_id, db)
-    return (
-        await db.execute(select(DayClose).where(DayClose.branch_id == branch_id).order_by(DayClose.business_date.desc()))
-    ).scalars().all()
+    statement = select(DayClose).where(DayClose.branch_id == branch_id)
+    if status_filter is not None:
+        statement = statement.where(DayClose.status == status_filter)
+    if cursor:
+        statement = statement.where(DayClose.id < cursor)
+    rows = (await db.execute(statement.order_by(DayClose.id.desc()).limit(limit))).scalars().all()
+    return _cursor_result(rows, limit)
 
 
 @router.get("/reports/branch-operations")
@@ -2008,21 +2131,55 @@ async def branch_operations_report(branch_id: int, db: AsyncSession = Depends(ge
 @router.get("/client/role-shells")
 async def role_shells_manifest():
     return {
-        "guest_touchpoint": {"surfaces": ["reservation_create", "waitlist_status", "order_status"]},
-        "pos": {"surfaces": ["seat_party", "order_capture", "bill_settlement"]},
-        "kds": {"surfaces": ["kitchen_tickets", "ticket_transition", "pass_time_events"]},
-        "backoffice": {"surfaces": ["inventory", "procurement", "day_close", "accounting_exports"]},
+        "web": {
+            "guest": {
+                "journeys": [
+                    "reservation_create",
+                    "reservation_update_status",
+                    "waitlist_status_lookup",
+                    "order_status_lookup",
+                    "bill_breakdown_view",
+                ]
+            },
+            "pos_front_of_house": {
+                "journeys": [
+                    "table_seat_or_release",
+                    "waitlist_promote",
+                    "order_capture_with_modifiers",
+                    "order_edit_with_approval",
+                    "split_merge_bill_and_settlement",
+                    "refund_create_or_rerun",
+                ]
+            },
+            "kds": {
+                "journeys": [
+                    "kitchen_ticket_queue",
+                    "ticket_transition_and_event_log",
+                    "stockout_delay_signal_to_floor",
+                ]
+            },
+            "backoffice_admin": {
+                "journeys": [
+                    "inventory_adjustment_and_stock_transfer",
+                    "purchase_order_and_receipt",
+                    "discount_void_refund_approval",
+                    "day_close_blockers_and_finalize",
+                    "accounting_export_and_retry",
+                    "branch_policy_update",
+                ]
+            },
+        }
     }
 
 
 @router.get("/client/mobile-role-flows")
 async def mobile_role_flows_manifest():
     return {
-        "host": ["reservation_create", "seat_party", "waitlist_promote"],
-        "waiter": ["order_create", "order_patch", "bill_lookup"],
-        "chef": ["kitchen_ticket_list", "kitchen_ticket_patch"],
-        "cashier": ["drawer_open", "bill_settlement", "drawer_close"],
-        "manager": ["day_close_open", "day_close_finalize", "accounting_export_retry"],
+        "host": ["reservation_create", "waitlist_create", "seat_party", "table_release"],
+        "waiter": ["order_create", "order_patch_with_approval", "kitchen_delay_ack", "bill_lookup"],
+        "cashier": ["drawer_open", "bill_settlement", "refund_create", "refund_rerun", "drawer_close"],
+        "manager": ["discount_approval", "order_edit_approval", "day_close_blockers", "day_close_finalize", "accounting_export_retry"],
+        "inventory": ["ingredient_list", "inventory_adjustment", "stock_transfer_dispatch_receive", "stock_count_review"],
     }
 
 
