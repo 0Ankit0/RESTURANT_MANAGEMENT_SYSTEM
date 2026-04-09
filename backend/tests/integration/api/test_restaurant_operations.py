@@ -182,7 +182,7 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.post(
         "/api/v1/inventory/adjustments",
-        json={"ingredient_id": ingredient["id"], "change_qty": -1, "reason": "prep_usage"},
+        json={"ingredient_id": ingredient["id"], "change_qty": -1, "reason": "prep_usage", "approved_by": 1},
     )
     assert res.status_code == 201
 
@@ -432,10 +432,135 @@ async def test_branch_bootstrap_and_privileged_audit(client):
 
     adjustment = await client.post(
         "/api/v1/inventory/adjustments",
-        json={"ingredient_id": ingredient["id"], "change_qty": -0.5, "reason": "manual_count"},
+        json={"ingredient_id": ingredient["id"], "change_qty": -0.5, "reason": "manual_count", "approved_by": 55},
     )
     assert adjustment.status_code == 201
 
     audits = await client.get(f"/api/v1/audit/privileged-actions?branch_id={branch_id}")
     assert audits.status_code == 200
     assert any(row["action"] == "inventory.adjustment.manual" for row in audits.json())
+
+
+@pytest.mark.asyncio
+async def test_edge_case_controls_and_audit_trace(client):
+    branch = (await client.post("/api/v1/branches", json={"name": "EdgeCase", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={"code": "E1", "seats": 4})).json()
+    menu = (await client.post(f"/api/v1/branches/{branch['id']}/menu-items", json={"name": "Steak", "price": 20})).json()
+    ingredient = (
+        await client.post(
+            f"/api/v1/branches/{branch['id']}/ingredients",
+            json={"name": "Beef", "unit": "kg", "quantity_on_hand": 10, "reorder_threshold": 2},
+        )
+    ).json()
+    await client.post(
+        "/api/v1/recipes",
+        json={
+            "branch_id": branch["id"],
+            "name": "Steak",
+            "items": [{"ingredient_id": ingredient["id"], "quantity": 0.4}],
+        },
+    )
+    drawer = (
+        await client.post(
+            f"/api/v1/branches/{branch['id']}/drawer-sessions",
+            json={"cashier_id": 8, "opening_balance": 200},
+        )
+    ).json()
+
+    reservation = (
+        await client.post(
+            "/api/v1/reservations",
+            json={
+                "branch_id": branch["id"],
+                "guest_name": "Reservation Guest",
+                "guest_phone": "+1999888777",
+                "party_size": 2,
+                "reservation_time": "2026-04-09T18:00:00Z",
+            },
+        )
+    ).json()
+    seated = await client.post(
+        f"/api/v1/tables/{table['id']}/seat",
+        json={"reservation_id": reservation["id"], "party_size": 2},
+    )
+    assert seated.status_code == 200
+
+    delivery_order = await client.post(
+        "/api/v1/orders",
+        json={
+            "branch_id": branch["id"],
+            "order_source": "delivery",
+            "waiter_id": 5,
+            "items": [{"menu_item_id": menu["id"], "quantity": 1, "course_no": 2, "notes": "channel #abc"}],
+        },
+    )
+    assert delivery_order.status_code == 201
+    order_id = delivery_order.json()["order"]["id"]
+    bill_id = delivery_order.json()["bill"]["id"]
+    assert delivery_order.json()["order"]["order_source"] == "delivery"
+
+    kitchen = await client.get("/api/v1/kitchen/tickets")
+    assert kitchen.status_code == 200
+    ticket_id = kitchen.json()["items"][0]["id"]
+    assert (await client.patch(f"/api/v1/kitchen/tickets/{ticket_id}", json={"status": "in_preparation"})).status_code == 200
+
+    cancel_without_approval = await client.patch(f"/api/v1/orders/{order_id}", json={"status": "cancelled"})
+    assert cancel_without_approval.status_code == 409
+
+    approval = (
+        await client.post(
+            "/api/v1/orders/edit-approvals",
+            json={"order_id": order_id, "requested_by": 5, "reason": "customer requested cancellation"},
+        )
+    ).json()
+    await client.patch(f"/api/v1/orders/edit-approvals/{approval['id']}", json={"status": "approved", "approved_by": 1})
+    cancel_with_approval = await client.patch(
+        f"/api/v1/orders/{order_id}",
+        json={"status": "cancelled", "edit_approval_id": approval["id"]},
+    )
+    assert cancel_with_approval.status_code == 200
+
+    settle = await client.post(
+        f"/api/v1/bills/{bill_id}/settlements",
+        json={"cashier_id": 8, "settlements": [{"payment_method": "cash", "amount": 5}]},
+    )
+    assert settle.status_code == 200
+
+    assert (
+        await client.post(
+            "/api/v1/refunds",
+            json={"branch_id": branch["id"], "bill_id": bill_id, "amount": 1, "approved_by": 1},
+        )
+    ).status_code == 400
+
+    assert (
+        await client.post(
+            f"/api/v1/drawer-sessions/{drawer['id']}/close",
+            json={"closing_balance": 203, "override_reason": "cash mismatch"},
+        )
+    ).status_code == 400
+
+    assert (
+        await client.post(
+            f"/api/v1/drawer-sessions/{drawer['id']}/close",
+            json={"closing_balance": 203, "override_reason": "cash mismatch", "approved_by": 1},
+        )
+    ).status_code == 200
+
+    refund = await client.post(
+        "/api/v1/refunds",
+        json={
+            "branch_id": branch["id"],
+            "bill_id": bill_id,
+            "amount": 1,
+            "reason": "post-close supervised adjustment",
+            "approved_by": 1,
+        },
+    )
+    assert refund.status_code == 201
+
+    audits = await client.get(f"/api/v1/audit/privileged-actions?branch_id={branch['id']}")
+    assert audits.status_code == 200
+    actions = [row["action"] for row in audits.json()]
+    assert "billing.refund.created" in actions
+    assert "reconciliation.override" in actions

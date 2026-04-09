@@ -335,6 +335,7 @@ class InventoryAdjustmentCreate(BaseModel):
     ingredient_id: int
     change_qty: float
     reason: str
+    approved_by: int
 
 
 class RecipeItemCreate(BaseModel):
@@ -558,7 +559,7 @@ class RefundCreate(BaseModel):
     settlement_id: int | None = None
     amount: float = Field(gt=0)
     reason: str | None = None
-    approved_by: int | None = None
+    approved_by: int
 
 
 class RefundRead(BaseModel):
