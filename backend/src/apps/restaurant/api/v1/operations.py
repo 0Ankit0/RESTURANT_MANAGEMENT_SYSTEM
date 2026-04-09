@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import json
 
@@ -7,7 +7,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import delete, func, select
 
+from src.apps.core.config import settings
 from src.apps.iam.api.deps import get_db
+from src.apps.observability.service import create_log_entry
 from src.apps.restaurant.access import require_restaurant_access
 from src.apps.restaurant.domains.billing import apply_settlement, bill_totals
 from src.apps.restaurant.domains.inventory import apply_inventory_delta
@@ -49,6 +51,8 @@ from src.apps.restaurant.models import (
     OrderEditApproval,
     OrderItem,
     OrderStatus,
+    OperationalEventLog,
+    OperationalSeverity,
     PrivilegedActionAudit,
     PurchaseOrder,
     PurchaseOrderLine,
@@ -173,7 +177,10 @@ from src.apps.restaurant.schemas.operations import (
     WaitlistCursorPage,
     WaitlistRead,
     OrderCursorPage,
+    OperationalNotificationRead,
     KitchenTicketCursorPage,
+    ShiftScheduleRead,
+    ShiftScheduleRow,
 )
 
 router = APIRouter(dependencies=[Depends(require_restaurant_access)])
@@ -246,6 +253,7 @@ async def _audit_privileged_action(
 ) -> None:
     if action not in PRIVILEGED_ACTIONS:
         return
+    retention_until = datetime.utcnow() + timedelta(days=settings.PRIVILEGED_AUDIT_RETENTION_DAYS)
     db.add(
         PrivilegedActionAudit(
             branch_id=branch_id,
@@ -254,7 +262,44 @@ async def _audit_privileged_action(
             resource_type=resource_type,
             resource_id=resource_id,
             payload_json=json.dumps(payload or {}, default=str),
+            retention_until=retention_until,
+            is_operational_exception=action in {"billing.refund.created", "reconciliation.override"},
         )
+    )
+
+
+async def _emit_operational_event(
+    *,
+    db: AsyncSession,
+    branch_id: int,
+    event_name: str,
+    severity: OperationalSeverity = OperationalSeverity.INFO,
+    actor_user_id: int | None = None,
+    payload: dict | None = None,
+    is_exception: bool = False,
+) -> None:
+    retention_until = datetime.utcnow() + timedelta(days=settings.OPS_EVENT_RETENTION_DAYS)
+    db.add(
+        OperationalEventLog(
+            branch_id=branch_id,
+            event_name=event_name,
+            severity=severity,
+            actor_user_id=actor_user_id,
+            payload_json=json.dumps(payload or {}, default=str),
+            is_operational_exception=is_exception,
+            retention_until=retention_until,
+        )
+    )
+    await create_log_entry(
+        db,
+        level="WARNING" if severity in {OperationalSeverity.WARNING, OperationalSeverity.CRITICAL} else "INFO",
+        logger_name="restaurant.ops",
+        source="restaurant",
+        message=f"Operational event: {event_name}",
+        event_code=event_name,
+        metadata={"branch_id": branch_id, **(payload or {}), "is_exception": is_exception},
+        user_id=actor_user_id,
+        flush=False,
     )
 
 
@@ -690,6 +735,12 @@ async def create_reservation(payload: ReservationCreate, db: AsyncSession = Depe
     await _get_branch_or_404(payload.branch_id, db)
     reservation = Reservation(**payload.model_dump(), status=ReservationStatus.CONFIRMED)
     db.add(reservation)
+    await _emit_operational_event(
+        db=db,
+        branch_id=payload.branch_id,
+        event_name="reservation.created",
+        payload={"reservation_id": reservation.id, "party_size": payload.party_size},
+    )
     await db.commit()
     await db.refresh(reservation)
     return reservation
@@ -774,6 +825,12 @@ async def seat_party(table_id: int, payload: SeatTableRequest, db: AsyncSession 
         reservation.status = ReservationStatus.SEATED
         reservation.table_id = table.id
 
+    await _emit_operational_event(
+        db=db,
+        branch_id=table.branch_id,
+        event_name="table.seated",
+        payload={"table_id": table.id, "party_size": payload.party_size, "reservation_id": payload.reservation_id},
+    )
     await db.commit()
     return {"table_id": table.id, "status": table.status, "party_size": payload.party_size}
 
@@ -852,6 +909,20 @@ async def create_order(payload: OrderCreate, request: Request, db: AsyncSession 
         total_amount=totals["total_amount"],
     )
     db.add(bill)
+    await _emit_operational_event(
+        db=db,
+        branch_id=order.branch_id,
+        event_name="order.opened",
+        actor_user_id=order.waiter_id,
+        payload={"order_id": order.id, "item_count": len(payload.items), "source": str(order.order_source)},
+    )
+    await _emit_operational_event(
+        db=db,
+        branch_id=order.branch_id,
+        event_name="order.item_added",
+        actor_user_id=order.waiter_id,
+        payload={"order_id": order.id, "item_count": len(payload.items)},
+    )
     await db.commit()
     await db.refresh(order)
     await db.refresh(bill)
@@ -1016,6 +1087,17 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, db: 
             pass_seconds=elapsed_seconds,
         )
     )
+    if payload.status == KitchenTicketStatus.READY:
+        order_item = await db.get(OrderItem, ticket.order_item_id)
+        order = await db.get(Order, order_item.order_id) if order_item else None
+        if order:
+            await _emit_operational_event(
+                db=db,
+                branch_id=order.branch_id,
+                event_name="kitchen.ticket_ready",
+                actor_user_id=payload.updated_by,
+                payload={"ticket_id": ticket.id, "from_status": str(previous_status)},
+            )
     await db.commit()
     await db.refresh(ticket)
     return ticket
@@ -1070,6 +1152,20 @@ async def adjust_inventory(payload: InventoryAdjustmentCreate, db: AsyncSession 
             "approved_by": payload.approved_by,
         },
     )
+    if ingredient.quantity_on_hand <= ingredient.reorder_threshold:
+        await _emit_operational_event(
+            db=db,
+            branch_id=ingredient.branch_id,
+            event_name="inventory.stock_low",
+            severity=OperationalSeverity.WARNING,
+            actor_user_id=payload.approved_by,
+            payload={
+                "ingredient_id": ingredient.id,
+                "quantity_on_hand": ingredient.quantity_on_hand,
+                "reorder_threshold": ingredient.reorder_threshold,
+            },
+            is_exception=True,
+        )
     await db.commit()
     await db.refresh(ingredient)
     return {"ingredient": ingredient, "ledger_entry": ledger}
@@ -1414,6 +1510,12 @@ async def receive_purchase_order(po_id: int, payload: PurchaseReceiptCreate, req
         if all(line.received_qty >= line.ordered_qty for line in lines)
         else PurchaseOrderStatus.PARTIAL
     )
+    await _emit_operational_event(
+        db=db,
+        branch_id=po.branch_id,
+        event_name="goods.received",
+        payload={"purchase_order_id": po.id, "status": str(po.status), "line_count": len(payload.lines)},
+    )
 
     await db.commit()
     await db.refresh(po)
@@ -1437,6 +1539,12 @@ async def create_goods_receipt(payload: GoodsReceiptCreate, db: AsyncSession = D
 
     receipt = GoodsReceipt(**payload.model_dump(), received_at=datetime.utcnow())
     db.add(receipt)
+    await _emit_operational_event(
+        db=db,
+        branch_id=payload.branch_id,
+        event_name="goods.received",
+        payload={"goods_receipt_id": receipt.id, "purchase_order_id": payload.purchase_order_id},
+    )
     await db.commit()
     await db.refresh(receipt)
     return receipt
@@ -1484,6 +1592,23 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
 
     bill.paid_amount = next_paid
     bill.status = BillStatus.PAID if next_status == "paid" else BillStatus.PARTIALLY_PAID
+    order = await db.get(Order, bill.order_id)
+    if order:
+        await _emit_operational_event(
+            db=db,
+            branch_id=order.branch_id,
+            event_name="settlement.completed",
+            actor_user_id=payload.cashier_id,
+            payload={"bill_id": bill.id, "paid_amount": bill.paid_amount, "status": str(bill.status)},
+        )
+        if bill.status == BillStatus.PAID:
+            await _emit_operational_event(
+                db=db,
+                branch_id=order.branch_id,
+                event_name="bill.closed",
+                actor_user_id=payload.cashier_id,
+                payload={"bill_id": bill.id, "total_amount": bill.total_amount},
+            )
 
     await db.commit()
     await db.refresh(bill)
@@ -1661,6 +1786,15 @@ async def close_drawer_session(session_id: int, payload: DrawerCloseRequest, db:
             resource_id=session.id,
             payload={"override_reason": payload.override_reason, "closing_balance": payload.closing_balance},
         )
+    await _emit_operational_event(
+        db=db,
+        branch_id=session.branch_id,
+        event_name="drawer.closed",
+        actor_user_id=session.cashier_id,
+        severity=OperationalSeverity.WARNING if payload.override_reason else OperationalSeverity.INFO,
+        payload={"session_id": session.id, "closing_balance": payload.closing_balance, "override_reason": payload.override_reason},
+        is_exception=bool(payload.override_reason),
+    )
     await db.commit()
     await db.refresh(session)
     return session
@@ -1674,6 +1808,14 @@ async def create_shift(payload: ShiftCreate, db: AsyncSession = Depends(get_db))
 
     shift = Shift(**payload.model_dump())
     db.add(shift)
+    if shift.status == "started":
+        await _emit_operational_event(
+            db=db,
+            branch_id=shift.branch_id,
+            event_name="shift.started",
+            actor_user_id=shift.staff_user_id,
+            payload={"shift_id": shift.id, "role": shift.role},
+        )
     await db.commit()
     await db.refresh(shift)
     return shift
@@ -1689,6 +1831,13 @@ async def create_attendance(payload: AttendanceCreate, db: AsyncSession = Depend
 
     attendance = AttendanceRecord(**payload.model_dump(), check_in_at=datetime.utcnow())
     db.add(attendance)
+    await _emit_operational_event(
+        db=db,
+        branch_id=payload.branch_id,
+        event_name="shift.started",
+        actor_user_id=payload.staff_user_id,
+        payload={"attendance_id": attendance.id, "shift_id": payload.shift_id},
+    )
     await db.commit()
     await db.refresh(attendance)
     return attendance
@@ -1706,6 +1855,13 @@ async def checkout_attendance(attendance_id: int, payload: AttendanceCheckout, d
     if payload.notes is not None:
         attendance.notes = payload.notes
     db.add(attendance)
+    await _emit_operational_event(
+        db=db,
+        branch_id=attendance.branch_id,
+        event_name="shift.closed",
+        actor_user_id=attendance.staff_user_id,
+        payload={"attendance_id": attendance.id, "shift_id": attendance.shift_id},
+    )
     await db.commit()
     await db.refresh(attendance)
     return attendance
@@ -1720,6 +1876,78 @@ async def list_attendance(branch_id: int, db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
 
+
+@router.get("/shifts/schedule", response_model=ShiftScheduleRead)
+async def get_shift_schedule(branch_id: int, business_date: str, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    shifts = (
+        await db.execute(select(Shift).where(Shift.branch_id == branch_id).order_by(Shift.starts_at.asc()))
+    ).scalars().all()
+    rows: list[ShiftScheduleRow] = []
+    for shift in shifts:
+        attendance = (
+            await db.execute(
+                select(AttendanceRecord)
+                .where(AttendanceRecord.shift_id == shift.id, AttendanceRecord.staff_user_id == shift.staff_user_id)
+                .order_by(AttendanceRecord.id.desc())
+            )
+        ).scalars().first()
+        rows.append(
+            ShiftScheduleRow(
+                shift_id=shift.id or 0,
+                staff_user_id=shift.staff_user_id,
+                role=shift.role,
+                starts_at=shift.starts_at,
+                ends_at=shift.ends_at,
+                status=shift.status,
+                checked_in=attendance is not None,
+                checked_out=attendance is not None and attendance.check_out_at is not None,
+            )
+        )
+    return {"branch_id": branch_id, "business_date": business_date, "rows": rows}
+
+
+@router.get("/operations/notifications", response_model=list[OperationalNotificationRead])
+async def list_operational_notifications(
+    branch_id: int,
+    only_exceptions: bool = False,
+    severity: OperationalSeverity | None = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_branch_or_404(branch_id, db)
+    statement = select(OperationalEventLog).where(OperationalEventLog.branch_id == branch_id)
+    if only_exceptions:
+        statement = statement.where(OperationalEventLog.is_operational_exception == True)
+    if severity is not None:
+        statement = statement.where(OperationalEventLog.severity == severity)
+    rows = (await db.execute(statement.order_by(OperationalEventLog.id.desc()).limit(limit))).scalars().all()
+    return rows
+
+
+@router.post("/compliance/retention/prune")
+async def prune_compliance_retention(db: AsyncSession = Depends(get_db)):
+    now = datetime.utcnow()
+    stale_audits = (
+        await db.execute(
+            select(PrivilegedActionAudit).where(
+                PrivilegedActionAudit.retention_until.is_not(None),
+                PrivilegedActionAudit.retention_until < now,
+            )
+        )
+    ).scalars().all()
+    stale_events = (
+        await db.execute(
+            select(OperationalEventLog).where(
+                OperationalEventLog.retention_until.is_not(None),
+                OperationalEventLog.retention_until < now,
+            )
+        )
+    ).scalars().all()
+    for row in stale_audits + stale_events:
+        await db.delete(row)
+    await db.commit()
+    return {"deleted_privileged_audits": len(stale_audits), "deleted_operational_events": len(stale_events)}
 
 
 
@@ -1762,6 +1990,12 @@ async def promote_waitlist(waitlist_id: int, table_id: int, db: AsyncSession = D
 
     table.status = TableStatus.OCCUPIED
     entry.status = WaitlistStatus.SEATED
+    await _emit_operational_event(
+        db=db,
+        branch_id=entry.branch_id,
+        event_name="waitlist.promoted",
+        payload={"waitlist_id": entry.id, "table_id": table.id},
+    )
     await db.commit()
     await db.refresh(entry)
     return entry
@@ -1815,6 +2049,22 @@ async def update_shift_status(shift_id: int, payload: ShiftStatusPatch, db: Asyn
     if not shift:
         raise HTTPException(status_code=404, detail="Shift not found")
     shift.status = payload.status
+    if payload.status == "started":
+        await _emit_operational_event(
+            db=db,
+            branch_id=shift.branch_id,
+            event_name="shift.started",
+            actor_user_id=shift.staff_user_id,
+            payload={"shift_id": shift.id, "role": shift.role},
+        )
+    elif payload.status == "closed":
+        await _emit_operational_event(
+            db=db,
+            branch_id=shift.branch_id,
+            event_name="shift.closed",
+            actor_user_id=shift.staff_user_id,
+            payload={"shift_id": shift.id, "role": shift.role},
+        )
     await db.commit()
     await db.refresh(shift)
     return shift
@@ -1849,6 +2099,12 @@ async def create_accounting_export(payload: AccountingExportCreate, request: Req
         status=AccountingExportStatus.GENERATED,
     )
     db.add(export)
+    await _emit_operational_event(
+        db=db,
+        branch_id=payload.branch_id,
+        event_name="accounting.export_generated",
+        payload={"business_date": payload.business_date.isoformat()},
+    )
     await db.commit()
     await db.refresh(export)
     payload_out = export.model_dump()
@@ -1955,6 +2211,15 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
         )
     ).one()[0]
     if open_drawers or open_bills:
+        await _emit_operational_event(
+            db=db,
+            branch_id=record.branch_id,
+            event_name="branch.day_close_blocked",
+            severity=OperationalSeverity.WARNING,
+            actor_user_id=payload.closed_by,
+            payload={"open_drawers": open_drawers, "open_bills": open_bills},
+            is_exception=True,
+        )
         raise HTTPException(
             status_code=409,
             detail=f"Day-close blocked: open_drawers={open_drawers}, open_bills={open_bills}",
@@ -1969,6 +2234,15 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
         )
     ).one()[0]
     if pending_required_checklist:
+        await _emit_operational_event(
+            db=db,
+            branch_id=record.branch_id,
+            event_name="branch.day_close_blocked",
+            severity=OperationalSeverity.WARNING,
+            actor_user_id=payload.closed_by,
+            payload={"pending_required_checklist": pending_required_checklist},
+            is_exception=True,
+        )
         raise HTTPException(status_code=409, detail=f"Day-close blocked: pending_required_checklist={pending_required_checklist}")
 
     record.status = DayCloseStatus.CLOSED
@@ -1976,6 +2250,13 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
     record.notes = payload.notes or record.notes
     record.closed_at = datetime.utcnow()
     db.add(record)
+    await _emit_operational_event(
+        db=db,
+        branch_id=record.branch_id,
+        event_name="branch.day_closed",
+        actor_user_id=payload.closed_by,
+        payload={"day_close_id": record.id, "business_date": record.business_date.isoformat()},
+    )
     await db.commit()
     await db.refresh(record)
     return record
@@ -2116,14 +2397,85 @@ async def branch_operations_report(branch_id: int, db: AsyncSession = Depends(ge
             )
         )
     ).one()[0]
+    delayed_tickets = (
+        await db.execute(
+            select(func.count(KitchenTicket.id))
+            .join(OrderItem, OrderItem.id == KitchenTicket.order_item_id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(Order.branch_id == branch_id, KitchenTicket.status == KitchenTicketStatus.DELAYED)
+        )
+    ).one()[0]
+    scheduled_shift_count = (
+        await db.execute(select(func.count(Shift.id)).where(Shift.branch_id == branch_id))
+    ).one()[0]
+    active_attendance_count = (
+        await db.execute(
+            select(func.count(AttendanceRecord.id)).where(
+                AttendanceRecord.branch_id == branch_id,
+                AttendanceRecord.check_out_at.is_(None),
+            )
+        )
+    ).one()[0]
+    open_drawers = (
+        await db.execute(
+            select(func.count(CashDrawerSession.id)).where(
+                CashDrawerSession.branch_id == branch_id,
+                CashDrawerSession.status == DrawerStatus.OPEN,
+            )
+        )
+    ).one()[0]
+    unpaid_bills = (
+        await db.execute(
+            select(func.count(Bill.id))
+            .join(Order, Order.id == Bill.order_id)
+            .where(Order.branch_id == branch_id, Bill.status != BillStatus.PAID)
+        )
+    ).one()[0]
+    failed_exports = (
+        await db.execute(
+            select(func.count(AccountingExportRetry.id))
+            .join(AccountingExport, AccountingExport.id == AccountingExportRetry.accounting_export_id)
+            .where(
+                AccountingExport.branch_id == branch_id,
+                AccountingExportRetry.status == AccountingExportRetryStatus.FAILED,
+            )
+        )
+    ).one()[0]
+    recent_ops_exceptions = (
+        await db.execute(
+            select(func.count(OperationalEventLog.id)).where(
+                OperationalEventLog.branch_id == branch_id,
+                OperationalEventLog.is_operational_exception == True,
+            )
+        )
+    ).one()[0]
+    readiness_checks = {
+        "has_active_drawer": open_drawers > 0,
+        "has_scheduled_staff": scheduled_shift_count > 0,
+        "critical_stock_risk": low_stock_count > 0,
+        "settlement_blocked": unpaid_bills > 0,
+    }
 
     return {
         "branch_id": branch_id,
         "orders_count": orders_count,
         "open_tickets": open_tickets,
+        "service_delay_count": delayed_tickets,
         "gross_sales": float(gross_sales or 0.0),
         "collected_sales": float(collected_sales or 0.0),
         "low_stock_count": low_stock_count,
+        "staffing": {
+            "scheduled_shift_count": scheduled_shift_count,
+            "checked_in_count": active_attendance_count,
+            "coverage_gap_count": max(0, scheduled_shift_count - active_attendance_count),
+        },
+        "settlement_health": {
+            "open_drawers": open_drawers,
+            "unpaid_bills": unpaid_bills,
+            "failed_exports": failed_exports,
+        },
+        "readiness": readiness_checks,
+        "operational_exception_count": recent_ops_exceptions,
         "generated_at": datetime.utcnow(),
     }
 
@@ -2190,6 +2542,12 @@ async def update_branch_policy(policy_id: int, payload: BranchPolicyPatch, db: A
         raise HTTPException(status_code=404, detail="Policy not found")
     policy.value = payload.value
     policy.updated_at = datetime.utcnow()
+    await _emit_operational_event(
+        db=db,
+        branch_id=policy.branch_id,
+        event_name="admin.policy_changed",
+        payload={"policy_id": policy.id, "key": policy.key},
+    )
     await db.commit()
     await db.refresh(policy)
     return policy

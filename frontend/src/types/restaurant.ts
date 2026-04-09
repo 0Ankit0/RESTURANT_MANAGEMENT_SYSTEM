@@ -77,8 +77,38 @@ export interface BranchOperationsReport {
   branch_id: number;
   orders_count: number;
   open_tickets: number;
+  service_delay_count: number;
   gross_sales: number;
   collected_sales: number;
   low_stock_count: number;
+  staffing: {
+    scheduled_shift_count: number;
+    checked_in_count: number;
+    coverage_gap_count: number;
+  };
+  settlement_health: {
+    open_drawers: number;
+    unpaid_bills: number;
+    failed_exports: number;
+  };
+  readiness: {
+    has_active_drawer: boolean;
+    has_scheduled_staff: boolean;
+    critical_stock_risk: boolean;
+    settlement_blocked: boolean;
+  };
+  operational_exception_count: number;
   generated_at: string;
+}
+
+export interface OperationalNotification {
+  id: number;
+  branch_id: number;
+  event_name: string;
+  severity: 'info' | 'warning' | 'critical';
+  source: string;
+  actor_user_id: number | null;
+  payload_json: string | null;
+  is_operational_exception: boolean;
+  occurred_at: string;
 }

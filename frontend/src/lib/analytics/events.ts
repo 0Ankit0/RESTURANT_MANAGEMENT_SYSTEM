@@ -35,3 +35,10 @@ export const TenantEvents = {
   TENANT_MEMBER_INVITED: 'tenant_member_invited',
   TENANT_MEMBER_JOINED: 'tenant_member_joined',
 } as const;
+
+export const RestaurantOpsEvents = {
+  DASHBOARD_VIEWED: 'restaurant_ops_dashboard_viewed',
+  QUICK_ORDER_CREATED: 'restaurant_ops_quick_order_created',
+  RESERVATION_CREATED: 'restaurant_ops_reservation_created',
+  WAITLIST_PROMOTED: 'restaurant_ops_waitlist_promoted',
+} as const;
