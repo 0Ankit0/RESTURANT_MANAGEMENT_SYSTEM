@@ -8,6 +8,7 @@ import type {
   CursorPage,
   KitchenTicket,
   MenuItem,
+  OperationalNotification,
   Reservation,
   RestaurantOrder,
   RestaurantTable,
@@ -75,6 +76,20 @@ export function useBranchOperationsReport(branchId: number) {
     queryFn: async () => {
       const response = await apiClient.get<BranchOperationsReport>('/reports/branch-operations', {
         params: { branch_id: branchId },
+      });
+      return response.data;
+    },
+    enabled: branchId > 0,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useOperationalNotifications(branchId: number) {
+  return useQuery({
+    queryKey: ['restaurant', 'operational-notifications', branchId],
+    queryFn: async () => {
+      const response = await apiClient.get<OperationalNotification[]>('/operations/notifications', {
+        params: { branch_id: branchId, limit: 20 },
       });
       return response.data;
     },

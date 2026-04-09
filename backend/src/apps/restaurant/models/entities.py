@@ -104,6 +104,12 @@ class AccountingExportRetryStatus(str, Enum):
     FAILED = "failed"
 
 
+class OperationalSeverity(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
 
 class Branch(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -295,7 +301,23 @@ class PrivilegedActionAudit(SQLModel, table=True):
     resource_type: str = Field(max_length=80)
     resource_id: Optional[int] = Field(default=None)
     payload_json: Optional[str] = Field(default=None, max_length=2000)
+    compliance_tag: str = Field(default="privileged_action", max_length=80)
+    retention_until: Optional[datetime] = Field(default=None, index=True)
+    is_operational_exception: bool = Field(default=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OperationalEventLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    event_name: str = Field(max_length=120, index=True)
+    severity: OperationalSeverity = Field(default=OperationalSeverity.INFO, index=True)
+    source: str = Field(default="restaurant", max_length=80, index=True)
+    actor_user_id: Optional[int] = Field(default=None, index=True)
+    payload_json: Optional[str] = Field(default=None, max_length=3000)
+    is_operational_exception: bool = Field(default=False, index=True)
+    retention_until: Optional[datetime] = Field(default=None, index=True)
+    occurred_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class WaitlistEntry(SQLModel, table=True):

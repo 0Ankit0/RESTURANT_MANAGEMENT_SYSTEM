@@ -390,10 +390,16 @@ async def test_restaurant_flow(client, db_session):
     assert res.status_code == 200
     assert res.json()["orders_count"] >= 1
     assert res.json()["collected_sales"] >= 34.5
+    assert "settlement_health" in res.json()
+    assert "staffing" in res.json()
 
     res = await client.get(f"/api/v1/drawer-reconciliation?branch_id={branch['id']}")
     assert res.status_code == 200
     assert len(res.json()["rows"]) >= 1
+
+    res = await client.get(f"/api/v1/operations/notifications?branch_id={branch['id']}&limit=10")
+    assert res.status_code == 200
+    assert len(res.json()) >= 1
 
     res = await client.patch(f"/api/v1/admin/branch-policies/{policy['id']}", json={"value": "15"})
     assert res.status_code == 200

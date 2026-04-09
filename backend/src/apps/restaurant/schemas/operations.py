@@ -10,6 +10,7 @@ from src.apps.restaurant.models import (
     KitchenTicketStatus,
     OrderSource,
     OrderStatus,
+    OperationalSeverity,
     PurchaseOrderStatus,
     ReservationStatus,
     StockCountSessionStatus,
@@ -461,6 +462,37 @@ class AttendanceRead(BaseModel):
     check_in_at: datetime
     check_out_at: datetime | None
     notes: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class ShiftScheduleRow(BaseModel):
+    shift_id: int
+    staff_user_id: int
+    role: str
+    starts_at: datetime
+    ends_at: datetime
+    status: ShiftStatus
+    checked_in: bool
+    checked_out: bool
+
+
+class ShiftScheduleRead(BaseModel):
+    branch_id: int
+    business_date: str
+    rows: list[ShiftScheduleRow]
+
+
+class OperationalNotificationRead(BaseModel):
+    id: int
+    branch_id: int
+    event_name: str
+    severity: OperationalSeverity
+    source: str
+    actor_user_id: int | None
+    payload_json: str | None
+    is_operational_exception: bool
+    occurred_at: datetime
 
     model_config = {"from_attributes": True}
 

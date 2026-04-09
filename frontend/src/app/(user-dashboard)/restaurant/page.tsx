@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,12 @@ import {
   useCreateOrder,
   useCreateReservation,
   useKitchenTickets,
+  useOperationalNotifications,
   usePromoteWaitlist,
   useSeatTable,
 } from '@/hooks/use-restaurant';
+import { useAnalytics } from '@/hooks/use-analytics';
+import { RestaurantOpsEvents } from '@/lib/analytics/events';
 
 export default function RestaurantOpsPage() {
   const [branchId, setBranchId] = useState(1);
@@ -33,12 +36,19 @@ export default function RestaurantOpsPage() {
   const menuItems = useBranchMenuItems(branchId);
   const reservations = useBranchReservations(branchId);
   const kitchen = useKitchenTickets();
+  const notifications = useOperationalNotifications(branchId);
   const report = useBranchOperationsReport(branchId);
+  const analytics = useAnalytics();
   const createReservation = useCreateReservation();
   const seatTable = useSeatTable();
   const promoteWaitlist = usePromoteWaitlist();
   const createOrder = useCreateOrder();
 
+  useEffect(() => {
+    if (branchId > 0) {
+      analytics.capture(RestaurantOpsEvents.DASHBOARD_VIEWED, { branch_id: branchId });
+    }
+  }, [analytics, branchId]);
 
 
   const seatFirstTable = async () => {
@@ -52,6 +62,7 @@ export default function RestaurantOpsPage() {
     const table = tables.data?.find((row) => row.status === 'available');
     if (!entry || !table) return;
     await promoteWaitlist.mutateAsync({ waitlistId: entry.id, tableId: table.id });
+    analytics.capture(RestaurantOpsEvents.WAITLIST_PROMOTED, { branch_id: branchId, waitlist_id: entry.id });
   };
 
   const createQuickOrder = async () => {
@@ -66,6 +77,7 @@ export default function RestaurantOpsPage() {
       menu_item_id: parsedMenuId,
       quantity: 1,
     });
+    analytics.capture(RestaurantOpsEvents.QUICK_ORDER_CREATED, { branch_id: branchId, menu_item_id: parsedMenuId });
   };
 
   const submitReservation = async () => {
@@ -79,6 +91,7 @@ export default function RestaurantOpsPage() {
       reservation_time: new Date(Date.now() + 30 * 60_000).toISOString(),
       notes: 'Created from restaurant operations dashboard',
     });
+    analytics.capture(RestaurantOpsEvents.RESERVATION_CREATED, { branch_id: branchId, party_size: Number(partySize) || 1 });
   };
 
   return (
@@ -123,6 +136,18 @@ export default function RestaurantOpsPage() {
         <Card>
           <CardHeader><CardTitle className="text-sm">Low Stock Alerts</CardTitle></CardHeader>
           <CardContent className="text-2xl font-bold">{report.data?.low_stock_count ?? 0}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Service Delays</CardTitle></CardHeader>
+          <CardContent className="text-2xl font-bold">{report.data?.service_delay_count ?? 0}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Staffing Gaps</CardTitle></CardHeader>
+          <CardContent className="text-2xl font-bold">{report.data?.staffing?.coverage_gap_count ?? 0}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Ops Exceptions</CardTitle></CardHeader>
+          <CardContent className="text-2xl font-bold">{report.data?.operational_exception_count ?? 0}</CardContent>
         </Card>
       </div>
 
@@ -205,6 +230,28 @@ export default function RestaurantOpsPage() {
                 <span className="text-gray-500">{ticket.status}</span>
               </div>
             )) ?? <p className="text-sm text-gray-500">No tickets available</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle>Settlement Health</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div>Open drawers: <strong>{report.data?.settlement_health?.open_drawers ?? 0}</strong></div>
+            <div>Unpaid bills: <strong>{report.data?.settlement_health?.unpaid_bills ?? 0}</strong></div>
+            <div>Failed exports: <strong>{report.data?.settlement_health?.failed_exports ?? 0}</strong></div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Operational Notifications</CardTitle></CardHeader>
+          <CardContent className="space-y-2 max-h-72 overflow-auto">
+            {notifications.data?.map((notice) => (
+              <div key={notice.id} className="text-sm border rounded p-2">
+                <div className="font-medium">{notice.event_name}</div>
+                <div className="text-gray-500">{notice.severity} · {new Date(notice.occurred_at).toLocaleString()}</div>
+              </div>
+            )) ?? <p className="text-sm text-gray-500">No operational notifications</p>}
           </CardContent>
         </Card>
       </div>
