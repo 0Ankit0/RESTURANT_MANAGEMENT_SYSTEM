@@ -890,6 +890,17 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncS
         raise HTTPException(status_code=409, detail="Cannot edit items on a cancelled order")
 
     if payload.status is not None:
+        if payload.status == OrderStatus.CANCELLED and previous_status in {
+            OrderStatus.SUBMITTED,
+            OrderStatus.IN_PROGRESS,
+            OrderStatus.READY,
+            OrderStatus.SERVED,
+        }:
+            if payload.edit_approval_id is None:
+                raise HTTPException(status_code=409, detail="Order void/cancel after submit requires approval")
+            approval = await db.get(OrderEditApproval, payload.edit_approval_id)
+            if not approval or approval.order_id != order.id or approval.status != "approved":
+                raise HTTPException(status_code=400, detail="Invalid order void/cancel approval")
         order.status = payload.status
 
     if payload.items is not None:
@@ -1040,10 +1051,15 @@ async def adjust_inventory(payload: InventoryAdjustmentCreate, db: AsyncSession 
         db=db,
         action="inventory.adjustment.manual",
         branch_id=ingredient.branch_id,
-        actor_user_id=None,
+        actor_user_id=payload.approved_by,
         resource_type="stock_ledger_entry",
         resource_id=ledger.id,
-        payload={"ingredient_id": ingredient.id, "change_qty": payload.change_qty, "reason": payload.reason},
+        payload={
+            "ingredient_id": ingredient.id,
+            "change_qty": payload.change_qty,
+            "reason": payload.reason,
+            "approved_by": payload.approved_by,
+        },
     )
     await db.commit()
     await db.refresh(ingredient)
@@ -1505,6 +1521,18 @@ async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=404, detail="Bill not found")
     if payload.amount > bill.paid_amount:
         raise HTTPException(status_code=400, detail="Refund exceeds paid amount")
+    if not payload.reason:
+        raise HTTPException(status_code=400, detail="Refund reason is required")
+
+    latest_drawer = (
+        await db.execute(
+            select(CashDrawerSession)
+            .where(CashDrawerSession.branch_id == payload.branch_id)
+            .order_by(CashDrawerSession.id.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    post_close_refund = bool(latest_drawer and latest_drawer.status == DrawerStatus.CLOSED)
 
     refund = Refund(**payload.model_dump(), created_at=datetime.utcnow())
     bill.paid_amount = round(bill.paid_amount - payload.amount, 2)
@@ -1518,7 +1546,13 @@ async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db
         actor_user_id=payload.approved_by,
         resource_type="refund",
         resource_id=refund.id,
-        payload={"bill_id": payload.bill_id, "amount": payload.amount, "reason": payload.reason},
+        payload={
+            "bill_id": payload.bill_id,
+            "amount": payload.amount,
+            "reason": payload.reason,
+            "approved_by": payload.approved_by,
+            "post_close_refund": post_close_refund,
+        },
     )
     await db.commit()
     await db.refresh(refund)
@@ -1551,6 +1585,8 @@ async def close_drawer_session(session_id: int, payload: DrawerCloseRequest, db:
     session.status = DrawerStatus.CLOSED
     session.closing_balance = payload.closing_balance
     session.closed_at = datetime.utcnow()
+    if payload.override_reason and payload.approved_by is None:
+        raise HTTPException(status_code=400, detail="Reconciliation override requires approved_by")
     if payload.override_reason:
         await _audit_privileged_action(
             db=db,
