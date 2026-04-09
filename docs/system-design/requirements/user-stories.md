@@ -48,3 +48,27 @@
 
 - **US-ADM-001**: As an admin, I want to configure branch policies, menus, taxes, and payment methods so the platform fits different restaurant needs.
 - **US-ADM-002**: As an admin, I want role templates and integration settings so operational surfaces remain secure and maintainable.
+
+## Role Journey Mapping (Web and Mobile)
+
+### Web journeys
+- **Guest**
+  - Reserve table, check waitlist/status, view order and bill status.
+- **POS / Front-of-house**
+  - Seat/release tables, promote waitlist, capture and edit orders (with approvals), settle/split bills, trigger refunds/reruns.
+- **KDS**
+  - View kitchen queue, transition ticket states, emit stockout/delay signals.
+- **Backoffice / Admin**
+  - Run inventory/procurement workflows, resolve approvals, evaluate day-close blockers, finalize day-close, run accounting exports/retries.
+
+### Mobile journeys (live operations roles)
+- **Host**
+  - Reservation + waitlist + seating + release loop.
+- **Waiter**
+  - Order capture/patch + delay acknowledgement + bill lookup.
+- **Cashier**
+  - Drawer open/close, settlements, refund create/rerun.
+- **Manager**
+  - Approval workflows, day-close blocker review/finalization, accounting export retries.
+- **Inventory**
+  - Ingredient visibility, adjustments, transfer dispatch/receive, stock count review.
