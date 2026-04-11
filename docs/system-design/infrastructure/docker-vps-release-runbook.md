@@ -27,8 +27,17 @@ Create non-checked-in environment files before deployment:
 - `backend/.env.production`
 - `frontend/.env.staging`
 - `frontend/.env.production`
+- `mobile/.env.staging`
+- `mobile/.env.production`
 
 Do not commit secrets. Use secure secret injection on VPS or CI.
+
+Mobile payment environments must include:
+
+- `WEBSITE_URL`
+- `PAYMENT_RETURN_URL_BASE`
+
+Reference contract: `mobile/env.production.contract.md`.
 
 ## Migration-first Startup
 

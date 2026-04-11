@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../../../../core/config/runtime_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/network/api_endpoints.dart';
 
@@ -40,7 +40,7 @@ class _SocialAuthWebViewPageState extends State<SocialAuthWebViewPage> {
   void initState() {
     super.initState();
 
-    final baseUrl = dotenv.env['BASE_URL'] ?? 'http://127.0.0.1:8000/api/v1';
+    final baseUrl = RuntimeConfig.apiBaseUrl;
     final apiBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     final loginUrl = '$apiBase${ApiEndpoints.socialLogin(widget.provider)}';
 

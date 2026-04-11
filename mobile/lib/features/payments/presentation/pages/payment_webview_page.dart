@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../data/models/payment.dart';
+import '../../../../core/config/runtime_config.dart';
 import '../providers/payment_provider.dart';
 
 /// Callback result passed back when payment completes or fails.
@@ -33,7 +34,7 @@ class PaymentWebViewPage extends ConsumerStatefulWidget {
     this.paymentUrl,
     this.esewaFormAction,
     this.esewaFormFields,
-    this.callbackUrlPrefix = 'http://localhost:3000/payment-callback',
+    this.callbackUrlPrefix = '',
   });
 
   @override
@@ -42,6 +43,10 @@ class PaymentWebViewPage extends ConsumerStatefulWidget {
 
 class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
   late final WebViewController _controller;
+
+  String get _callbackUrlPrefix => widget.callbackUrlPrefix.isNotEmpty
+      ? widget.callbackUrlPrefix
+      : RuntimeConfig.paymentReturnUrlBase;
   bool _loading = true;
   bool _verifying = false;
 
@@ -92,7 +97,7 @@ class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
 
   NavigationDecision _onNavRequest(NavigationRequest request) {
     final url = request.url;
-    if (url.startsWith(widget.callbackUrlPrefix)) {
+    if (_callbackUrlPrefix.isNotEmpty && url.startsWith(_callbackUrlPrefix)) {
       _handleCallback(Uri.parse(url));
       return NavigationDecision.prevent;
     }

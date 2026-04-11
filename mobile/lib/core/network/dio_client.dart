@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/runtime_config.dart';
 import '../storage/secure_storage.dart';
 
 class DioClient {
@@ -8,7 +8,7 @@ class DioClient {
   bool _isRefreshing = false;
 
   DioClient(this._secureStorage) {
-    final baseUrl = dotenv.env['BASE_URL'] ?? 'http://127.0.0.1:8000/api/v1';
+    final baseUrl = RuntimeConfig.apiBaseUrl;
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,

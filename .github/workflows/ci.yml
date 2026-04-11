@@ -28,11 +28,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install backend deps
-        run: uv sync --frozen --all-groups
+        run: uv sync --frozen --group dev --group test
       - name: Ruff
         run: uv run ruff check src tests
       - name: Pytest
-        run: uv run pytest
+        run: uv run --group test pytest
 
   frontend:
     runs-on: ubuntu-latest
