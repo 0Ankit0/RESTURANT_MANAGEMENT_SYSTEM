@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install backend deps
-        run: uv sync --frozen
+        run: uv sync --frozen --all-groups
       - name: Ruff
         run: uv run ruff check src tests
       - name: Pytest
