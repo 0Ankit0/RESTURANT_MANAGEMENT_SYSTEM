@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,15 +21,81 @@ import {
 } from '@/hooks/use-restaurant';
 import { useAnalytics } from '@/hooks/use-analytics';
 import { RestaurantOpsEvents } from '@/lib/analytics/events';
+import { useAuthStore } from '@/store/auth-store';
+
+type StaffContext = {
+  staffId: number | null;
+  branchPreferences: number[];
+};
+
+const asPositiveNumber = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const normalizeBranchPreferences = (value: unknown): number[] => {
+  if (!Array.isArray(value)) return [];
+  const normalized = value
+    .map((entry) => {
+      if (typeof entry === 'number' || typeof entry === 'string') {
+        return asPositiveNumber(entry);
+      }
+      if (entry && typeof entry === 'object') {
+        const record = entry as Record<string, unknown>;
+        return asPositiveNumber(record.branch_id ?? record.branchId ?? record.id);
+      }
+      return null;
+    })
+    .filter((entry): entry is number => entry !== null);
+
+  return Array.from(new Set(normalized));
+};
+
+const deriveStaffContext = (user: unknown): StaffContext => {
+  if (!user || typeof user !== 'object') {
+    return { staffId: null, branchPreferences: [] };
+  }
+
+  const record = user as Record<string, unknown>;
+  const defaultBranch = asPositiveNumber(
+    record.default_branch_id ?? record.defaultBranchId ?? record.branch_id ?? record.branchId
+  );
+  const membershipBranches = normalizeBranchPreferences(record.branch_memberships ?? record.branchMemberships ?? record.branches);
+  const fallbackBranches = normalizeBranchPreferences(record.assigned_branch_ids ?? record.assignedBranchIds);
+
+  return {
+    staffId: asPositiveNumber(record.staff_id ?? record.staffId ?? record.id),
+    branchPreferences: [defaultBranch, ...membershipBranches, ...fallbackBranches].filter(
+      (entry): entry is number => entry !== null
+    ),
+  };
+};
 
 export default function RestaurantOpsPage() {
-  const [branchId, setBranchId] = useState(1);
-  const [guestName, setGuestName] = useState('Walk-in Guest');
-  const [guestPhone, setGuestPhone] = useState('+10000000000');
-  const [partySize, setPartySize] = useState('2');
+  const user = useAuthStore((state) => state.user);
+  const [branchId, setBranchId] = useState(0);
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [partySize, setPartySize] = useState('');
   const [menuItemId, setMenuItemId] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [quickOrderError, setQuickOrderError] = useState<string | null>(null);
+
+  const staffContext = useMemo(() => deriveStaffContext(user), [user]);
 
   const branches = useRestaurantBranches();
+  const availableBranchIds = useMemo(() => new Set((branches.data ?? []).map((branch) => branch.id)), [branches.data]);
+  const resolvedBranchId = useMemo(() => {
+    const preferred = staffContext.branchPreferences.find((candidate) => availableBranchIds.has(candidate));
+    return preferred ?? (branches.data?.[0]?.id ?? 0);
+  }, [availableBranchIds, branches.data, staffContext.branchPreferences]);
+
+  useEffect(() => {
+    if (branchId > 0) return;
+    if (!resolvedBranchId) return;
+    setBranchId(resolvedBranchId);
+  }, [branchId, resolvedBranchId]);
+
   const tables = useBranchTables(branchId);
   const orders = useBranchOrders(branchId);
   const waitlist = useBranchWaitlist(branchId);
@@ -50,6 +116,15 @@ export default function RestaurantOpsPage() {
     }
   }, [analytics, branchId]);
 
+  const hasBranchAssignment = branchId > 0;
+  const hasEligibleStaffContext = staffContext.staffId !== null;
+  const branchGuardMessage = !hasBranchAssignment
+    ? 'No branch is assigned to your account yet. Please contact an administrator before using Restaurant Operations.'
+    : null;
+  const staffGuardMessage = !hasEligibleStaffContext
+    ? 'No eligible staff profile is linked to your user. Quick order creation is disabled until staff context is available.'
+    : null;
+
 
   const seatFirstTable = async () => {
     const table = tables.data?.find((row) => row.status === 'available');
@@ -66,14 +141,28 @@ export default function RestaurantOpsPage() {
   };
 
   const createQuickOrder = async () => {
+    if (!hasBranchAssignment) {
+      setQuickOrderError('Please select an assigned branch before creating a quick order.');
+      return;
+    }
+    if (!hasEligibleStaffContext) {
+      setQuickOrderError('Quick order requires an eligible staff context tied to your user account.');
+      return;
+    }
+
     const table = tables.data?.find((row) => row.status === 'occupied') ?? null;
     const fallbackMenuId = menuItems.data?.find((row) => row.is_available)?.id ?? null;
     const parsedMenuId = Number(menuItemId || fallbackMenuId);
-    if (!Number.isFinite(parsedMenuId) || parsedMenuId <= 0 || branchId <= 0) return;
+    if (!Number.isFinite(parsedMenuId) || parsedMenuId <= 0) {
+      setQuickOrderError('Choose a valid menu item to create a quick order.');
+      return;
+    }
+
+    setQuickOrderError(null);
     await createOrder.mutateAsync({
       branch_id: branchId,
       table_id: table?.id ?? null,
-      waiter_id: 1,
+      waiter_id: staffContext.staffId,
       menu_item_id: parsedMenuId,
       quantity: 1,
     });
@@ -81,17 +170,43 @@ export default function RestaurantOpsPage() {
   };
 
   const submitReservation = async () => {
-    if (branchId <= 0) return;
+    if (!hasBranchAssignment) {
+      setFormError('Please select an assigned branch before creating a reservation.');
+      return;
+    }
+
+    const trimmedGuestName = guestName.trim();
+    const trimmedGuestPhone = guestPhone.trim();
+    const parsedPartySize = Number(partySize);
+
+    if (!trimmedGuestName) {
+      setFormError('Guest name is required.');
+      return;
+    }
+    if (!trimmedGuestPhone) {
+      setFormError('Guest phone is required.');
+      return;
+    }
+    if (!Number.isFinite(parsedPartySize) || parsedPartySize < 1) {
+      setFormError('Party size must be at least 1.');
+      return;
+    }
+
+    setFormError(null);
 
     await createReservation.mutateAsync({
       branch_id: branchId,
-      guest_name: guestName,
-      guest_phone: guestPhone,
-      party_size: Math.max(1, Number(partySize) || 1),
+      guest_name: trimmedGuestName,
+      guest_phone: trimmedGuestPhone,
+      party_size: parsedPartySize,
       reservation_time: new Date(Date.now() + 30 * 60_000).toISOString(),
       notes: 'Created from restaurant operations dashboard',
     });
-    analytics.capture(RestaurantOpsEvents.RESERVATION_CREATED, { branch_id: branchId, party_size: Number(partySize) || 1 });
+    analytics.capture(RestaurantOpsEvents.RESERVATION_CREATED, { branch_id: branchId, party_size: parsedPartySize });
+
+    setGuestName('');
+    setGuestPhone('');
+    setPartySize('');
   };
 
   return (
@@ -108,7 +223,9 @@ export default function RestaurantOpsPage() {
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
               value={branchId}
               onChange={(e) => setBranchId(Number(e.target.value))}
+              disabled={!branches.data?.length}
             >
+              {!branches.data?.length && <option value={0}>No branches available</option>}
               {(branches.data ?? []).map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name} (#{branch.id})
@@ -119,6 +236,15 @@ export default function RestaurantOpsPage() {
           <Button variant="outline" onClick={() => { branches.refetch(); report.refetch(); orders.refetch(); waitlist.refetch(); tables.refetch(); }}>Refresh</Button>
         </div>
       </div>
+
+      {(branchGuardMessage || staffGuardMessage) && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="pt-6 space-y-2 text-sm text-amber-900">
+            {branchGuardMessage && <p>{branchGuardMessage}</p>}
+            {staffGuardMessage && <p>{staffGuardMessage}</p>}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
@@ -155,19 +281,22 @@ export default function RestaurantOpsPage() {
         <Card>
           <CardHeader><CardTitle>Create Reservation</CardTitle></CardHeader>
           <CardContent className="space-y-2">
+            <p className="text-xs text-gray-500">Enter guest details to create a reservation.</p>
             <Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Guest name" />
             <Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="Guest phone" />
             <Input value={partySize} onChange={(e) => setPartySize(e.target.value)} placeholder="Party size" />
-            <Button onClick={submitReservation} disabled={createReservation.isPending}>Create Reservation</Button>
-            <Button variant="outline" onClick={seatFirstTable} disabled={seatTable.isPending}>Seat First Available Table</Button>
-            <Button variant="outline" onClick={promoteFirstWaitlist} disabled={promoteWaitlist.isPending}>Promote First Waitlist</Button>
+            {formError && <p className="text-xs text-red-600">{formError}</p>}
+            <Button onClick={submitReservation} disabled={createReservation.isPending || !hasBranchAssignment}>Create Reservation</Button>
+            <Button variant="outline" onClick={seatFirstTable} disabled={seatTable.isPending || !hasBranchAssignment}>Seat First Available Table</Button>
+            <Button variant="outline" onClick={promoteFirstWaitlist} disabled={promoteWaitlist.isPending || !hasBranchAssignment}>Promote First Waitlist</Button>
             <Input value={menuItemId} onChange={(e) => setMenuItemId(e.target.value)} placeholder="Menu item ID for quick order" list="menu-item-options" />
             <datalist id="menu-item-options">
               {menuItems.data?.map((item) => (
                 <option key={item.id} value={String(item.id)}>{item.name} (${item.price.toFixed(2)})</option>
               ))}
             </datalist>
-            <Button variant="outline" onClick={createQuickOrder} disabled={createOrder.isPending}>Create Quick Order</Button>
+            {quickOrderError && <p className="text-xs text-red-600">{quickOrderError}</p>}
+            <Button variant="outline" onClick={createQuickOrder} disabled={createOrder.isPending || !hasBranchAssignment || !hasEligibleStaffContext}>Create Quick Order</Button>
           </CardContent>
         </Card>
 
