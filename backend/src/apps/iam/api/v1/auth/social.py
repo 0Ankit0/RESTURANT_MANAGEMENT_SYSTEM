@@ -1,5 +1,6 @@
 """Social OAuth2 login endpoints — thin router, all logic delegated to utils and config."""
 from datetime import datetime, timedelta, timezone
+import logging
 from typing import Any, Optional
 
 import httpx
@@ -29,6 +30,7 @@ from src.apps.iam.utils.social import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Maps provider name → its enabled setting flag
 _PROVIDER_ENABLED: dict[str, bool] = {
@@ -185,7 +187,11 @@ async def social_callback(
                 if primary:
                     user_info["email"] = primary
             except Exception:
-                pass
+                logger.warning(
+                    "auth.social.fetch_github_email_failed",
+                    exc_info=True,
+                    extra={"operation": "fetch_github_email", "provider": provider},
+                )
 
     social_id, email, display_name = extract_user_info(provider, user_info)
 

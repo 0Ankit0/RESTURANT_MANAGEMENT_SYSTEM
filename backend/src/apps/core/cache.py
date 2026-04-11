@@ -1,8 +1,10 @@
 from typing import Optional, Any
 import json
+import logging
 from redis.asyncio import Redis, ConnectionPool
 from src.apps.core.config import settings
 
+logger = logging.getLogger(__name__)
 
 class RedisCache:
     """Redis cache client for production environment"""
@@ -49,7 +51,11 @@ class RedisCache:
             if value:
                 return json.loads(value)
         except Exception:
-            pass
+            logger.warning(
+                "core.cache.get_failed",
+                exc_info=True,
+                extra={"operation": "redis_get", "cache_key": key},
+            )
         return None
     
     @classmethod
@@ -64,6 +70,11 @@ class RedisCache:
             await client.setex(key, ttl, serialized)
             return True
         except Exception:
+            logger.warning(
+                "core.cache.set_failed",
+                exc_info=True,
+                extra={"operation": "redis_set", "cache_key": key, "ttl": ttl},
+            )
             return False
     
     @classmethod
@@ -77,6 +88,11 @@ class RedisCache:
             await client.delete(key)
             return True
         except Exception:
+            logger.warning(
+                "core.cache.delete_failed",
+                exc_info=True,
+                extra={"operation": "redis_delete", "cache_key": key},
+            )
             return False
     
     @classmethod
@@ -89,6 +105,11 @@ class RedisCache:
         try:
             return bool(await client.exists(key))
         except Exception:
+            logger.warning(
+                "core.cache.exists_failed",
+                exc_info=True,
+                extra={"operation": "redis_exists", "cache_key": key},
+            )
             return False
     
     @classmethod
@@ -107,4 +128,9 @@ class RedisCache:
                 return await client.delete(*keys)
             return 0
         except Exception:
+            logger.warning(
+                "core.cache.clear_pattern_failed",
+                exc_info=True,
+                extra={"operation": "redis_clear_pattern", "pattern": pattern},
+            )
             return 0

@@ -8,6 +8,7 @@ When analytics are disabled the middleware is still registered but all
 captures are no-ops (AnalyticsService.capture is a no-op when disabled).
 """
 import time
+import logging
 from typing import Callable
 
 from fastapi import Request, Response
@@ -15,6 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from src.apps.analytics.events import ApiEvents
+logger = logging.getLogger(__name__)
 
 # Paths that are not worth tracking
 _SKIP_PREFIXES = ("/docs", "/redoc", "/openapi", "/media", "/favicon")
@@ -43,7 +45,10 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
         try:
             user_id = str(request.state.user_id)
         except AttributeError:
-            pass
+            logger.debug(
+                "analytics.middleware.user_id_missing",
+                extra={"operation": "resolve_distinct_id", "path": path},
+            )
         distinct_id = user_id or f"anon:{request.client.host if request.client else 'unknown'}"
 
         await analytics.capture(
