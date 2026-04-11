@@ -24,7 +24,12 @@ function PaymentCallbackInner() {
 
   useEffect(() => {
     const provider = (searchParams.get('provider') || 'khalti') as PaymentProvider;
-    const pidx = searchParams.get('pidx') ?? undefined;
+    const pidx =
+      searchParams.get('pidx') ??
+      searchParams.get('session_id') ??
+      searchParams.get('paymentId') ??
+      undefined;
+    const oid = searchParams.get('PayerID') ?? undefined;
     const data = searchParams.get('data') ?? undefined;
 
     if (!pidx && !data) {
@@ -34,13 +39,16 @@ function PaymentCallbackInner() {
     }
 
     verifyPayment.mutate(
-      { provider, pidx, data },
+      { provider, pidx, oid, data },
       {
         onSuccess: (result) => {
           if (result.status === 'completed') {
             setStatus('success');
             setMessage(`Payment of ${result.amount ? result.amount / 100 : ''} completed successfully.`);
             setTimeout(() => router.push('/finances'), 4000);
+          } else if (result.status === 'initiated' || result.status === 'pending') {
+            setStatus('success');
+            setMessage(`Payment is ${result.status}. It will update automatically after provider reconciliation.`);
           } else {
             setStatus('error');
             setMessage(`Payment status: ${result.status}. Please try again or contact support.`);

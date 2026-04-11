@@ -9,14 +9,17 @@ import { PaymentInitiateForm } from '@/components/finances/stripe-payment-form';
 import type { PaymentTransaction } from '@/types';
 
 const STATUS_COLORS: Record<string, string> = {
+  initiated: 'bg-blue-100 text-blue-800',
   completed: 'bg-green-100 text-green-800',
   pending: 'bg-yellow-100 text-yellow-800',
   failed: 'bg-red-100 text-red-800',
   refunded: 'bg-gray-100 text-gray-700',
+  cancelled: 'bg-gray-200 text-gray-700',
 };
 
 function TransactionRow({ tx }: { tx: PaymentTransaction }) {
   const color = STATUS_COLORS[tx.status] ?? 'bg-gray-100 text-gray-700';
+  const divisor = tx.provider === 'khalti' ? 100 : 1;
   return (
     <tr className="border-b border-gray-100 last:border-0">
       <td className="py-3 text-sm text-gray-500">
@@ -24,7 +27,7 @@ function TransactionRow({ tx }: { tx: PaymentTransaction }) {
       </td>
       <td className="py-3 text-sm text-gray-900 capitalize">{tx.provider}</td>
       <td className="py-3 text-sm font-medium text-gray-900">
-        {tx.currency} {(tx.amount / 100).toFixed(2)}
+        {tx.currency} {(tx.amount / divisor).toFixed(2)}
       </td>
       <td className="py-3">
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>

@@ -8,6 +8,7 @@ interface TransactionCardProps {
 }
 
 const statusColors: Record<string, string> = {
+  initiated: 'bg-blue-100 text-blue-800',
   pending: 'bg-yellow-100 text-yellow-800',
   completed: 'bg-green-100 text-green-800',
   failed: 'bg-red-100 text-red-800',
@@ -16,6 +17,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function TransactionCard({ transaction }: TransactionCardProps) {
+  const amountDivisor = transaction.provider === 'khalti' ? 100 : 1;
   return (
     <div className="p-4 rounded-lg border border-gray-200 flex items-center justify-between">
       <div className="flex items-center gap-3">
@@ -29,7 +31,7 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
       </div>
       <div className="text-right">
         <p className="font-semibold text-gray-900">
-          {(transaction.amount / 100).toFixed(2)} {transaction.currency.toUpperCase()}
+          {(transaction.amount / amountDivisor).toFixed(2)} {transaction.currency.toUpperCase()}
         </p>
         <span
           className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${

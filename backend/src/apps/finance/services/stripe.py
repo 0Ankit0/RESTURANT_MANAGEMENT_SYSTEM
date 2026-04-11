@@ -19,7 +19,6 @@ Flow:
   4. POST /payments/verify/ with provider=stripe and pidx=<session_id>
 """
 import json
-from datetime import datetime
 
 import stripe
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,25 +68,28 @@ class StripeService(BasePaymentProvider):
         success_url = f"{request.return_url}?session_id={{CHECKOUT_SESSION_ID}}"
         cancel_url = request.return_url
 
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": "usd",
-                        "unit_amount": request.amount,  # Stripe expects cents
-                        "product_data": {"name": request.purchase_order_name},
-                    },
-                    "quantity": 1,
-                }
-            ],
-            mode="payment",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
-                "purchase_order_id": request.purchase_order_id,
-            },
-        )
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                line_items=[
+                    {
+                        "price_data": {
+                            "currency": "usd",
+                            "unit_amount": request.amount,  # Stripe expects cents
+                            "product_data": {"name": request.purchase_order_name},
+                        },
+                        "quantity": 1,
+                    }
+                ],
+                mode="payment",
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={
+                    "purchase_order_id": request.purchase_order_id,
+                },
+            )
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
         tx = PaymentTransaction(
             provider=PaymentProvider.STRIPE,
@@ -136,9 +138,12 @@ class StripeService(BasePaymentProvider):
         if not session_id:
             raise ValueError("session_id (pidx) is required for Stripe verification")
 
-        session = stripe.checkout.Session.retrieve(session_id)
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
-        our_status = _STATUS_MAP.get(session.status, PaymentStatus.FAILED)
+        our_status = _STATUS_MAP.get(session.status, PaymentStatus.PENDING)
         # Also check payment_status for completed sessions
         if session.status == "complete" and session.payment_status == "paid":
             our_status = PaymentStatus.COMPLETED
@@ -153,7 +158,12 @@ class StripeService(BasePaymentProvider):
         if tx is None:
             raise ValueError(f"No transaction found for Stripe session_id={session_id}")
 
-        tx.status = our_status
+        await self.reconcile_transaction(tx, db)
+        self.apply_transition(
+            tx,
+            our_status,
+            failure_reason=session.status if our_status == PaymentStatus.FAILED else None,
+        )
         tx.provider_transaction_id = session.payment_intent
         tx.extra_data = json.dumps({
             "session_id": session.id,
@@ -161,7 +171,6 @@ class StripeService(BasePaymentProvider):
             "payment_status": session.payment_status,
             "payment_intent": session.payment_intent,
         })
-        tx.updated_at = datetime.now()
         db.add(tx)
         await db.commit()
         await db.refresh(tx)

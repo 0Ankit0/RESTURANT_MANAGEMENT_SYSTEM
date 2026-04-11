@@ -12,7 +12,6 @@ Test card (Khalti wallet):
   OTP    : 987654
 """
 import json
-from datetime import datetime
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,8 +115,8 @@ class KhaltiService(BasePaymentProvider):
 
         try:
             resp = await self._post_khalti("epayment/initiate/", payload)
-        except RuntimeError as exc:
-            raise RuntimeError(f"Khalti initiation request failed: {exc}") from exc
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
         if resp.status_code != 200:
             error_detail = resp.text
@@ -135,7 +134,9 @@ class KhaltiService(BasePaymentProvider):
             db.add(tx)
             await db.commit()
             await db.refresh(tx)
-            raise ValueError(f"Khalti initiation failed ({resp.status_code}): {error_detail}")
+            raise self.map_error(
+                ValueError(f"initiation failed ({resp.status_code}): {error_detail}")
+            )
 
         data = resp.json()
         pidx: str = data["pidx"]
@@ -186,8 +187,8 @@ class KhaltiService(BasePaymentProvider):
 
         try:
             resp = await self._post_khalti("epayment/lookup/", {"pidx": pidx})
-        except RuntimeError as exc:
-            raise RuntimeError(f"Khalti lookup request failed: {exc}") from exc
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
         if resp.status_code != 200:
             raise ValueError(f"Khalti lookup failed ({resp.status_code}): {resp.text}")
@@ -203,7 +204,7 @@ class KhaltiService(BasePaymentProvider):
             "User canceled": PaymentStatus.CANCELLED,
             "Refunded": PaymentStatus.REFUNDED,
         }
-        our_status = status_map.get(khalti_status, PaymentStatus.FAILED)
+        our_status = status_map.get(khalti_status, PaymentStatus.PENDING)
 
         from sqlmodel import select
         result = await db.execute(
@@ -214,10 +215,14 @@ class KhaltiService(BasePaymentProvider):
         if tx is None:
             raise ValueError(f"No transaction found for Khalti pidx={pidx}")
 
-        tx.status = our_status
+        await self.reconcile_transaction(tx, db)
+        self.apply_transition(
+            tx,
+            our_status,
+            failure_reason=data.get("status") if our_status == PaymentStatus.FAILED else None,
+        )
         tx.provider_transaction_id = transaction_id_provider
         tx.extra_data = json.dumps(data)
-        tx.updated_at = datetime.now()
         db.add(tx)
         await db.commit()
         await db.refresh(tx)

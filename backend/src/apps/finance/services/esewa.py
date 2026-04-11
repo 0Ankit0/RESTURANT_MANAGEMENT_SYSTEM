@@ -23,7 +23,6 @@ import hashlib
 import hmac
 import json
 import uuid
-from datetime import datetime
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -170,7 +169,7 @@ class EsewaService(BasePaymentProvider):
         try:
             decoded = json.loads(base64.b64decode(request.data).decode("utf-8"))
         except Exception as exc:
-            raise ValueError(f"Failed to decode eSewa callback data: {exc}") from exc
+            raise self.map_error(ValueError(f"Failed to decode callback data: {exc}")) from exc
 
         cb = EsewaCallbackData(**decoded)
 
@@ -185,25 +184,28 @@ class EsewaService(BasePaymentProvider):
             )
             legacy_sig = _compute_esewa_signature(legacy_message, settings.ESEWA_SECRET_KEY)
             if cb.signature not in {expected_sig, legacy_sig}:
-                raise ValueError("eSewa callback signature verification failed")
+                raise self.map_error(ValueError("callback signature verification failed"))
 
         # ------ double-check via status API --------------------------------
         transaction_uuid = cb.transaction_uuid
         if not transaction_uuid:
             raise ValueError("transaction_uuid missing from eSewa callback")
 
-        async with httpx.AsyncClient() as client:
-            resp = await retry_async(
-                lambda: client.get(
-                    self.STATUS_URL,
-                    params={
-                        "product_code": settings.ESEWA_MERCHANT_CODE,
-                        "transaction_uuid": transaction_uuid,
-                        "total_amount": cb.total_amount,
-                    },
-                    timeout=default_timeout(30),
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await retry_async(
+                    lambda: client.get(
+                        self.STATUS_URL,
+                        params={
+                            "product_code": settings.ESEWA_MERCHANT_CODE,
+                            "transaction_uuid": transaction_uuid,
+                            "total_amount": cb.total_amount,
+                        },
+                        timeout=default_timeout(30),
+                    )
                 )
-            )
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
         esewa_status_data: dict = {}
         if resp.status_code == 200:
@@ -222,7 +224,7 @@ class EsewaService(BasePaymentProvider):
             "NOT_FOUND": PaymentStatus.FAILED,
             "CANCELED": PaymentStatus.CANCELLED,
         }
-        our_status = status_map.get(esewa_status_str, PaymentStatus.FAILED)
+        our_status = status_map.get(esewa_status_str, PaymentStatus.PENDING)
 
         # ------ update transaction ----------------------------------------
         from sqlmodel import select
@@ -236,13 +238,17 @@ class EsewaService(BasePaymentProvider):
         if tx is None:
             raise ValueError(f"No transaction found for eSewa transaction_uuid={transaction_uuid}")
 
-        tx.status = our_status
+        await self.reconcile_transaction(tx, db)
+        self.apply_transition(
+            tx,
+            our_status,
+            failure_reason=esewa_status_str if our_status == PaymentStatus.FAILED else None,
+        )
         tx.provider_transaction_id = cb.transaction_code or esewa_status_data.get("ref_id")
         tx.extra_data = json.dumps({
             "callback": decoded,
             "status_api": esewa_status_data,
         })
-        tx.updated_at = datetime.now()
         db.add(tx)
         await db.commit()
         await db.refresh(tx)
