@@ -6,6 +6,7 @@ import '../../data/models/payment.dart';
 import '../providers/payment_provider.dart';
 import '../../../../core/analytics/analytics_provider.dart';
 import '../../../../core/analytics/analytics_events.dart';
+import '../../../../core/config/runtime_config.dart';
 import 'payment_utils.dart';
 import 'payment_webview_page.dart';
 
@@ -61,7 +62,24 @@ class _PaymentsPageState extends ConsumerState<PaymentsPage> {
         ? (nprAmount * 100).round()
         : nprAmount.round();
 
-    final returnUrl = 'http://localhost:3000/payment-callback?provider=${_selectedProvider!.name}';
+    final callbackBase = RuntimeConfig.paymentReturnUrlBase;
+    if (callbackBase.isEmpty) {
+      _showError(
+        'Payment callback URL is not configured. Please contact support.',
+      );
+      return;
+    }
+
+    final websiteUrl = RuntimeConfig.websiteUrl;
+    if (websiteUrl.isEmpty) {
+      _showError(
+        'Website URL is not configured. Please contact support.',
+      );
+      return;
+    }
+
+    final returnUrl =
+        '$callbackBase?provider=${_selectedProvider!.name}';
 
     setState(() => _initiating = true);
 
@@ -73,7 +91,7 @@ class _PaymentsPageState extends ConsumerState<PaymentsPage> {
         purchaseOrderId: _orderId!,
         purchaseOrderName: _orderNameCtrl.text.trim(),
         returnUrl: returnUrl,
-        websiteUrl: 'http://localhost:3000',
+        websiteUrl: websiteUrl,
         customerName: _customerNameCtrl.text.trim().isEmpty
             ? null
             : _customerNameCtrl.text.trim(),
@@ -120,6 +138,7 @@ class _PaymentsPageState extends ConsumerState<PaymentsPage> {
             esewaFormAction: response.extra?['form_action'] as String?,
             esewaFormFields:
                 response.extra?['form_fields'] as Map<String, dynamic>?,
+            callbackUrlPrefix: RuntimeConfig.paymentReturnUrlBase,
           ),
         ),
       ),
