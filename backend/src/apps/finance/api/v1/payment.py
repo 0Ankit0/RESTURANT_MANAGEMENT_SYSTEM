@@ -8,7 +8,7 @@ GET  /payments/             — list transactions (authenticated users)
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, col
 
@@ -172,6 +172,108 @@ async def verify_payment(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Payment provider error: {_describe_exception(exc)}",
         )
+
+
+async def _verify_from_callback(
+    provider: PaymentProvider,
+    db: AsyncSession,
+    analytics: AnalyticsService,
+    *,
+    pidx: str | None = None,
+    oid: str | None = None,
+    refId: str | None = None,
+    data: str | None = None,
+) -> VerifyPaymentResponse:
+    payload = VerifyPaymentRequest(
+        provider=provider,
+        pidx=pidx,
+        oid=oid,
+        refId=refId,
+        data=data,
+    )
+    result = await _get_provider(provider).verify_payment(payload, db)
+    from src.apps.finance.models.payment import PaymentStatus
+    event = (
+        PaymentEvents.PAYMENT_COMPLETED
+        if result.status == PaymentStatus.COMPLETED
+        else PaymentEvents.PAYMENT_FAILED
+    )
+    await analytics.capture(
+        str(result.transaction_id),
+        event,
+        {"provider": provider.value, "status": result.status.value, "transaction_id": result.transaction_id},
+    )
+    return result
+
+
+@router.get("/callback/khalti/", response_model=VerifyPaymentResponse)
+async def khalti_callback(
+    pidx: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    analytics: AnalyticsService = Depends(get_analytics),
+) -> VerifyPaymentResponse:
+    return await _verify_from_callback(PaymentProvider.KHALTI, db, analytics, pidx=pidx)
+
+
+@router.get("/callback/esewa/", response_model=VerifyPaymentResponse)
+async def esewa_callback(
+    data: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    analytics: AnalyticsService = Depends(get_analytics),
+) -> VerifyPaymentResponse:
+    return await _verify_from_callback(PaymentProvider.ESEWA, db, analytics, data=data)
+
+
+@router.get("/callback/stripe/", response_model=VerifyPaymentResponse)
+async def stripe_callback(
+    session_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    analytics: AnalyticsService = Depends(get_analytics),
+) -> VerifyPaymentResponse:
+    return await _verify_from_callback(PaymentProvider.STRIPE, db, analytics, pidx=session_id)
+
+
+@router.get("/callback/paypal/", response_model=VerifyPaymentResponse)
+async def paypal_callback(
+    paymentId: str = Query(...),
+    PayerID: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    analytics: AnalyticsService = Depends(get_analytics),
+) -> VerifyPaymentResponse:
+    return await _verify_from_callback(PaymentProvider.PAYPAL, db, analytics, pidx=paymentId, oid=PayerID)
+
+
+@router.post("/reconcile/{transaction_id}/", response_model=VerifyPaymentResponse)
+async def reconcile_transaction(
+    transaction_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    analytics: AnalyticsService = Depends(get_analytics),
+) -> VerifyPaymentResponse:
+    """
+    Retry-safe reconciliation for pending/failed verification states.
+    """
+    decoded_id = decode_id_or_404(transaction_id)
+    tx = await db.get(PaymentTransaction, decoded_id)
+    if tx is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if tx.provider_pidx is None and tx.provider != PaymentProvider.ESEWA:
+        raise HTTPException(status_code=400, detail="Missing provider reference for reconciliation")
+
+    callback_data = request.query_params.get("data")
+    if tx.provider == PaymentProvider.ESEWA and not callback_data:
+        raise HTTPException(
+            status_code=400,
+            detail="eSewa reconciliation requires callback `data` query parameter.",
+        )
+
+    return await _verify_from_callback(
+        tx.provider,
+        db,
+        analytics,
+        pidx=tx.provider_pidx,
+        data=callback_data,
+    )
 
 
 # ---------------------------------------------------------------------------

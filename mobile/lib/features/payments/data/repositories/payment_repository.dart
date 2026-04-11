@@ -54,7 +54,7 @@ class PaymentRepository {
     }
   }
 
-  Future<PaymentTransaction> getTransaction(int transactionId) async {
+  Future<PaymentTransaction> getTransaction(String transactionId) async {
     try {
       final response = await _dioClient.dio.get('${ApiEndpoints.payments}$transactionId/');
       return PaymentTransaction.fromJson(response.data as Map<String, dynamic>);

@@ -64,7 +64,9 @@ class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
     if (widget.provider == PaymentProvider.esewa) {
       _loadEsewaForm();
     } else {
-      _controller.loadRequest(Uri.parse(widget.paymentUrl!));
+      if ((widget.paymentUrl ?? '').isNotEmpty) {
+        _controller.loadRequest(Uri.parse(widget.paymentUrl!));
+      }
     }
   }
 
@@ -118,12 +120,23 @@ class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
           provider: PaymentProvider.khalti,
           pidx: pidx,
         );
-      } else {
+      } else if (widget.provider == PaymentProvider.esewa) {
         // eSewa sends base64-encoded `data` param
         final data = uri.queryParameters['data'];
         verifyReq = VerifyPaymentRequest(
           provider: PaymentProvider.esewa,
           data: data,
+        );
+      } else if (widget.provider == PaymentProvider.stripe) {
+        verifyReq = VerifyPaymentRequest(
+          provider: PaymentProvider.stripe,
+          pidx: uri.queryParameters['session_id'],
+        );
+      } else {
+        verifyReq = VerifyPaymentRequest(
+          provider: PaymentProvider.paypal,
+          pidx: uri.queryParameters['paymentId'],
+          oid: uri.queryParameters['PayerID'],
         );
       }
 
@@ -134,7 +147,9 @@ class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
           success: result.status == PaymentStatus.completed,
           message: result.status == PaymentStatus.completed
               ? 'Payment completed successfully!'
-              : 'Payment status: ${result.status.name}',
+              : result.status == PaymentStatus.pending || result.status == PaymentStatus.initiated
+                  ? 'Payment ${result.status.name}. Awaiting provider confirmation.'
+                  : 'Payment status: ${result.status.name}',
           response: result,
         ),
       );

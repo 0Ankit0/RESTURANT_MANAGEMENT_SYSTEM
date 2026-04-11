@@ -49,7 +49,11 @@ export function useVerifyPayment() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       analytics.capture(
-        data.status === 'completed' ? PaymentEvents.PAYMENT_COMPLETED : PaymentEvents.PAYMENT_FAILED,
+        data.status === 'completed'
+          ? PaymentEvents.PAYMENT_COMPLETED
+          : data.status === 'failed'
+            ? PaymentEvents.PAYMENT_FAILED
+            : PaymentEvents.PAYMENT_INITIATED,
         { provider: data.provider, status: data.status },
       );
     },

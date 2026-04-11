@@ -19,6 +19,25 @@ class PaymentStatus(str, Enum):
     REFUNDED = "refunded"
     CANCELLED = "cancelled"
 
+    @property
+    def is_terminal(self) -> bool:
+        return self in {
+            PaymentStatus.COMPLETED,
+            PaymentStatus.FAILED,
+            PaymentStatus.REFUNDED,
+            PaymentStatus.CANCELLED,
+        }
+
+
+ALLOWED_PAYMENT_TRANSITIONS: dict[PaymentStatus, set[PaymentStatus]] = {
+    PaymentStatus.PENDING: {PaymentStatus.INITIATED, PaymentStatus.FAILED, PaymentStatus.CANCELLED},
+    PaymentStatus.INITIATED: {PaymentStatus.PENDING, PaymentStatus.COMPLETED, PaymentStatus.FAILED, PaymentStatus.CANCELLED},
+    PaymentStatus.COMPLETED: {PaymentStatus.REFUNDED},
+    PaymentStatus.FAILED: {PaymentStatus.PENDING, PaymentStatus.INITIATED},
+    PaymentStatus.REFUNDED: set(),
+    PaymentStatus.CANCELLED: set(),
+}
+
 
 class PaymentTransactionBase(SQLModel):
     """Fields shared between table model and validation schemas."""
@@ -93,6 +112,11 @@ class PaymentTransaction(PaymentTransactionBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+    def can_transition_to(self, target: PaymentStatus) -> bool:
+        if self.status == target:
+            return True
+        return target in ALLOWED_PAYMENT_TRANSITIONS.get(self.status, set())
 
 
 class PaymentWebhookBase(SQLModel):

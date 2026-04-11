@@ -16,7 +16,6 @@ Flow:
   4. POST /payments/verify/ with provider=paypal, pidx=<paymentId>, extra oid=<PayerID>
 """
 import json
-from datetime import datetime
 
 import paypalrestsdk
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,27 +74,30 @@ class PayPalService(BasePaymentProvider):
         # Convert from cents to dollars for PayPal (assumes USD cents input)
         amount_dollars = f"{request.amount / 100:.2f}"
 
-        payment = paypalrestsdk.Payment(
-            {
-                "intent": "sale",
-                "payer": {"payment_method": "paypal"},
-                "redirect_urls": {
-                    "return_url": request.return_url,
-                    "cancel_url": request.return_url,
+        try:
+            payment = paypalrestsdk.Payment(
+                {
+                    "intent": "sale",
+                    "payer": {"payment_method": "paypal"},
+                    "redirect_urls": {
+                        "return_url": request.return_url,
+                        "cancel_url": request.return_url,
+                    },
+                    "transactions": [
+                        {
+                            "amount": {
+                                "total": amount_dollars,
+                                "currency": "USD",
+                            },
+                            "description": request.purchase_order_name,
+                            "invoice_number": request.purchase_order_id,
+                        }
+                    ],
                 },
-                "transactions": [
-                    {
-                        "amount": {
-                            "total": amount_dollars,
-                            "currency": "USD",
-                        },
-                        "description": request.purchase_order_name,
-                        "invoice_number": request.purchase_order_id,
-                    }
-                ],
-            },
-            api=_get_api(),
-        )
+                api=_get_api(),
+            )
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
         if not payment.create():
             error = payment.error or "PayPal payment creation failed"
@@ -112,7 +114,7 @@ class PayPalService(BasePaymentProvider):
             db.add(tx)
             await db.commit()
             await db.refresh(tx)
-            raise ValueError(f"PayPal initiation failed: {error}")
+            raise self.map_error(ValueError(f"initiation failed: {error}"))
 
         # Extract the buyer approval URL from PayPal links
         approval_url: str | None = next(
@@ -171,11 +173,14 @@ class PayPalService(BasePaymentProvider):
         if not payer_id:
             raise ValueError("PayerID (oid) is required for PayPal verification")
 
-        payment = paypalrestsdk.Payment.find(payment_id, api=_get_api())
+        try:
+            payment = paypalrestsdk.Payment.find(payment_id, api=_get_api())
+        except Exception as exc:
+            raise self.map_error(exc) from exc
 
         if not payment.execute({"payer_id": payer_id}):
             error = payment.error or "PayPal execution failed"
-            raise ValueError(f"PayPal execution failed: {error}")
+            raise self.map_error(ValueError(f"execution failed: {error}"))
 
         sale_id: str | None = None
         try:
@@ -197,10 +202,14 @@ class PayPalService(BasePaymentProvider):
         if tx is None:
             raise ValueError(f"No transaction found for PayPal paymentId={payment_id}")
 
-        tx.status = our_status
+        await self.reconcile_transaction(tx, db)
+        self.apply_transition(
+            tx,
+            our_status,
+            failure_reason=str(payment.state) if our_status == PaymentStatus.FAILED else None,
+        )
         tx.provider_transaction_id = sale_id or payment_id
         tx.extra_data = json.dumps({"payment_id": payment.id, "state": payment.state})
-        tx.updated_at = datetime.now()
         db.add(tx)
         await db.commit()
         await db.refresh(tx)
