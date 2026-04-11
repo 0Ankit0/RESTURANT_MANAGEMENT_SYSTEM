@@ -17,6 +17,7 @@ from src.apps.finance.models import *  # noqa: F403,F401
 from src.apps.iam.models import *  # noqa: F403,F401
 from src.apps.multitenancy.models import *  # noqa: F403,F401
 from src.apps.notification.models import *  # noqa: F403,F401
+from src.apps.restaurant.models import *  # noqa: F403,F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -30,7 +31,7 @@ if config.config_file_name is not None:
 target_metadata = sqlmodel.SQLModel.metadata
 
 def run_migrations_offline() -> None:
-    url = settings.SYNC_DATABASE_URL
+    url = config.get_main_option("sqlalchemy.url") or settings.SYNC_DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -43,8 +44,9 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
+    database_url = config.get_main_option("sqlalchemy.url") or settings.SYNC_DATABASE_URL or "sqlite:///./test.db"
     connectable = create_engine(
-        settings.SYNC_DATABASE_URL or "sqlite:///./test.db",
+        database_url,
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
