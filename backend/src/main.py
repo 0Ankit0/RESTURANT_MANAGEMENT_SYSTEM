@@ -9,7 +9,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from src.apps.core.config import settings
+from src.apps.core.config import Settings, settings, validate_startup_invariants
 from src.apps.core.handler import rate_limit_exceeded_handler
 from src.apps.core.logging import configure_logging
 from src.apps.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
@@ -32,6 +32,7 @@ from src.apps.restaurant.api import restaurant_router
 from src.apps.core.storage import storage_uses_local_filesystem
 
 configure_logging()
+validate_startup_invariants(Settings(**settings.model_dump()))
 
 # Rate limiter
 limiter = Limiter(

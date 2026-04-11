@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from src.apps.core.config import ENV_FILE_PATH, Settings, settings
+import pytest
+
+from src.apps.core.config import (
+    ENV_FILE_PATH,
+    Settings,
+    settings,
+    validate_startup_invariants,
+)
 
 
 class TestSettings:
@@ -94,3 +101,35 @@ class TestSettings:
 
     def test_env_file_path_points_to_backend_env(self):
         assert ENV_FILE_PATH == Path(__file__).resolve().parents[3] / ".env"
+
+    def test_production_startup_validation_rejects_insecure_defaults(self):
+        with pytest.raises(RuntimeError, match="DEBUG must be false"):
+            validate_startup_invariants(
+                Settings(
+                    APP_ENV="production",
+                    DEBUG=True,
+                )
+            )
+
+    def test_production_startup_validation_accepts_hardened_minimum(self):
+        parsed = Settings(
+            APP_ENV="production",
+            DEBUG=False,
+            SECRET_KEY="a" * 48,
+            SECURE_COOKIES=True,
+            TRUSTED_HOSTS="api.example.com",
+            PROXY_TRUSTED_HOSTS="10.0.0.10",
+            FORWARDED_ALLOW_IPS="10.0.0.10",
+            FEATURE_WEBSOCKETS=False,
+            FEATURE_SOCIAL_AUTH=False,
+            GOOGLE_ENABLED=False,
+            GITHUB_ENABLED=False,
+            FACEBOOK_ENABLED=False,
+            EMAIL_ENABLED=False,
+            PUSH_ENABLED=False,
+            SMS_ENABLED=False,
+            ANALYTICS_ENABLED=False,
+            STRIPE_ENABLED=False,
+            PAYPAL_ENABLED=False,
+        )
+        validate_startup_invariants(parsed)

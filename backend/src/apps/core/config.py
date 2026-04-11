@@ -644,3 +644,169 @@ OAUTH_PROVIDERS: dict[str, dict[str, Any]] = {
         "extra_params": {"response_type": "code"},
     },
 }
+
+
+def _is_blank(value: str | None) -> bool:
+    return value is None or not str(value).strip()
+
+
+def _is_weak_secret(value: str, *, min_length: int = 32) -> bool:
+    normalized = value.strip().lower()
+    weak_defaults = {
+        "",
+        "supersecretkey",
+        "secret",
+        "changeme",
+        "default",
+        "your-secret-key",
+        "replace-me",
+    }
+    return normalized in weak_defaults or len(value.strip()) < min_length
+
+
+def validate_startup_invariants(current_settings: Settings) -> None:
+    issues: list[str] = []
+    is_production = current_settings.APP_ENV == "production"
+
+    if is_production:
+        if current_settings.DEBUG:
+            issues.append("DEBUG must be false when APP_ENV=production.")
+        if _is_weak_secret(current_settings.SECRET_KEY):
+            issues.append(
+                "SECRET_KEY is weak/default; provide a strong random value (>=32 chars)."
+            )
+        if not current_settings.SECURE_COOKIES:
+            issues.append(
+                "SECURE_COOKIES must be true when APP_ENV=production."
+            )
+        if current_settings.COOKIE_SAMESITE == "none" and not current_settings.SECURE_COOKIES:
+            issues.append(
+                "COOKIE_SAMESITE=none requires SECURE_COOKIES=true."
+            )
+
+        trusted_hosts = [host.strip() for host in current_settings.TRUSTED_HOSTS if host.strip()]
+        if not trusted_hosts:
+            issues.append("TRUSTED_HOSTS must include at least one public hostname in production.")
+        if any(host == "*" for host in trusted_hosts):
+            issues.append("TRUSTED_HOSTS must not contain '*' in production.")
+
+        insecure_host_entries = {"localhost", "127.0.0.1", "test", "testserver"}
+        if any(host.lower() in insecure_host_entries for host in trusted_hosts):
+            issues.append(
+                "TRUSTED_HOSTS must not include localhost/test hostnames in production."
+            )
+
+        proxy_trusted = [host.strip() for host in current_settings.PROXY_TRUSTED_HOSTS if host.strip()]
+        forwarded_allow = [ip.strip() for ip in current_settings.FORWARDED_ALLOW_IPS if ip.strip()]
+
+        if not proxy_trusted:
+            issues.append("PROXY_TRUSTED_HOSTS must not be empty in production.")
+        if not forwarded_allow:
+            issues.append("FORWARDED_ALLOW_IPS must not be empty in production.")
+        if any(host == "*" for host in proxy_trusted):
+            issues.append("PROXY_TRUSTED_HOSTS must not contain '*' in production.")
+        if any(ip == "*" for ip in forwarded_allow):
+            issues.append("FORWARDED_ALLOW_IPS must not contain '*' in production.")
+
+    if current_settings.FEATURE_WEBSOCKETS and _is_blank(current_settings.REDIS_URL):
+        issues.append("FEATURE_WEBSOCKETS=true requires REDIS_URL.")
+
+    if current_settings.FEATURE_SOCIAL_AUTH and _is_blank(current_settings.SOCIAL_AUTH_REDIRECT_URL):
+        issues.append("FEATURE_SOCIAL_AUTH=true requires SOCIAL_AUTH_REDIRECT_URL.")
+
+    if current_settings.GOOGLE_ENABLED:
+        if _is_blank(current_settings.GOOGLE_CLIENT_ID) or _is_blank(current_settings.GOOGLE_CLIENT_SECRET):
+            issues.append("GOOGLE_ENABLED=true requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
+    if current_settings.GITHUB_ENABLED:
+        if _is_blank(current_settings.GITHUB_CLIENT_ID) or _is_blank(current_settings.GITHUB_CLIENT_SECRET):
+            issues.append("GITHUB_ENABLED=true requires GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET.")
+    if current_settings.FACEBOOK_ENABLED:
+        if _is_blank(current_settings.FACEBOOK_CLIENT_ID) or _is_blank(current_settings.FACEBOOK_CLIENT_SECRET):
+            issues.append("FACEBOOK_ENABLED=true requires FACEBOOK_CLIENT_ID and FACEBOOK_CLIENT_SECRET.")
+
+    if current_settings.EMAIL_ENABLED:
+        provider = current_settings.EMAIL_PROVIDER.strip().lower()
+        if provider == "smtp":
+            if any(
+                _is_blank(value)
+                for value in [
+                    current_settings.EMAIL_HOST,
+                    current_settings.EMAIL_HOST_USER,
+                    current_settings.EMAIL_FROM_ADDRESS,
+                    current_settings.EMAIL_HOST_PASSWORD.get_secret_value(),
+                ]
+            ):
+                issues.append("EMAIL_PROVIDER=smtp requires SMTP host/user/from/password settings.")
+        elif provider == "resend":
+            if _is_blank(current_settings.RESEND_API_KEY) or _is_blank(current_settings.RESEND_FROM_ADDRESS):
+                issues.append("EMAIL_PROVIDER=resend requires RESEND_API_KEY and RESEND_FROM_ADDRESS.")
+        elif provider == "ses":
+            if any(
+                _is_blank(value)
+                for value in [
+                    current_settings.AWS_REGION,
+                    current_settings.AWS_ACCESS_KEY_ID,
+                    current_settings.AWS_SECRET_ACCESS_KEY.get_secret_value(),
+                    current_settings.SES_FROM_ADDRESS,
+                ]
+            ):
+                issues.append("EMAIL_PROVIDER=ses requires AWS and SES sender settings.")
+        else:
+            issues.append(f"EMAIL_PROVIDER '{current_settings.EMAIL_PROVIDER}' is not supported.")
+
+    if current_settings.PUSH_ENABLED:
+        provider = current_settings.PUSH_PROVIDER.strip().lower()
+        if provider == "webpush":
+            if any(_is_blank(value) for value in [current_settings.VAPID_PRIVATE_KEY, current_settings.VAPID_PUBLIC_KEY]):
+                issues.append("PUSH_PROVIDER=webpush requires VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY.")
+        elif provider == "fcm":
+            has_legacy = not _is_blank(current_settings.FCM_SERVER_KEY)
+            has_v1 = not _is_blank(current_settings.FCM_PROJECT_ID) and (
+                not _is_blank(current_settings.FCM_SERVICE_ACCOUNT_JSON)
+                or not _is_blank(current_settings.FCM_SERVICE_ACCOUNT_FILE)
+            )
+            if not (has_legacy or has_v1):
+                issues.append(
+                    "PUSH_PROVIDER=fcm requires FCM_SERVER_KEY or (FCM_PROJECT_ID + service account credentials)."
+                )
+        elif provider == "onesignal":
+            if any(_is_blank(value) for value in [current_settings.ONESIGNAL_APP_ID, current_settings.ONESIGNAL_API_KEY]):
+                issues.append("PUSH_PROVIDER=onesignal requires ONESIGNAL_APP_ID and ONESIGNAL_API_KEY.")
+        else:
+            issues.append(f"PUSH_PROVIDER '{current_settings.PUSH_PROVIDER}' is not supported.")
+
+    if current_settings.SMS_ENABLED:
+        provider = current_settings.SMS_PROVIDER.strip().lower()
+        if provider == "twilio":
+            if any(_is_blank(value) for value in [current_settings.TWILIO_ACCOUNT_SID, current_settings.TWILIO_AUTH_TOKEN, current_settings.TWILIO_FROM_NUMBER]):
+                issues.append("SMS_PROVIDER=twilio requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER.")
+        elif provider == "vonage":
+            if any(_is_blank(value) for value in [current_settings.VONAGE_API_KEY, current_settings.VONAGE_API_SECRET, current_settings.VONAGE_FROM_NUMBER]):
+                issues.append("SMS_PROVIDER=vonage requires VONAGE_API_KEY, VONAGE_API_SECRET, and VONAGE_FROM_NUMBER.")
+        else:
+            issues.append(f"SMS_PROVIDER '{current_settings.SMS_PROVIDER}' is not supported.")
+
+    if current_settings.ANALYTICS_ENABLED:
+        provider = current_settings.ANALYTICS_PROVIDER.strip().lower()
+        if provider == "posthog" and _is_blank(current_settings.POSTHOG_API_KEY):
+            issues.append("ANALYTICS_PROVIDER=posthog requires POSTHOG_API_KEY.")
+        elif provider == "mixpanel" and _is_blank(current_settings.MIXPANEL_PROJECT_TOKEN):
+            issues.append("ANALYTICS_PROVIDER=mixpanel requires MIXPANEL_PROJECT_TOKEN.")
+        elif provider not in {"posthog", "mixpanel"}:
+            issues.append(f"ANALYTICS_PROVIDER '{current_settings.ANALYTICS_PROVIDER}' is not supported.")
+
+    if current_settings.STRIPE_ENABLED:
+        if _is_weak_secret(current_settings.STRIPE_SECRET_KEY, min_length=16):
+            issues.append("STRIPE_ENABLED=true requires STRIPE_SECRET_KEY.")
+        if _is_weak_secret(current_settings.STRIPE_WEBHOOK_SECRET, min_length=16):
+            issues.append("STRIPE_ENABLED=true requires STRIPE_WEBHOOK_SECRET.")
+
+    if current_settings.PAYPAL_ENABLED:
+        if _is_blank(current_settings.PAYPAL_CLIENT_ID) or _is_blank(current_settings.PAYPAL_CLIENT_SECRET):
+            issues.append("PAYPAL_ENABLED=true requires PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.")
+        if current_settings.PAYPAL_MODE not in {"sandbox", "live"}:
+            issues.append("PAYPAL_MODE must be either 'sandbox' or 'live'.")
+
+    if issues:
+        joined = "\n- ".join(["Startup configuration validation failed:"] + issues)
+        raise RuntimeError(joined)
