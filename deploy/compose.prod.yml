@@ -8,12 +8,12 @@ services:
     depends_on: [web, api]
 
   web:
-    image: ghcr.io/example/restaurant-web:latest
+    image: ghcr.io/restaurant-management-system/restaurant-web:prod
     restart: unless-stopped
     env_file: [../frontend/.env.production]
 
   api:
-    image: ghcr.io/example/restaurant-api:latest
+    image: ghcr.io/restaurant-management-system/restaurant-api:prod
     restart: unless-stopped
     env_file: [../backend/.env.production]
     healthcheck:
@@ -24,14 +24,14 @@ services:
     depends_on: [postgres, redis, minio]
 
   worker:
-    image: ghcr.io/example/restaurant-api:latest
+    image: ghcr.io/restaurant-management-system/restaurant-api:prod
     restart: unless-stopped
     command: uv run celery -A src.apps.core.celery_app worker --loglevel=info
     env_file: [../backend/.env.production]
     depends_on: [api]
 
   scheduler:
-    image: ghcr.io/example/restaurant-api:latest
+    image: ghcr.io/restaurant-management-system/restaurant-api:prod
     restart: unless-stopped
     command: uv run celery -A src.apps.core.celery_app beat --loglevel=info
     env_file: [../backend/.env.production]
