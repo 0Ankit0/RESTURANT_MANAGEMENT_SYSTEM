@@ -8,12 +8,16 @@ Casbin stores the runtime authorization tuples that are used during permission
 checks.
 """
 
+import logging
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from src.apps.iam.models import User, Role, UserRole, Permission, RolePermission
 from src.apps.iam.casbin_enforcer import CasbinEnforcer, GLOBAL_DOMAIN
 from src.apps.multitenancy.models.tenant import Tenant
+
+logger = logging.getLogger(__name__)
 
 
 async def get_user_roles(user_id: int, session: AsyncSession) -> list[Role]:
@@ -132,7 +136,15 @@ async def assign_role_to_user(
         try:
             await CasbinEnforcer.remove_role_for_user(str(user_id), role.name, domain)
         except Exception:
-            pass
+            logger.exception(
+                "rbac.assign_role_to_user.rollback_compensation_failed",
+                extra={
+                    "operation": "assign_role_to_user",
+                    "user_id": user_id,
+                    "role_id": role_id,
+                    "domain": domain,
+                },
+            )
         raise
 
     await session.refresh(user_role)
@@ -171,7 +183,15 @@ async def remove_role_from_user(
         try:
             await CasbinEnforcer.add_role_for_user(str(user_id), role.name, domain)
         except Exception:
-            pass
+            logger.exception(
+                "rbac.remove_role_from_user.rollback_compensation_failed",
+                extra={
+                    "operation": "remove_role_from_user",
+                    "user_id": user_id,
+                    "role_id": role_id,
+                    "domain": domain,
+                },
+            )
         raise
     return True
 
@@ -216,7 +236,15 @@ async def assign_permission_to_role(
         try:
             await CasbinEnforcer.remove_policy(role.name, permission.resource, permission.action, domain)
         except Exception:
-            pass
+            logger.exception(
+                "rbac.assign_permission_to_role.rollback_compensation_failed",
+                extra={
+                    "operation": "assign_permission_to_role",
+                    "role_id": role_id,
+                    "permission_id": permission_id,
+                    "domain": domain,
+                },
+            )
         raise
 
     await session.refresh(role_permission)
@@ -259,7 +287,15 @@ async def remove_permission_from_role(
         try:
             await CasbinEnforcer.add_policy(role.name, permission.resource, permission.action, domain)
         except Exception:
-            pass
+            logger.exception(
+                "rbac.remove_permission_from_role.rollback_compensation_failed",
+                extra={
+                    "operation": "remove_permission_from_role",
+                    "role_id": role_id,
+                    "permission_id": permission_id,
+                    "domain": domain,
+                },
+            )
         raise
     return True
 

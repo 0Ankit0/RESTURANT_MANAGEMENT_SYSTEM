@@ -3,6 +3,7 @@ Tenant (multitenancy) API endpoints — CRUD, member management, invitations.
 """
 import uuid
 from datetime import datetime, timedelta
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +38,7 @@ from src.apps.analytics.events import TenantEvents
 from src.apps.iam.utils.hashid import decode_id_or_404
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _INVITATION_TTL_HOURS = 48
 
@@ -153,7 +155,14 @@ async def create_tenant(
         try:
             await CasbinEnforcer.remove_role_for_user(str(current_user.id), TenantRole.OWNER, tenant.slug)
         except Exception:
-            pass
+            logger.exception(
+                "multitenancy.create_tenant.rollback_compensation_failed",
+                extra={
+                    "operation": "create_tenant",
+                    "tenant_slug": tenant.slug,
+                    "owner_user_id": current_user.id,
+                },
+            )
         raise
 
     await db.refresh(tenant)
@@ -303,7 +312,16 @@ async def delete_tenant(
             try:
                 await CasbinEnforcer.add_role_for_user(str(user_id), role, tenant.slug)
             except Exception:
-                pass
+                logger.exception(
+                    "multitenancy.delete_tenant.rollback_compensation_failed",
+                    extra={
+                        "operation": "delete_tenant",
+                        "tenant_id": tenant_db_id,
+                        "tenant_slug": tenant.slug,
+                        "user_id": user_id,
+                        "role": role,
+                    },
+                )
         raise
 
     await RedisCache.clear_pattern("tenants:list:*")
@@ -392,7 +410,17 @@ async def update_member_role(
             await CasbinEnforcer.remove_role_for_user(str(user_db_id), data.role, tenant.slug)
             await CasbinEnforcer.add_role_for_user(str(user_db_id), previous_role, tenant.slug)
         except Exception:
-            pass
+            logger.exception(
+                "multitenancy.update_member_role.rollback_compensation_failed",
+                extra={
+                    "operation": "update_member_role",
+                    "tenant_id": tenant_db_id,
+                    "tenant_slug": tenant.slug,
+                    "user_id": user_db_id,
+                    "new_role": data.role,
+                    "previous_role": previous_role,
+                },
+            )
         raise
 
     await db.refresh(membership)
@@ -458,7 +486,16 @@ async def remove_member(
         try:
             await CasbinEnforcer.add_role_for_user(str(user_db_id), membership.role, tenant.slug)
         except Exception:
-            pass
+            logger.exception(
+                "multitenancy.remove_member.rollback_compensation_failed",
+                extra={
+                    "operation": "remove_member",
+                    "tenant_id": tenant_db_id,
+                    "tenant_slug": tenant.slug,
+                    "user_id": user_db_id,
+                    "role": membership.role,
+                },
+            )
         raise
 
     await RedisCache.clear_pattern("tenants:list:*")
@@ -625,7 +662,16 @@ async def accept_invitation(
         try:
             await CasbinEnforcer.remove_role_for_user(str(current_user.id), invitation.role, tenant.slug)
         except Exception:
-            pass
+            logger.exception(
+                "multitenancy.accept_invitation.rollback_compensation_failed",
+                extra={
+                    "operation": "accept_invitation",
+                    "tenant_id": invitation.tenant_id,
+                    "tenant_slug": tenant.slug,
+                    "user_id": current_user.id,
+                    "role": invitation.role,
+                },
+            )
         raise
 
     await db.refresh(membership)

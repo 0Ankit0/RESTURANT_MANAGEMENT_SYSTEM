@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime, timezone
+import logging
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlmodel import col, select
@@ -30,6 +31,7 @@ from src.apps.observability.service import (
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login/")
@@ -340,7 +342,15 @@ async def logout(
                     # Invalidate cached token list so revoked tokens are not served from cache
                     await RedisCache.clear_pattern(f"tokens:active:{current_user.id}:*")
             except Exception:
-                pass
+                logger.exception(
+                    "auth.logout.token_revocation_failed",
+                    extra={
+                        "operation": "logout_revoke_tokens_for_ip",
+                        "user_id": current_user.id,
+                        "ip_address": ip_address,
+                        "has_bearer_token": bool(token),
+                    },
+                )
         
         clear_auth_cookies(response)
         await analytics.capture(str(current_user.id), AuthEvents.LOGGED_OUT)
