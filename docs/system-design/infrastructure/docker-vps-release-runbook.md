@@ -52,6 +52,38 @@ uv run alembic upgrade head
 
 If DB revision differs from Alembic head, startup fails fast.
 
+## Production Startup Invariants (Fail-fast)
+
+When `APP_ENV=production`, backend bootstrap performs strict configuration validation and exits before serving traffic if any invariant is violated.
+
+Required invariants:
+
+- Runtime hardening
+  - `DEBUG=false`
+  - `SECRET_KEY` must be non-default and strong (random, minimum 32 chars)
+  - `SECURE_COOKIES=true`
+- Host/proxy trust hardening
+  - `TRUSTED_HOSTS` must be explicitly set (no `*`, no localhost/test hosts)
+  - `PROXY_TRUSTED_HOSTS` must be explicitly set (no `*`)
+  - `FORWARDED_ALLOW_IPS` must be explicitly set (no `*`)
+- Feature toggle prerequisites
+  - `FEATURE_WEBSOCKETS=true` requires `REDIS_URL`
+  - `FEATURE_SOCIAL_AUTH=true` requires `SOCIAL_AUTH_REDIRECT_URL`
+  - Enabled social providers require their client ID/secret:
+    - `GOOGLE_ENABLED=true` => `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+    - `GITHUB_ENABLED=true` => `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+    - `FACEBOOK_ENABLED=true` => `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`
+  - `EMAIL_ENABLED=true` requires valid provider-specific secrets (`smtp`, `resend`, or `ses`)
+  - `PUSH_ENABLED=true` requires valid provider-specific secrets (`webpush`, `fcm`, or `onesignal`)
+  - `SMS_ENABLED=true` requires valid provider-specific secrets (`twilio` or `vonage`)
+  - `ANALYTICS_ENABLED=true` requires provider-specific credentials (`posthog` or `mixpanel`)
+  - `STRIPE_ENABLED=true` requires `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
+  - `PAYPAL_ENABLED=true` requires `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and valid `PAYPAL_MODE`
+
+Operational recommendation:
+
+- Treat these as release gates in CI/CD by validating production env files before deployment.
+
 ## Health and Readiness Checks
 
 - Liveness: `/api/v1/system/health/`
