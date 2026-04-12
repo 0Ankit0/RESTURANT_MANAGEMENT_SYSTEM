@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useUserRoles, useAssignRole, useRemoveRole } from '@/hooks/use-rbac';
+import { useUserRoles, useAssignRole, useRemoveRole, useEffectivePermissions } from '@/hooks/use-rbac';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, Skeleton } from '@/components/ui';
 import { Plus, X } from 'lucide-react';
@@ -11,7 +11,13 @@ export function UserRolesTab() {
   const [userId, setUserId] = useState('');
   const [activeUserId, setActiveUserId] = useState('');
   const [roleId, setRoleId] = useState('');
+  const [organizationSlug, setOrganizationSlug] = useState('');
+  const [branchId, setBranchId] = useState('');
   const { data, isLoading } = useUserRoles(activeUserId);
+  const { data: effectivePermissions, isLoading: effectivePermissionsLoading } = useEffectivePermissions(activeUserId, {
+    organizationSlug: organizationSlug.trim() || undefined,
+    branchId: branchId ? Number(branchId) : undefined,
+  });
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
 
@@ -84,6 +90,40 @@ export function UserRolesTab() {
               >
                 <Plus className="h-3.5 w-3.5 mr-1" /> Assign Role
               </Button>
+            </div>
+            <div className="mt-4 space-y-3 border-t border-gray-100 pt-3">
+              <p className="text-sm font-medium text-gray-700">Effective permissions (tenant / branch scope)</p>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  placeholder="Tenant slug (optional)"
+                  value={organizationSlug}
+                  onChange={(e) => setOrganizationSlug(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Branch ID (optional)"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40"
+                />
+              </div>
+              {effectivePermissionsLoading && <Skeleton className="h-8 w-full" />}
+              {!effectivePermissionsLoading && (
+                <div className="space-y-2">
+                  {(effectivePermissions?.permissions ?? []).map((permission) => (
+                    <div key={`${permission.domain}:${permission.resource}:${permission.action}:${permission.source}`} className="rounded-md border border-gray-200 px-3 py-2 text-xs">
+                      <span className="font-mono">{permission.resource}:{permission.action}</span>
+                      <span className="ml-2 text-gray-500">domain={permission.domain}</span>
+                      <span className="ml-2 text-gray-500">source={permission.source}</span>
+                    </div>
+                  ))}
+                  {(effectivePermissions?.permissions ?? []).length === 0 && (
+                    <p className="text-xs text-gray-400">No effective permissions found in this scope.</p>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

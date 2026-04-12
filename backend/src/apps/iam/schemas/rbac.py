@@ -162,3 +162,37 @@ class CasbinPermissionsResponse(BaseModel):
     @field_serializer("user_id")
     def serialize_user_id(self, value: int) -> str:
         return encode_id(value)
+
+
+class RBACBootstrapRequest(BaseModel):
+    version: str = "v1"
+
+
+class RBACBootstrapResponse(BaseModel):
+    version: str
+    bootstrapped_at: datetime
+    actor_user_id: int
+    applied: bool
+    run_count: int
+    details: dict
+
+    @field_serializer("actor_user_id")
+    def serialize_actor_user_id(self, value: int) -> str:
+        return encode_id(value)
+
+
+class EffectivePermissionItem(BaseModel):
+    domain: str
+    resource: str
+    action: str
+    source: str
+
+
+class EffectivePermissionsResponse(BaseModel):
+    user_id: int
+    domain: str
+    permissions: list[EffectivePermissionItem]
+
+    @field_serializer("user_id")
+    def serialize_user_id(self, value: int) -> str:
+        return encode_id(value)

@@ -35,7 +35,7 @@ async def init_casbin(app: FastAPI):
     pass
 
 
-async def setup_default_roles_and_permissions(session):
+async def setup_default_roles_and_permissions(session) -> dict[str, object]:
     """
     Setup default roles and permissions for the application.
     Call this function after database migrations to initialize the RBAC system.
@@ -64,7 +64,7 @@ async def setup_default_roles_and_permissions(session):
     
     if existing_roles:
         print("Roles already exist. Skipping initialization.")
-        return
+        return {"created": False, "roles": 0, "permissions": 0}
     
     # Create default roles
     admin_role = Role(
@@ -126,3 +126,4 @@ async def setup_default_roles_and_permissions(session):
     print(f"- Admin role ID: {admin_role.id}")
     print(f"- Editor role ID: {editor_role.id}")
     print(f"- Viewer role ID: {viewer_role.id}")
+    return {"created": True, "roles": 3, "permissions": len(permissions)}

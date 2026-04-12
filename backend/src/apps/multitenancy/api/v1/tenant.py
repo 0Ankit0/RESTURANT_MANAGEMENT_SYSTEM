@@ -86,6 +86,13 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+def _role_transition_event(previous_role: TenantRole, next_role: TenantRole) -> str:
+    role_order = {TenantRole.MEMBER: 0, TenantRole.ADMIN: 1, TenantRole.OWNER: 2}
+    if role_order[next_role] > role_order[previous_role]:
+        return TenantEvents.TENANT_RBAC_ROLE_PROMOTED
+    return TenantEvents.TENANT_RBAC_ROLE_DEMOTED
+
+
 async def _require_tenant_role(
     tenant_id: int,
     user: User,
@@ -371,6 +378,7 @@ async def update_member_role(
     data: TenantMemberUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    analytics: AnalyticsService = Depends(get_analytics),
 ):
     """Update a member's role (admin/owner only; only owner can promote to owner)."""
     tenant_db_id = decode_id_or_404(tenant_id)
@@ -493,6 +501,19 @@ async def update_member_role(
 
     await db.refresh(membership)
     await RedisCache.clear_pattern("tenants:list:*")
+    await analytics.capture(
+        str(current_user.id),
+        _role_transition_event(previous_role, data.role),
+        {
+            "tenant_id": tenant_db_id,
+            "tenant_slug": tenant.slug,
+            "actor_user_id": current_user.id,
+            "subject_user_id": user_db_id,
+            "previous_role": previous_role.value,
+            "new_role": data.role.value,
+            "operation": "promote" if previous_role != data.role and previous_role in [TenantRole.MEMBER, TenantRole.ADMIN] and data.role in [TenantRole.ADMIN, TenantRole.OWNER] else "demote",
+        },
+    )
     return membership
 
 
@@ -580,6 +601,18 @@ async def remove_member(
         str(current_user.id),
         TenantEvents.TENANT_MEMBER_REMOVED,
         {"tenant_id": tenant_db_id, "removed_user_id": user_db_id},
+    )
+    await analytics.capture(
+        str(current_user.id),
+        TenantEvents.TENANT_RBAC_ROLE_REMOVED,
+        {
+            "tenant_id": tenant_db_id,
+            "tenant_slug": tenant.slug,
+            "actor_user_id": current_user.id,
+            "subject_user_id": user_db_id,
+            "role": membership.role.value,
+            "operation": "remove",
+        },
     )
 
 
@@ -793,6 +826,18 @@ async def accept_invitation(
         str(current_user.id),
         TenantEvents.TENANT_MEMBER_JOINED,
         {"tenant_id": tenant.id, "tenant_slug": tenant.slug, "role": invitation.role.value},
+    )
+    await analytics.capture(
+        str(current_user.id),
+        TenantEvents.TENANT_RBAC_ROLE_ADDED,
+        {
+            "tenant_id": tenant.id,
+            "tenant_slug": tenant.slug,
+            "actor_user_id": current_user.id,
+            "subject_user_id": current_user.id,
+            "role": invitation.role.value,
+            "operation": "add",
+        },
     )
     return membership
 

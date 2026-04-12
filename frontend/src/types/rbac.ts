@@ -53,3 +53,16 @@ export interface CheckPermissionResponse {
   action: string;
   allowed: boolean;
 }
+
+export interface EffectivePermissionItem {
+  domain: string;
+  resource: string;
+  action: string;
+  source: 'direct' | 'inherited';
+}
+
+export interface EffectivePermissionsResponse {
+  user_id: string;
+  domain: string;
+  permissions: EffectivePermissionItem[];
+}

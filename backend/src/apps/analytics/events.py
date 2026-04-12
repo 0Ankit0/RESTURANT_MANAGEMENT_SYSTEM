@@ -32,6 +32,10 @@ class TenantEvents:
     TENANT_MEMBER_INVITED = "tenant_member_invited"
     TENANT_MEMBER_JOINED = "tenant_member_joined"
     TENANT_MEMBER_REMOVED = "tenant_member_removed"
+    TENANT_RBAC_ROLE_ADDED = "tenant_rbac_role_added"
+    TENANT_RBAC_ROLE_REMOVED = "tenant_rbac_role_removed"
+    TENANT_RBAC_ROLE_PROMOTED = "tenant_rbac_role_promoted"
+    TENANT_RBAC_ROLE_DEMOTED = "tenant_rbac_role_demoted"
 
 
 class ApiEvents:
