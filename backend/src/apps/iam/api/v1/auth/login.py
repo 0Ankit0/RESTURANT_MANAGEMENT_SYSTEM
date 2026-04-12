@@ -19,7 +19,7 @@ from src.apps.iam.models.token_tracking import TokenTracking
 from src.apps.iam.schemas.token import Token
 from src.apps.iam.schemas.user import LoginRequest
 
-from src.apps.iam.utils.ip_access import revoke_tokens_for_ip, get_client_ip
+from src.apps.iam.utils.ip_access import revoke_tokens_for_ip, get_client_ip, revoke_active_tokens
 from src.apps.analytics.dependencies import get_analytics
 from src.apps.analytics.service import AnalyticsService
 from src.apps.analytics.events import AuthEvents
@@ -250,6 +250,13 @@ async def login_access_token(
                 value=access_token,
                 **auth_cookie_options(max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
             )
+            response.set_cookie(
+                key=settings.REFRESH_TOKEN_COOKIE,
+                value=refresh_token,
+                **auth_cookie_options(
+                    max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+                ),
+            )
             return {"message": "Logged in successfully"}
         
         return Token(
@@ -260,6 +267,15 @@ async def login_access_token(
     except HTTPException:
         raise
     except Exception as ex:
+        logger.exception(
+            "auth.login.unhandled_error",
+            extra={
+                "operation": "password_login",
+                "username": login_data.username,
+                "ip_address": ip_address,
+                "user_id": user.id if user else None,
+            },
+        )
         login_attempt = LoginAttempt(
             user_id=user.id if user else None,
             ip_address=ip_address,
@@ -297,65 +313,36 @@ async def logout(
     Logout user by clearing cookies and revoking current session token only
     """
     try:
-        # Get the current token
-        auth_header = request.headers.get("Authorization")
-        token = None
-        
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-        else:
-            token = request.cookies.get(settings.ACCESS_TOKEN_COOKIE)
-        
-        if token:
-            # Decode to get JTI
-            try:
-                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[security.ALGORITHM])
-                jti = payload.get("jti")
-                ip_address = get_client_ip(request)
-                
-                if jti:
-                    # Revoke only tokens from current IP/device
-                    result = await db.execute(
-                        select(TokenTracking).where(
-                            TokenTracking.user_id == current_user.id,
-                            TokenTracking.ip_address == ip_address,
-                            TokenTracking.is_active
-                        )
-                    )
-                    tokens = result.scalars().all()
-                    
-                    for token_tracking in tokens:
-                        token_tracking.is_active = False
-                        token_tracking.revoked_at = datetime.now(timezone.utc)
-                        token_tracking.revoke_reason = "User logout from this device"
-                    
-                    await db.commit()
-                    await record_token_event(
-                        db,
-                        user_id=current_user.id,
-                        ip_address=ip_address,
-                        action="revoked",
-                        request=request,
-                        metadata={"reason": "logout", "count": len(tokens)},
-                    )
-                    await db.commit()
-                    # Invalidate cached token list so revoked tokens are not served from cache
-                    await RedisCache.clear_pattern(f"tokens:active:{current_user.id}:*")
-            except Exception:
-                logger.exception(
-                    "auth.logout.token_revocation_failed",
-                    extra={
-                        "operation": "logout_revoke_tokens_for_ip",
-                        "user_id": current_user.id,
-                        "ip_address": ip_address,
-                        "has_bearer_token": bool(token),
-                    },
-                )
-        
+        ip_address = get_client_ip(request)
+        revoked_count = await revoke_active_tokens(
+            db=db,
+            user_id=current_user.id,
+            ip_address=ip_address,
+            reason="User logout from this device",
+        )
+        await db.commit()
+        await record_token_event(
+            db,
+            user_id=current_user.id,
+            ip_address=ip_address,
+            action="revoked",
+            request=request,
+            metadata={"reason": "logout", "count": revoked_count},
+        )
+        await db.commit()
+        await RedisCache.clear_pattern(f"tokens:active:{current_user.id}:*")
+
         clear_auth_cookies(response)
         await analytics.capture(str(current_user.id), AuthEvents.LOGGED_OUT)
         return {"message": "Successfully logged out from this device"}
     except Exception:
+        logger.exception(
+            "auth.logout.failed",
+            extra={
+                "operation": "logout",
+                "user_id": current_user.id,
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during logout"

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -39,6 +40,7 @@ interface LoginFormProps {
 export function LoginForm({ enabledProviders }: LoginFormProps) {
   const router = useRouter();
   const { loginAsync, isLoading, loginError } = useAuth();
+  const { authMessage, clearAuthMessage } = useAuthStore();
 
   const {
     register,
@@ -50,6 +52,7 @@ export function LoginForm({ enabledProviders }: LoginFormProps) {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
+      clearAuthMessage();
       const result = await loginAsync(data);
       if (result && 'requires_otp' in result) {
         const otpResult = result as OTPLoginResponse;
@@ -63,9 +66,15 @@ export function LoginForm({ enabledProviders }: LoginFormProps) {
   };
 
   const getErrorMessage = () => {
+    if (authMessage) return authMessage;
     if (!loginError) return null;
     const err = loginError as { response?: { data?: { detail?: string } } };
-    return err?.response?.data?.detail || 'Invalid username or password. Please try again.';
+    const detail = err?.response?.data?.detail;
+    if (!detail) return 'Invalid username or password. Please try again.';
+    if (detail.includes('Too many login attempts')) {
+      return `Account locked: ${detail}`;
+    }
+    return detail;
   };
 
   return (
@@ -76,7 +85,7 @@ export function LoginForm({ enabledProviders }: LoginFormProps) {
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
-          {loginError && (
+          {(loginError || authMessage) && (
             <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
               {getErrorMessage()}
             </div>

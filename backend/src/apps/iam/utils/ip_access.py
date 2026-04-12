@@ -1,5 +1,6 @@
 """Request and token utility helpers."""
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Iterable
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import and_, update
@@ -22,13 +23,35 @@ async def revoke_tokens_for_ip(
     user_id: int,
     ip_address: str,
     reason: str = "New token issued for same IP",
-) -> None:
-    await db.execute(
-        update(TokenTracking)
-        .where(and_(
-            TokenTracking.user_id == user_id,
-            TokenTracking.ip_address == ip_address,
-            TokenTracking.is_active == True,
-        ))
-        .values(is_active=False, revoked_at=datetime.now(), revoke_reason=reason)
+) -> int:
+    return await revoke_active_tokens(
+        db=db,
+        user_id=user_id,
+        reason=reason,
+        ip_address=ip_address,
     )
+
+
+async def revoke_active_tokens(
+    db: AsyncSession,
+    user_id: int,
+    reason: str,
+    ip_address: str | None = None,
+    exclude_jtis: Iterable[str] | None = None,
+) -> int:
+    filters = [TokenTracking.user_id == user_id, TokenTracking.is_active == True]
+    if ip_address:
+        filters.append(TokenTracking.ip_address == ip_address)
+    if exclude_jtis:
+        filters.append(TokenTracking.token_jti.notin_(list(exclude_jtis)))
+
+    result = await db.execute(
+        update(TokenTracking)
+        .where(and_(*filters))
+        .values(
+            is_active=False,
+            revoked_at=datetime.now(timezone.utc),
+            revoke_reason=reason,
+        )
+    )
+    return int(result.rowcount or 0)

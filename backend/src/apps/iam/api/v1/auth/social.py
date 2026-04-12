@@ -201,7 +201,17 @@ async def social_callback(
             detail=f"Could not retrieve email from {provider}. Please grant email permission and try again.",
         )
 
-    user = await find_or_create_social_user(db, provider, social_id, email, display_name)
+    try:
+        user = await find_or_create_social_user(db, provider, social_id, email, display_name)
+    except Exception:
+        logger.exception(
+            "auth.social.user_upsert_failed",
+            extra={"operation": "find_or_create_social_user", "provider": provider, "email": email},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process social login",
+        )
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This account has been deactivated.")
@@ -219,7 +229,12 @@ async def social_callback(
     refresh_payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[security.ALGORITHM])
 
     # Revoke any existing active tokens for this user+IP before issuing new ones
-    await revoke_tokens_for_ip(db, user.id, ip_address)
+    await revoke_tokens_for_ip(
+        db,
+        user.id,
+        ip_address,
+        reason="New login from same IP/device",
+    )
 
     db.add(TokenTracking(
         user_id=user.id,
@@ -271,6 +286,11 @@ async def social_callback(
             key=settings.ACCESS_TOKEN_COOKIE,
             value=access_token,
             **auth_cookie_options(max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
+        )
+        redirect_resp.set_cookie(
+            key=settings.REFRESH_TOKEN_COOKIE,
+            value=refresh_token,
+            **auth_cookie_options(max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60),
         )
         return redirect_resp
 
