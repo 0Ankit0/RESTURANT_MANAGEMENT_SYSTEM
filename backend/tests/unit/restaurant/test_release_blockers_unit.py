@@ -38,7 +38,7 @@ def test_recipe_depletion_guard_via_inventory_delta():
 
 
 def test_procurement_reconciliation_statuses():
-    assert po_status(lines_fully_received=0, total_lines=3) == "open"
+    assert po_status(lines_fully_received=0, total_lines=3) == "in_transit"
     assert po_status(lines_fully_received=2, total_lines=3) == "partial"
     assert po_status(lines_fully_received=3, total_lines=3) == "received"
 

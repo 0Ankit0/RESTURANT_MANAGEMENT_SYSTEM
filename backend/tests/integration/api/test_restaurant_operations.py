@@ -837,3 +837,90 @@ async def test_lifecycle_idempotency_and_operational_events(client):
     assert 'order.opened' in event_names
     assert 'settlement.completed' in event_names
     assert 'branch.day_closed' in event_names
+
+
+@pytest.mark.asyncio
+async def test_release_workflow_gate_scenarios(client):
+    branch = (await client.post('/api/v1/branches', json={'name': 'GateFlow', 'tax_rate': 0.1, 'service_charge_rate': 0.05})).json()
+    table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={'code': 'G1', 'seats': 4})).json()
+    menu = (await client.post(f"/api/v1/branches/{branch['id']}/menu-items", json={'name': 'Ramen', 'price': 15})).json()
+
+    reservation = (
+        await client.post(
+            '/api/v1/reservations',
+            json={
+                'branch_id': branch['id'],
+                'guest_name': 'Gate Guest',
+                'guest_phone': '+1555444000',
+                'party_size': 2,
+                'reservation_time': '2026-04-10T18:30:00Z',
+            },
+        )
+    ).json()
+    seated = await client.post(f"/api/v1/tables/{table['id']}/seat", json={'reservation_id': reservation['id'], 'party_size': 2})
+    assert seated.status_code == 200
+
+    order = (
+        await client.post(
+            '/api/v1/orders',
+            json={
+                'branch_id': branch['id'],
+                'order_source': 'dine_in',
+                'table_id': table['id'],
+                'waiter_id': 12,
+                'items': [{'menu_item_id': menu['id'], 'quantity': 1, 'course_no': 1}],
+            },
+        )
+    ).json()
+
+    kitchen = await client.get('/api/v1/kitchen/tickets')
+    assert kitchen.status_code == 200
+    ticket_id = kitchen.json()['items'][0]['id']
+    assert (await client.patch(f'/api/v1/kitchen/tickets/{ticket_id}', json={'status': 'in_preparation'})).status_code == 200
+
+    bill_id = order['bill']['id']
+    settlement = await client.post(
+        f'/api/v1/bills/{bill_id}/settlements',
+        json={'cashier_id': 7, 'settlements': [{'payment_method': 'cash', 'amount': order['bill']['total_amount']}]},
+    )
+    assert settlement.status_code == 200
+    assert settlement.json()['status'] == 'paid'
+
+    export = (
+        await client.post(
+            '/api/v1/accounting-exports',
+            json={'branch_id': branch['id'], 'business_date': '2026-04-10T00:00:00Z'},
+            headers={'Idempotency-Key': 'gate-export-1'},
+        )
+    ).json()
+    retry = await client.post(
+        f"/api/v1/accounting-exports/{export['id']}/retry",
+        json={'requested_by': 1, 'reason': 'network recovery run'},
+    )
+    assert retry.status_code == 201
+
+    drawer = (
+        await client.post(
+            f"/api/v1/branches/{branch['id']}/drawer-sessions",
+            json={'cashier_id': 7, 'opening_balance': 100},
+        )
+    ).json()
+    day_close = (
+        await client.post(
+            '/api/v1/day-close',
+            json={'branch_id': branch['id'], 'business_date': '2026-04-10T00:00:00Z', 'notes': 'gate validation'},
+        )
+    ).json()
+
+    blocked_finalize = await client.patch(f"/api/v1/day-close/{day_close['id']}/finalize", json={'closed_by': 1})
+    assert blocked_finalize.status_code == 409
+
+    blockers = await client.get(f"/api/v1/day-close/{day_close['id']}/blockers")
+    assert blockers.status_code == 200
+    assert any(item.startswith('open_drawers=') for item in blockers.json()['blockers'])
+
+    closed = await client.post(
+        f"/api/v1/drawer-sessions/{drawer['id']}/close",
+        json={'closing_balance': 100},
+    )
+    assert closed.status_code == 200
