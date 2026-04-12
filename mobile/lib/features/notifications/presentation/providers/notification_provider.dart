@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/dio_provider.dart';
+import '../../../../core/realtime/push_realtime_bridge.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/notification_list.dart';
 import '../../data/models/notification_device.dart';
@@ -54,4 +55,18 @@ final pushConfigProvider = FutureProvider<PushConfig>((ref) {
       onesignal: PushProviderConfig(enabled: false),
     );
   });
+});
+
+
+final notificationRealtimeBridgeProvider = Provider<void>((ref) {
+  final sub = PushRealtimeBridge.stream.listen((event) {
+    if (event.channel != PushRealtimeChannel.notifications) {
+      return;
+    }
+    ref.invalidate(unreadCountProvider);
+    ref.invalidate(notificationsProvider((unreadOnly: false)));
+    ref.invalidate(notificationsProvider((unreadOnly: true)));
+  });
+
+  ref.onDispose(sub.cancel);
 });

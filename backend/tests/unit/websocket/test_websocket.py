@@ -217,6 +217,45 @@ class TestConnectionManager:
         await mgr.disconnect(ws, 5)
         assert "room-cleanup" not in mgr.rooms_stats
 
+
+
+    @pytest.mark.unit
+    async def test_receive_and_decrypt_invalid_frame_closes_socket(self):
+        mgr = ConnectionManager()
+        ws = self._make_ws()
+        ws.receive_text = AsyncMock(return_value='{"type":"ping"}')
+        ws.close = AsyncMock()
+        key = self._make_key()
+        await mgr.connect(ws, user_id=1, session_key=key)
+
+        with pytest.raises(Exception):
+            await mgr.receive_and_decrypt(ws, user_id=1)
+
+        ws.close.assert_called_once_with(code=4003)
+
+    @pytest.mark.unit
+    async def test_push_event_to_room_fanout(self):
+        mgr = ConnectionManager()
+        ws1 = self._make_ws()
+        ws2 = self._make_ws()
+        k1 = derive_session_key("jti-room-1")
+        k2 = derive_session_key("jti-room-2")
+        await mgr.connect(ws1, 11, k1)
+        await mgr.connect(ws2, 22, k2)
+        await mgr.join_room(11, "branch:1:ops")
+        await mgr.join_room(22, "branch:1:ops")
+        ws1.send_text.reset_mock()
+        ws2.send_text.reset_mock()
+
+        await mgr.push_event_to_room("branch:1:ops", "restaurant.kitchen.status_updated", {"ticket_id": 3})
+
+        for ws, key in ((ws1, k1), (ws2, k2)):
+            frame = WSEncryptedFrame.model_validate_json(ws.send_text.call_args[0][0])
+            inner = json.loads(decrypt(frame.iv, frame.data, key))
+            assert inner["type"] == "event"
+            assert inner["event"] == "restaurant.kitchen.status_updated"
+
+
     @pytest.mark.unit
     async def test_push_event_helper(self):
         mgr = ConnectionManager()
@@ -411,6 +450,31 @@ class TestWSHandshakeAndMessages:
                 continue
 
         assert len(pong_frames) == 1
+
+
+
+    @pytest.mark.unit
+    async def test_join_and_leave_room_acknowledged(self, db_session: AsyncSession):
+        _user, token, jti = await self._setup_user_and_token(db_session)
+        join_frame = self._make_encrypted_frame(jti, {"type": "join_room", "id": "1", "room": "branch:5:ops"})
+        leave_frame = self._make_encrypted_frame(jti, {"type": "leave_room", "id": "2", "room": "branch:5:ops"})
+        ws = self._make_mock_ws(token, [join_frame, leave_frame])
+
+        from src.apps.websocket.api.v1.ws import _handle_connection
+        await _handle_connection(ws, db_session, initial_room=None)
+
+        key = derive_session_key(jti)
+        decrypted = []
+        for raw in [c[0][0] for c in ws.send_text.call_args_list[1:]]:
+            try:
+                frame = WSEncryptedFrame.model_validate_json(raw)
+                decrypted.append(json.loads(decrypt(frame.iv, frame.data, key)))
+            except Exception:
+                continue
+
+        assert any(m.get("type") == "ack" and m.get("ref") == "1" for m in decrypted)
+        assert any(m.get("type") == "ack" and m.get("ref") == "2" for m in decrypted)
+
 
     @pytest.mark.unit
     async def test_invalid_token_closes_with_4001(self, db_session: AsyncSession):

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/services/push_registration_service.dart';
 import '../providers/notification_provider.dart';
+import '../../../restaurant/presentation/providers/restaurant_provider.dart';
 
 class NotificationBootstrapper extends ConsumerStatefulWidget {
   const NotificationBootstrapper({
@@ -57,6 +58,8 @@ class _NotificationBootstrapperState
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
+    ref.watch(notificationRealtimeBridgeProvider);
+    ref.watch(restaurantRealtimeBridgeProvider);
     final prefs = ref.watch(notificationPrefsProvider);
     final pushConfig = ref.watch(pushConfigProvider);
     ref.watch(notificationDevicesProvider);

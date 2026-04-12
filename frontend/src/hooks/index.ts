@@ -89,6 +89,7 @@ export {
   useWebSocket,
   useNotificationWebSocket,
   useTenantWebSocket,
+  useRestaurantOpsWebSocket,
   useWSStats,
   useWSIsOnline,
 } from './use-websocket';

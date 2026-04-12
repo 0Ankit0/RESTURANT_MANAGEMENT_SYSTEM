@@ -80,6 +80,9 @@ from src.apps.restaurant.models import (
     WaitlistEntry,
     WaitlistStatus,
 )
+from src.apps.websocket.manager import manager as ws_manager
+from src.apps.websocket.schemas.messages import WSRestaurantEvent
+
 from src.apps.restaurant.schemas.operations import (
     AccountingExportRetryCreate,
     AccountingExportRetryCursorPage,
@@ -305,6 +308,36 @@ async def _emit_operational_event(
         flush=False,
     )
 
+
+    websocket_event = f"restaurant.{event_name}"
+    await _emit_ws_operational_event(
+        branch_id=branch_id,
+        event_name=websocket_event,
+        severity=severity,
+        payload=payload,
+    )
+
+
+
+
+def _ops_room(branch_id: int) -> str:
+    return f"branch:{branch_id}:ops"
+
+
+async def _emit_ws_operational_event(*, branch_id: int, event_name: str, severity: OperationalSeverity, payload: dict | None) -> None:
+    try:
+        await ws_manager.push_event_to_room(
+            room=_ops_room(branch_id),
+            event=event_name,
+            data={
+                "branch_id": branch_id,
+                "severity": severity.value if hasattr(severity, "value") else str(severity),
+                "payload": payload or {},
+            },
+        )
+    except Exception:
+        # WS delivery must never block transactional domain flows.
+        pass
 
 def _event_payload(*, stage: str, action: str, resource_id: int | None = None, status: str | None = None, **extra: object) -> dict:
     payload: dict[str, object] = {"stage": stage, "action": action}
@@ -1205,9 +1238,22 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, requ
             pass_seconds=elapsed_seconds,
         )
     )
+    order_item = await db.get(OrderItem, ticket.order_item_id)
+    order = await db.get(Order, order_item.order_id) if order_item else None
+    if order:
+        await _emit_ws_operational_event(
+            branch_id=order.branch_id,
+            event_name=WSRestaurantEvent.KITCHEN_STATUS_UPDATED.value,
+            severity=OperationalSeverity.INFO,
+            payload={
+                "ticket_id": ticket.id,
+                "from_status": str(previous_status),
+                "to_status": str(payload.status),
+                "updated_by": payload.updated_by,
+            },
+        )
+
     if payload.status == KitchenTicketStatus.READY:
-        order_item = await db.get(OrderItem, ticket.order_item_id)
-        order = await db.get(Order, order_item.order_id) if order_item else None
         if order:
             await _emit_operational_event(
                 db=db,
@@ -1767,6 +1813,17 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
                 status=str(bill.status),
                 paid_amount=bill.paid_amount,
             ),
+        )
+        await _emit_ws_operational_event(
+            branch_id=order.branch_id,
+            event_name=WSRestaurantEvent.SETTLEMENT_STATUS_CHANGED.value,
+            severity=OperationalSeverity.INFO,
+            payload={
+                "bill_id": bill.id,
+                "status": str(bill.status),
+                "paid_amount": bill.paid_amount,
+                "total_amount": bill.total_amount,
+            },
         )
         if bill.status == BillStatus.PAID:
             await _emit_operational_event(
@@ -2332,6 +2389,12 @@ async def create_accounting_export(payload: AccountingExportCreate, request: Req
         event_name="accounting.export_generated",
         payload={"business_date": payload.business_date.isoformat()},
     )
+    await _emit_ws_operational_event(
+        branch_id=payload.branch_id,
+        event_name=WSRestaurantEvent.EXPORT_STATUS_CHANGED.value,
+        severity=OperationalSeverity.INFO,
+        payload={"business_date": payload.business_date.isoformat(), "status": AccountingExportStatus.GENERATED.value},
+    )
     await db.commit()
     await db.refresh(export)
     payload_out = export.model_dump()
@@ -2375,6 +2438,12 @@ async def retry_accounting_export(export_id: int, payload: AccountingExportRetry
     db.add(export)
     await db.commit()
     await db.refresh(retry)
+    await _emit_ws_operational_event(
+        branch_id=export.branch_id,
+        event_name=WSRestaurantEvent.EXPORT_STATUS_CHANGED.value,
+        severity=OperationalSeverity.INFO,
+        payload={"export_id": export.id, "retry_id": retry.id, "status": export.status.value},
+    )
     return retry
 
 
