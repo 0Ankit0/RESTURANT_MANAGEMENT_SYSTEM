@@ -8,12 +8,14 @@ import {
   useCreateRole,
   useCreatePermission,
 } from '@/hooks/use-rbac';
+import { useSecurityIncidents } from '@/hooks/use-observability';
+import { UserRolesTab } from './user-roles-tab';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui';
-import { ShieldCheck, Key, Plus, Settings2 } from 'lucide-react';
+import { ShieldCheck, Key, Plus, Settings2, Users, ClipboardList } from 'lucide-react';
 import type { Role } from '@/types';
 
-type Tab = 'roles' | 'permissions';
+type Tab = 'roles' | 'permissions' | 'assignments' | 'audit';
 
 // ── Role row ─────────────────────────────────────────────────────────────────
 function RoleRow({ role }: { role: Role }) {
@@ -48,6 +50,7 @@ export default function RBACPage() {
   const permissionsQuery = usePermissions();
   const createRole = useCreateRole();
   const createPermission = useCreatePermission();
+  const roleAudit = useSecurityIncidents({ signal_type: 'admin.role_change', limit: 20 });
 
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [roleName, setRoleName] = useState('');
@@ -77,6 +80,8 @@ export default function RBACPage() {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'roles', label: 'Roles', icon: <ShieldCheck className="h-4 w-4" /> },
     { id: 'permissions', label: 'Permissions', icon: <Key className="h-4 w-4" /> },
+    { id: 'assignments', label: 'Assignments', icon: <Users className="h-4 w-4" /> },
+    { id: 'audit', label: 'Audit', icon: <ClipboardList className="h-4 w-4" /> },
   ];
 
   return (
@@ -241,6 +246,49 @@ export default function RBACPage() {
                 ))}
                 {!permissionsQuery.isLoading && permissionsQuery.data?.items.length === 0 && (
                   <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500">No permissions found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'assignments' && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">User Role Assignment</h2>
+          <p className="text-sm text-gray-500">Assign and revoke global roles by user hashid.</p>
+          <UserRolesTab />
+        </div>
+      )}
+
+      {activeTab === 'audit' && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">RBAC Audit Trail</h2>
+          <p className="text-sm text-gray-500">Recent admin RBAC changes captured by observability.</p>
+          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Summary</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Seen</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {roleAudit.isLoading && (
+                  <tr><td colSpan={3} className="px-4 py-4 text-center text-gray-500">Loading…</td></tr>
+                )}
+                {(roleAudit.data?.items ?? []).map((incident) => (
+                  <tr key={incident.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm capitalize">{incident.status}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{incident.summary}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {new Date(incident.last_seen_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+                {!roleAudit.isLoading && roleAudit.data?.items.length === 0 && (
+                  <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500">No RBAC audit incidents found.</td></tr>
                 )}
               </tbody>
             </table>

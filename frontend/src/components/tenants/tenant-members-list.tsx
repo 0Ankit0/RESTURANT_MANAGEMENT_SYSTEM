@@ -1,6 +1,6 @@
 'use client';
 
-import { useTenantMembers } from '@/hooks/use-tenants';
+import { useTenantMembers, useUpdateMemberRole, useRemoveMember } from '@/hooks/use-tenants';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, Crown, Shield, User, MoreVertical } from 'lucide-react';
@@ -25,6 +25,8 @@ const roleColors: Record<TenantRole, string> = {
 
 export function TenantMembersList({ tenantId, onInvite }: TenantMembersListProps) {
   const { data, isLoading } = useTenantMembers(tenantId);
+  const updateRole = useUpdateMemberRole();
+  const removeMember = useRemoveMember();
   const members = data?.items ?? [];
 
   if (isLoading) {
@@ -90,9 +92,30 @@ export function TenantMembersList({ tenantId, onInvite }: TenantMembersListProps
                       </span>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={member.role}
+                      onChange={(event) =>
+                        updateRole.mutate({
+                          tenantId,
+                          userId: member.user_id,
+                          role: event.target.value as TenantRole,
+                        })
+                      }
+                      className="rounded border border-gray-200 px-2 py-1 text-xs"
+                    >
+                      <option value="owner">owner</option>
+                      <option value="admin">admin</option>
+                      <option value="member">member</option>
+                    </select>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeMember.mutate({ tenantId, userId: member.user_id })}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               );
             })}
