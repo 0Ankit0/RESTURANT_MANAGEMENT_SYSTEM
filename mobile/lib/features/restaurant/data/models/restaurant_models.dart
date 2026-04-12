@@ -72,6 +72,130 @@ class RestaurantWaitlistItem {
   }
 }
 
+class KitchenTicketItem {
+  final int id;
+  final String station;
+  final String status;
+  final int priority;
+  final DateTime? updatedAt;
+
+  KitchenTicketItem({
+    required this.id,
+    required this.station,
+    required this.status,
+    required this.priority,
+    required this.updatedAt,
+  });
+
+  factory KitchenTicketItem.fromJson(Map<String, dynamic> json) {
+    return KitchenTicketItem(
+      id: json['id'] as int,
+      station: json['station'] as String? ?? 'line',
+      status: json['status'] as String? ?? 'queued',
+      priority: json['priority'] as int? ?? 0,
+      updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? ''),
+    );
+  }
+}
+
+class StockAlertItem {
+  final int id;
+  final int? branchId;
+  final String itemName;
+  final String severity;
+  final int availableUnits;
+
+  StockAlertItem({
+    required this.id,
+    required this.branchId,
+    required this.itemName,
+    required this.severity,
+    required this.availableUnits,
+  });
+
+  factory StockAlertItem.fromJson(Map<String, dynamic> json) {
+    return StockAlertItem(
+      id: json['id'] as int,
+      branchId: json['branch_id'] as int?,
+      itemName: json['item_name'] as String? ?? 'Inventory Item',
+      severity: json['severity'] as String? ?? 'warning',
+      availableUnits: json['available_units'] as int? ?? 0,
+    );
+  }
+}
+
+class SettlementHealth {
+  final int openDrawers;
+  final int unpaidBills;
+  final int failedExports;
+
+  SettlementHealth({
+    required this.openDrawers,
+    required this.unpaidBills,
+    required this.failedExports,
+  });
+
+  factory SettlementHealth.fromJson(Map<String, dynamic> json) {
+    return SettlementHealth(
+      openDrawers: json['open_drawers'] as int? ?? 0,
+      unpaidBills: json['unpaid_bills'] as int? ?? 0,
+      failedExports: json['failed_exports'] as int? ?? 0,
+    );
+  }
+
+  static SettlementHealth empty() =>
+      SettlementHealth(openDrawers: 0, unpaidBills: 0, failedExports: 0);
+}
+
+class RestaurantBillItem {
+  final int id;
+  final double totalAmount;
+  final double paidAmount;
+  final String status;
+
+  RestaurantBillItem({
+    required this.id,
+    required this.totalAmount,
+    required this.paidAmount,
+    required this.status,
+  });
+
+  factory RestaurantBillItem.fromJson(Map<String, dynamic> json) {
+    return RestaurantBillItem(
+      id: json['id'] as int,
+      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+      paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
+      status: json['status'] as String? ?? 'open',
+    );
+  }
+}
+
+class OperationalNotificationItem {
+  final int id;
+  final int branchId;
+  final String eventName;
+  final String severity;
+  final DateTime? occurredAt;
+
+  OperationalNotificationItem({
+    required this.id,
+    required this.branchId,
+    required this.eventName,
+    required this.severity,
+    required this.occurredAt,
+  });
+
+  factory OperationalNotificationItem.fromJson(Map<String, dynamic> json) {
+    return OperationalNotificationItem(
+      id: json['id'] as int,
+      branchId: json['branch_id'] as int? ?? 0,
+      eventName: json['event_name'] as String? ?? 'Operational event',
+      severity: json['severity'] as String? ?? 'info',
+      occurredAt: DateTime.tryParse(json['occurred_at'] as String? ?? ''),
+    );
+  }
+}
+
 class CursorPage<T> {
   final List<T> items;
   final int? nextCursor;
@@ -86,6 +210,7 @@ class BranchOperationsReport {
   final double grossSales;
   final double collectedSales;
   final int lowStockCount;
+  final SettlementHealth settlementHealth;
 
   BranchOperationsReport({
     required this.branchId,
@@ -94,6 +219,7 @@ class BranchOperationsReport {
     required this.grossSales,
     required this.collectedSales,
     required this.lowStockCount,
+    required this.settlementHealth,
   });
 
   factory BranchOperationsReport.fromJson(Map<String, dynamic> json) {
@@ -104,6 +230,9 @@ class BranchOperationsReport {
       grossSales: (json['gross_sales'] as num?)?.toDouble() ?? 0,
       collectedSales: (json['collected_sales'] as num?)?.toDouble() ?? 0,
       lowStockCount: json['low_stock_count'] as int? ?? 0,
+      settlementHealth: SettlementHealth.fromJson(
+        json['settlement_health'] as Map<String, dynamic>? ?? const {},
+      ),
     );
   }
 }
