@@ -12,6 +12,7 @@ import type {
   UserRolesResponse,
   RolePermissionsResponse,
   CheckPermissionResponse,
+  EffectivePermissionsResponse,
   PaginatedResponse,
 } from '@/types';
 
@@ -228,6 +229,33 @@ export function useCasbinPermissions(userId: string, scope?: AuthorizationScopeO
           },
         }
       );
+      return response.data;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useEffectivePermissions(
+  userId: string,
+  scope?: AuthorizationScopeOptions & { branchId?: number; includeGlobal?: boolean }
+) {
+  const resolvedScope = {
+    organizationId: scope?.organizationId,
+    organizationSlug: scope?.organizationSlug,
+    branchId: scope?.branchId,
+    includeGlobal: scope?.includeGlobal ?? true,
+  };
+  return useQuery({
+    queryKey: ['rbac', 'effective-permissions', userId, resolvedScope],
+    queryFn: async () => {
+      const response = await apiClient.get<EffectivePermissionsResponse>(`/effective-permissions/${userId}`, {
+        params: {
+          organization_id: resolvedScope.organizationId,
+          organization_slug: resolvedScope.organizationSlug,
+          branch_id: resolvedScope.branchId,
+          include_global: resolvedScope.includeGlobal,
+        },
+      });
       return response.data;
     },
     enabled: !!userId,

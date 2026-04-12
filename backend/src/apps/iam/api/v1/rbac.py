@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, func, col
 from src.db.session import get_session
 from src.apps.iam.models import Role, Permission, User
+from src.apps.iam.models.casbin_rule import CasbinRule
 from src.apps.iam.api.deps import get_current_active_superuser
 from src.apps.iam.schemas.rbac import (
     RoleCreate,
@@ -21,6 +22,10 @@ from src.apps.iam.schemas.rbac import (
     RoleAssignmentResponse,
     CasbinRolesResponse,
     CasbinPermissionsResponse,
+    RBACBootstrapRequest,
+    RBACBootstrapResponse,
+    EffectivePermissionsResponse,
+    EffectivePermissionItem,
 )
 from src.apps.iam.utils.rbac import (
     assign_role_to_user,
@@ -33,6 +38,7 @@ from src.apps.iam.utils.rbac import (
     resolve_authorization_domain,
 )
 from src.apps.iam.casbin_enforcer import CasbinEnforcer, GLOBAL_DOMAIN
+from src.apps.iam.services.rbac_bootstrap import bootstrap_rbac_defaults
 from src.apps.iam.utils.hashid import decode_id_or_404
 from src.apps.core.schemas import PaginatedResponse
 from src.apps.core.cache import RedisCache
@@ -80,6 +86,33 @@ async def _invalidate_role_authorization_cache(role_id: int) -> None:
     await RedisCache.clear_pattern(f"role:{role_id}:permissions*")
     await RedisCache.clear_pattern("casbin:permissions:*")
     await RedisCache.clear_pattern("permission:check:*")
+
+
+@router.post("/bootstrap", response_model=RBACBootstrapResponse, status_code=status.HTTP_200_OK)
+async def bootstrap_default_rbac(
+    payload: RBACBootstrapRequest,
+    current_user: User = Depends(get_current_active_superuser),
+    session: AsyncSession = Depends(get_session),
+):
+    state = await bootstrap_rbac_defaults(
+        session,
+        actor_user_id=current_user.id,
+        version=payload.version,
+    )
+    await record_admin_role_change(
+        session,
+        actor_user_id=current_user.id,
+        subject_user_id=current_user.id,
+        action="bootstrap_rbac_defaults",
+        metadata={
+            "version": state.version,
+            "applied": state.applied,
+            "run_count": state.run_count,
+            "details": state.details,
+        },
+    )
+    await session.commit()
+    return RBACBootstrapResponse.model_validate(state)
 
 
 # ==== Role Management ====
@@ -428,6 +461,115 @@ async def check_user_permission(
         ttl=120,
     )
     return response
+
+
+@router.get("/effective-permissions/{user_id}", response_model=EffectivePermissionsResponse)
+async def get_effective_permissions(
+    user_id: str,
+    organization_id: str | None = Query(default=None, description="Organization hashid"),
+    organization_slug: str | None = Query(default=None, description="Organization slug"),
+    branch_id: int | None = Query(default=None, description="Branch scope id"),
+    include_global: bool = Query(default=True, description="Include global inherited permissions"),
+    current_user: User = Depends(get_current_active_superuser),
+    session: AsyncSession = Depends(get_session),
+):
+    del current_user
+    uid = decode_id_or_404(user_id)
+    organization_db_id = decode_id_or_404(organization_id) if organization_id else None
+    if branch_id is not None:
+        resolved_domain = f"branch:{branch_id}"
+    else:
+        resolved_domain = await resolve_authorization_domain(
+            session,
+            organization_id=organization_db_id,
+            organization_slug=organization_slug,
+        )
+
+    policies: list[EffectivePermissionItem] = []
+
+    direct_domain_rows = (
+        await session.execute(
+            select(CasbinRule).where(
+                CasbinRule.ptype == "p",
+                CasbinRule.v0 == str(uid),
+                CasbinRule.v1 == resolved_domain,
+            )
+        )
+    ).scalars().all()
+    for row in direct_domain_rows:
+        policies.append(
+            EffectivePermissionItem(
+                domain=resolved_domain,
+                resource=row.v2,
+                action=row.v3,
+                source="direct",
+            )
+        )
+
+    role_rows = (
+        await session.execute(
+            select(CasbinRule).where(
+                CasbinRule.ptype == "g",
+                CasbinRule.v0 == str(uid),
+                CasbinRule.v2 == resolved_domain,
+            )
+        )
+    ).scalars().all()
+    for role_row in role_rows:
+        role_policies = (
+            await session.execute(
+                select(CasbinRule).where(
+                    CasbinRule.ptype == "p",
+                    CasbinRule.v0 == role_row.v1,
+                    CasbinRule.v1 == resolved_domain,
+                )
+            )
+        ).scalars().all()
+        for row in role_policies:
+            policies.append(
+                EffectivePermissionItem(
+                    domain=resolved_domain,
+                    resource=row.v2,
+                    action=row.v3,
+                    source="inherited",
+                )
+            )
+
+    if include_global and resolved_domain != GLOBAL_DOMAIN:
+        global_roles = (
+            await session.execute(
+                select(CasbinRule).where(
+                    CasbinRule.ptype == "g",
+                    CasbinRule.v0 == str(uid),
+                    CasbinRule.v2 == GLOBAL_DOMAIN,
+                )
+            )
+        ).scalars().all()
+        for role_row in global_roles:
+            role_policies = (
+                await session.execute(
+                    select(CasbinRule).where(
+                        CasbinRule.ptype == "p",
+                        CasbinRule.v0 == role_row.v1,
+                        CasbinRule.v1 == GLOBAL_DOMAIN,
+                    )
+                )
+            ).scalars().all()
+            for row in role_policies:
+                policies.append(
+                    EffectivePermissionItem(
+                        domain=GLOBAL_DOMAIN,
+                        resource=row.v2,
+                        action=row.v3,
+                        source="inherited",
+                    )
+                )
+
+    unique: dict[tuple[str, str, str, str], EffectivePermissionItem] = {}
+    for item in policies:
+        unique[(item.domain, item.resource, item.action, item.source)] = item
+
+    return EffectivePermissionsResponse(user_id=uid, domain=resolved_domain, permissions=list(unique.values()))
 
 
 # ==== Casbin Direct Operations ====
