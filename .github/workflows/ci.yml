@@ -33,6 +33,10 @@ jobs:
         run: uv run ruff check src tests
       - name: Pytest
         run: uv run --group test pytest
+      - name: Workflow scenario gates
+        run: |
+          uv run --group test pytest tests/integration/api/test_restaurant_operations.py::test_release_workflow_gate_scenarios
+          uv run --group test pytest tests/integration/api/test_release_readiness_gates.py::test_e2e_seat_to_settlement_and_security_audits
 
   frontend:
     runs-on: ubuntu-latest
@@ -54,6 +58,8 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm run test
+      - name: Workflow scenario gates
+        run: npm run test:workflow
       - name: Build
         run: npm run build
 
@@ -72,7 +78,22 @@ jobs:
       - name: Analyze
         run: flutter analyze
       - name: Test
-        run: flutter test
+        run: flutter test --coverage
+      - name: Workflow scenario gates
+        run: flutter test test/restaurant_page_widget_test.dart test/payment_and_notifications_flow_test.dart
+      - name: Coverage threshold
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          text = Path('coverage/lcov.info').read_text()
+          lf = sum(int(x) for x in re.findall(r'LF:(\d+)', text))
+          lh = sum(int(x) for x in re.findall(r'LH:(\d+)', text))
+          pct = (lh / lf * 100) if lf else 0
+          print(f'coverage={pct:.2f}% ({lh}/{lf})')
+          assert pct >= 25, f'Mobile coverage below threshold: {pct:.2f}% < 25%'
+          PY
 
   docker-build:
     runs-on: ubuntu-latest
