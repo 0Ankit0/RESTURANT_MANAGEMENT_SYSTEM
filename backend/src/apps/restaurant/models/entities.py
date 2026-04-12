@@ -46,9 +46,11 @@ class KitchenTicketStatus(str, Enum):
 
 
 class PurchaseOrderStatus(str, Enum):
-    OPEN = "open"
+    REQUESTED = "requested"
+    IN_TRANSIT = "in_transit"
     PARTIAL = "partial"
     RECEIVED = "received"
+    DISCREPANCY = "discrepancy"
 
 
 class BillStatus(str, Enum):
@@ -202,7 +204,7 @@ class StockLedgerEntry(SQLModel, table=True):
 class PurchaseOrder(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     branch_id: int = Field(foreign_key="branch.id", index=True)
-    status: PurchaseOrderStatus = Field(default=PurchaseOrderStatus.OPEN)
+    status: PurchaseOrderStatus = Field(default=PurchaseOrderStatus.REQUESTED)
     created_by: Optional[int] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

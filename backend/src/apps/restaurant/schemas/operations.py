@@ -411,6 +411,13 @@ class PurchaseReceiptLine(BaseModel):
 
 class PurchaseReceiptCreate(BaseModel):
     lines: list[PurchaseReceiptLine]
+    discrepancy_notes: str | None = None
+
+
+class PurchaseOrderAction(BaseModel):
+    action: str
+    approved_by: int | None = None
+    discrepancy_notes: str | None = None
 
 
 class SettlementItem(BaseModel):

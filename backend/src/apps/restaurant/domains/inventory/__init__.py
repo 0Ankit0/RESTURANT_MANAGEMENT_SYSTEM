@@ -12,3 +12,10 @@ def variance(expected_qty: float, counted_qty: float) -> float:
     if expected_qty < 0 or counted_qty < 0:
         raise ValueError("Quantities cannot be negative")
     return round(counted_qty - expected_qty, 3)
+
+
+def recipe_component_delta(component_qty: float, item_qty: int, *, reverse: bool = False) -> float:
+    if component_qty <= 0 or item_qty <= 0:
+        raise ValueError("Recipe component and item quantities must be positive")
+    change = round(component_qty * item_qty, 3)
+    return change if reverse else -change
