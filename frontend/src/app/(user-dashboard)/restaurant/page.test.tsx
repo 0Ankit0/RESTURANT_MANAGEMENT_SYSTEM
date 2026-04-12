@@ -31,6 +31,8 @@ const { mockCapture, mockState, hookMocks } = vi.hoisted(() => ({
   useResolveOrderEditApproval: vi.fn(),
   useUpdateOrder: vi.fn(),
   useSettleBill: vi.fn(),
+  useCancelReservation: vi.fn(),
+  useTransitionReservation: vi.fn(),
 },
 }));
 
@@ -84,6 +86,8 @@ describe('RestaurantOpsPage', () => {
     hookMocks.useResolveOrderEditApproval.mockReturnValue(mState());
     hookMocks.useUpdateOrder.mockReturnValue(mState());
     hookMocks.useSettleBill.mockReturnValue(mState());
+    hookMocks.useCancelReservation.mockReturnValue(mState());
+    hookMocks.useTransitionReservation.mockReturnValue(mState());
   });
 
   afterEach(() => {

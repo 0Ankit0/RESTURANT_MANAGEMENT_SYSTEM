@@ -396,3 +396,29 @@ export function useSettleBill() {
     },
   });
 }
+
+export function useCancelReservation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { branchId: number; reservationId: number }) => {
+      const response = await apiClient.post<Reservation>(`/reservations/${payload.reservationId}/cancel`);
+      return response.data;
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branchId);
+    },
+  });
+}
+
+export function useTransitionReservation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { branchId: number; reservationId: number; status: Reservation['status'] }) => {
+      const response = await apiClient.patch<Reservation>(`/reservations/${payload.reservationId}`, { status: payload.status });
+      return response.data;
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branchId);
+    },
+  });
+}

@@ -78,6 +78,21 @@ class RestaurantRepository {
     }
   }
 
+  Future<List<RestaurantReservationItem>> getReservations(int branchId) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantReservations,
+        queryParameters: {'branch_id': branchId},
+      );
+      final list = response.data as List<dynamic>? ?? [];
+      return list
+          .map((item) => RestaurantReservationItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
   Future<CursorPage<KitchenTicketItem>> getKitchenTickets({int? branchId}) async {
     try {
       final response = await _dioClient.dio.get(
@@ -233,6 +248,40 @@ class RestaurantRepository {
               .toUtc()
               .toIso8601String(),
         },
+      );
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<void> transitionReservation({
+    required int reservationId,
+    required String status,
+  }) async {
+    try {
+      if (status == 'cancelled') {
+        await _dioClient.dio.post(
+          ApiEndpoints.restaurantReservationCancel(reservationId),
+        );
+        return;
+      }
+      await _dioClient.dio.patch(
+        ApiEndpoints.restaurantReservation(reservationId),
+        data: {'status': status},
+      );
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<void> updateOrderStatus({
+    required int orderId,
+    required String status,
+  }) async {
+    try {
+      await _dioClient.dio.patch(
+        ApiEndpoints.restaurantOrder(orderId),
+        data: {'status': status},
       );
     } catch (e) {
       throw ErrorHandler.handle(e);
