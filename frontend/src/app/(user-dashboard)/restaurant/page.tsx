@@ -26,6 +26,7 @@ import {
   useUpdateOrder,
 } from '@/hooks/use-restaurant';
 import { useAnalytics } from '@/hooks/use-analytics';
+import { useRestaurantOpsWebSocket } from '@/hooks/use-websocket';
 import { RestaurantOpsEvents } from '@/lib/analytics/events';
 import { useAuthStore } from '@/store/auth-store';
 import type { KitchenTicketStatus } from '@/types/restaurant';
@@ -162,6 +163,7 @@ export default function RestaurantOpsPage() {
   const notifications = useOperationalNotifications(branchId);
   const report = useBranchOperationsReport(branchId);
   const analytics = useAnalytics();
+  useRestaurantOpsWebSocket(branchId);
   const createReservation = useCreateReservation();
   const seatTable = useSeatTable();
   const promoteWaitlist = usePromoteWaitlist();

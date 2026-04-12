@@ -16,6 +16,7 @@ from src.apps.notification.models.notification_preference import NotificationPre
 from src.apps.notification.schemas.notification import NotificationCreate, NotificationList, NotificationRead
 from src.apps.notification.schemas.notification_device import NotificationDeviceCreate
 from src.apps.notification.schemas.notification_preference import NotificationPreferenceRead
+from src.apps.websocket.schemas.messages import WSRestaurantEvent
 from src.apps.notification.tasks import (
     send_notification_email_task,
     send_push_notification_task,
@@ -190,7 +191,7 @@ async def _push_to_ws(notification: Notification) -> None:
 
         await manager.push_event(
             user_id=notification.user_id,
-            event="notification.new",
+            event=WSRestaurantEvent.NOTIFICATION_PUSHED.value,
             data={
                 "id": notification.id,
                 "title": notification.title,

@@ -36,6 +36,7 @@ const { mockCapture, mockState, hookMocks } = vi.hoisted(() => ({
 
 vi.mock('@/hooks/use-restaurant', () => hookMocks);
 vi.mock('@/hooks/use-analytics', () => ({ useAnalytics: () => ({ capture: mockCapture }) }));
+vi.mock('@/hooks/use-websocket', () => ({ useRestaurantOpsWebSocket: vi.fn() }));
 vi.mock('@/store/auth-store', () => ({ useAuthStore: (selector: (s: typeof mockState) => unknown) => selector(mockState) }));
 
 function qState(data: unknown) {

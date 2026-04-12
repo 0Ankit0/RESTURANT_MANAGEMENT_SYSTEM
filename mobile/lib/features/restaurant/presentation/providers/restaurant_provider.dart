@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/analytics/analytics_events.dart';
 import '../../../../core/analytics/analytics_provider.dart';
 import '../../../../core/providers/dio_provider.dart';
+import '../../../../core/realtime/push_realtime_bridge.dart';
 import '../../data/models/restaurant_models.dart';
 import '../../data/repositories/restaurant_repository.dart';
 
@@ -358,3 +359,29 @@ class RestaurantActionController extends StateNotifier<RestaurantActionState> {
     }
   }
 }
+
+
+final restaurantRealtimeBridgeProvider = Provider<void>((ref) {
+  final sub = PushRealtimeBridge.stream.listen((event) {
+    if (event.channel != PushRealtimeChannel.restaurant) {
+      return;
+    }
+
+    final selectedBranch = ref.read(selectedBranchIdProvider);
+    if (event.branchId != null && event.branchId != selectedBranch) {
+      return;
+    }
+
+    ref.invalidate(restaurantBranchReportProvider);
+    ref.invalidate(restaurantOperationalNotificationsProvider);
+
+    if (event.event.startsWith('restaurant.kitchen.')) {
+      ref.invalidate(restaurantKitchenTicketsProvider);
+    }
+    if (event.event.startsWith('restaurant.settlement.')) {
+      ref.invalidate(restaurantBillsProvider);
+    }
+  });
+
+  ref.onDispose(sub.cancel);
+});

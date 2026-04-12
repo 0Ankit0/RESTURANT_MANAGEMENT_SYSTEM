@@ -49,6 +49,17 @@ class WSMessageType(str, Enum):
 # Encrypted frame envelope
 # ──────────────────────────────────────────────────────────
 
+
+
+class WSRestaurantEvent(str, Enum):
+    """Canonical websocket events used by restaurant operations flows."""
+
+    KITCHEN_STATUS_UPDATED = "restaurant.kitchen.status_updated"
+    SETTLEMENT_STATUS_CHANGED = "restaurant.settlement.status_changed"
+    EXPORT_STATUS_CHANGED = "restaurant.export.status_changed"
+    NOTIFICATION_PUSHED = "notification.new"
+
+
 class WSEncryptedFrame(BaseModel):
     """
     Wrapper for every WebSocket frame after the handshake.

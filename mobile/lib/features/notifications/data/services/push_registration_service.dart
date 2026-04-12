@@ -6,12 +6,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
+import '../../../../core/realtime/push_realtime_bridge.dart';
 import '../models/notification_device.dart';
 import '../models/push_config.dart';
 import '../repositories/notification_repository.dart';
 
 class PushRegistrationService {
   PushRegistrationService(this._repository);
+
+  static bool _listenersInitialized = false;
 
   final NotificationRepository _repository;
 
@@ -24,6 +27,8 @@ class PushRegistrationService {
     if (activeProvider == null) {
       return;
     }
+
+    _ensureRealtimeListeners();
 
     final hasActiveDevice = existingDevices.any(
       (device) => device.provider == activeProvider && device.isActive,
@@ -52,7 +57,8 @@ class PushRegistrationService {
       return;
     }
 
-    final app = Firebase.apps.where((candidate) => candidate.name == 'template-push');
+    final app =
+        Firebase.apps.where((candidate) => candidate.name == 'template-push');
 
     if (app.isEmpty) {
       await Firebase.initializeApp(
@@ -113,6 +119,27 @@ class PushRegistrationService {
         'user_id': userId,
         'platform': _platform,
       },
+    });
+  }
+
+  void _ensureRealtimeListeners() {
+    if (_listenersInitialized) {
+      return;
+    }
+    _listenersInitialized = true;
+
+    FirebaseMessaging.onMessage.listen((message) {
+      final event = PushRealtimeBridge.fromPushData(message.data);
+      if (event != null) {
+        PushRealtimeBridge.emit(event);
+      }
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      final event = PushRealtimeBridge.fromPushData(message.data);
+      if (event != null) {
+        PushRealtimeBridge.emit(event);
+      }
     });
   }
 
