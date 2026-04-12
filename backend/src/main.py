@@ -29,6 +29,7 @@ from src.apps.system.api import router as system_router
 from src.apps.observability.api import router as observability_router
 from src.apps.observability.service import prune_old_log_entries
 from src.apps.restaurant.api import restaurant_router
+from src.apps.restaurant.services.ops_event_outbox import ops_event_outbox_dispatcher
 from src.apps.core.storage import storage_uses_local_filesystem
 
 configure_logging()
@@ -64,9 +65,12 @@ async def lifespan(app: FastAPI):
         await prune_old_log_entries(session)
         await session.commit()
 
+    await ops_event_outbox_dispatcher.start()
+
     yield
 
     # Cleanup on shutdown
+    await ops_event_outbox_dispatcher.stop()
     await ws_manager.teardown()
     await RedisCache.close()
     await shutdown_analytics()

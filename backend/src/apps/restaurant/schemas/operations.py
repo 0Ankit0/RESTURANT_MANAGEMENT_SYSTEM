@@ -11,6 +11,7 @@ from src.apps.restaurant.models import (
     OrderSource,
     OrderStatus,
     OperationalSeverity,
+    OpsEventOutboxStatus,
     PurchaseOrderStatus,
     ReservationStatus,
     StockCountSessionStatus,
@@ -500,6 +501,25 @@ class OperationalNotificationRead(BaseModel):
     payload_json: str | None
     is_operational_exception: bool
     occurred_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class OpsEventOutboxRead(BaseModel):
+    id: int
+    event_id: str
+    branch_id: int
+    room: str
+    event_name: str
+    severity: OperationalSeverity
+    status: OpsEventOutboxStatus
+    attempt_count: int
+    max_attempts: int
+    next_attempt_at: datetime
+    last_error: str | None
+    dead_lettered_at: datetime | None
+    occurred_at: datetime
+    sent_at: datetime | None
 
     model_config = {"from_attributes": True}
 

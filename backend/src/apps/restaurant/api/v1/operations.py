@@ -20,6 +20,7 @@ from src.apps.restaurant.domains.menu import line_total
 from src.apps.restaurant.domains.seating import evaluate_table_assignment
 from src.apps.restaurant.domains.workforce import validate_shift_window
 from src.apps.restaurant.domains.access import PRIVILEGED_ACTIONS
+from src.apps.restaurant.services.ops_event_outbox import ops_event_outbox_dispatcher
 from src.apps.restaurant.models import (
     AccountingExportRetry,
     AccountingExportRetryStatus,
@@ -54,6 +55,8 @@ from src.apps.restaurant.models import (
     OrderItem,
     OrderStatus,
     OperationalEventLog,
+    OpsEventOutbox,
+    OpsEventOutboxStatus,
     OperationalSeverity,
     PrivilegedActionAudit,
     PurchaseOrder,
@@ -80,7 +83,6 @@ from src.apps.restaurant.models import (
     WaitlistEntry,
     WaitlistStatus,
 )
-from src.apps.websocket.manager import manager as ws_manager
 from src.apps.websocket.schemas.messages import WSRestaurantEvent
 
 from src.apps.restaurant.schemas.operations import (
@@ -184,6 +186,7 @@ from src.apps.restaurant.schemas.operations import (
     WaitlistRead,
     OrderCursorPage,
     OperationalNotificationRead,
+    OpsEventOutboxRead,
     KitchenTicketCursorPage,
     ShiftScheduleRead,
     ShiftScheduleRow,
@@ -310,7 +313,8 @@ async def _emit_operational_event(
 
 
     websocket_event = f"restaurant.{event_name}"
-    await _emit_ws_operational_event(
+    await _enqueue_ws_operational_event(
+        db=db,
         branch_id=branch_id,
         event_name=websocket_event,
         severity=severity,
@@ -324,20 +328,30 @@ def _ops_room(branch_id: int) -> str:
     return f"branch:{branch_id}:ops"
 
 
-async def _emit_ws_operational_event(*, branch_id: int, event_name: str, severity: OperationalSeverity, payload: dict | None) -> None:
-    try:
-        await ws_manager.push_event_to_room(
+async def _enqueue_ws_operational_event(
+    *,
+    db: AsyncSession,
+    branch_id: int,
+    event_name: str,
+    severity: OperationalSeverity,
+    payload: dict | None,
+    max_attempts: int = 6,
+) -> None:
+    now = datetime.utcnow()
+    db.add(
+        OpsEventOutbox(
+            branch_id=branch_id,
             room=_ops_room(branch_id),
-            event=event_name,
-            data={
-                "branch_id": branch_id,
-                "severity": severity.value if hasattr(severity, "value") else str(severity),
-                "payload": payload or {},
-            },
+            event_name=event_name,
+            severity=severity,
+            payload_json=json.dumps(payload or {}, default=str),
+            status=OpsEventOutboxStatus.PENDING,
+            next_attempt_at=now,
+            max_attempts=max_attempts,
+            occurred_at=now,
+            updated_at=now,
         )
-    except Exception:
-        # WS delivery must never block transactional domain flows.
-        pass
+    )
 
 def _event_payload(*, stage: str, action: str, resource_id: int | None = None, status: str | None = None, **extra: object) -> dict:
     payload: dict[str, object] = {"stage": stage, "action": action}
@@ -1241,7 +1255,8 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, requ
     order_item = await db.get(OrderItem, ticket.order_item_id)
     order = await db.get(Order, order_item.order_id) if order_item else None
     if order:
-        await _emit_ws_operational_event(
+        await _enqueue_ws_operational_event(
+            db=db,
             branch_id=order.branch_id,
             event_name=WSRestaurantEvent.KITCHEN_STATUS_UPDATED.value,
             severity=OperationalSeverity.INFO,
@@ -1814,7 +1829,8 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
                 paid_amount=bill.paid_amount,
             ),
         )
-        await _emit_ws_operational_event(
+        await _enqueue_ws_operational_event(
+            db=db,
             branch_id=order.branch_id,
             event_name=WSRestaurantEvent.SETTLEMENT_STATUS_CHANGED.value,
             severity=OperationalSeverity.INFO,
@@ -2183,6 +2199,46 @@ async def list_operational_notifications(
     return rows
 
 
+@router.get("/operations/outbox", response_model=list[OpsEventOutboxRead])
+async def list_ops_event_outbox(
+    branch_id: int | None = None,
+    status_filter: OpsEventOutboxStatus | None = None,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+):
+    statement = select(OpsEventOutbox)
+    if branch_id is not None:
+        await _get_branch_or_404(branch_id, db)
+        statement = statement.where(OpsEventOutbox.branch_id == branch_id)
+    if status_filter is not None:
+        statement = statement.where(OpsEventOutbox.status == status_filter)
+    rows = (await db.execute(statement.order_by(OpsEventOutbox.id.desc()).limit(limit))).scalars().all()
+    return rows
+
+
+@router.post("/operations/outbox/dispatch")
+async def dispatch_ops_event_outbox_once():
+    processed = await ops_event_outbox_dispatcher.dispatch_once()
+    return {"processed": processed}
+
+
+@router.post("/operations/outbox/{outbox_id}/requeue", response_model=OpsEventOutboxRead)
+async def requeue_dead_letter_outbox(outbox_id: int, db: AsyncSession = Depends(get_db)):
+    row = await db.get(OpsEventOutbox, outbox_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Outbox row not found")
+    if row.status != OpsEventOutboxStatus.DEAD_LETTER:
+        raise HTTPException(status_code=409, detail="Only dead-letter rows can be requeued")
+    row.status = OpsEventOutboxStatus.RETRY
+    row.next_attempt_at = datetime.utcnow()
+    row.dead_lettered_at = None
+    row.last_error = None
+    row.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
 @router.post("/compliance/retention/prune")
 async def prune_compliance_retention(db: AsyncSession = Depends(get_db)):
     now = datetime.utcnow()
@@ -2389,7 +2445,8 @@ async def create_accounting_export(payload: AccountingExportCreate, request: Req
         event_name="accounting.export_generated",
         payload={"business_date": payload.business_date.isoformat()},
     )
-    await _emit_ws_operational_event(
+    await _enqueue_ws_operational_event(
+        db=db,
         branch_id=payload.branch_id,
         event_name=WSRestaurantEvent.EXPORT_STATUS_CHANGED.value,
         severity=OperationalSeverity.INFO,
@@ -2436,14 +2493,15 @@ async def retry_accounting_export(export_id: int, payload: AccountingExportRetry
     export.status = AccountingExportStatus.GENERATED
     db.add(retry)
     db.add(export)
-    await db.commit()
-    await db.refresh(retry)
-    await _emit_ws_operational_event(
+    await _enqueue_ws_operational_event(
+        db=db,
         branch_id=export.branch_id,
         event_name=WSRestaurantEvent.EXPORT_STATUS_CHANGED.value,
         severity=OperationalSeverity.INFO,
         payload={"export_id": export.id, "retry_id": retry.id, "status": export.status.value},
     )
+    await db.commit()
+    await db.refresh(retry)
     return retry
 
 
