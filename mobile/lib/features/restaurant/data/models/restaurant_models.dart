@@ -72,6 +72,29 @@ class RestaurantWaitlistItem {
   }
 }
 
+class RestaurantReservationItem {
+  final int id;
+  final String guestName;
+  final int partySize;
+  final String status;
+
+  RestaurantReservationItem({
+    required this.id,
+    required this.guestName,
+    required this.partySize,
+    required this.status,
+  });
+
+  factory RestaurantReservationItem.fromJson(Map<String, dynamic> json) {
+    return RestaurantReservationItem(
+      id: json['id'] as int,
+      guestName: json['guest_name'] as String? ?? 'Guest',
+      partySize: json['party_size'] as int? ?? 1,
+      status: json['status'] as String? ?? 'pending',
+    );
+  }
+}
+
 class KitchenTicketItem {
   final int id;
   final String station;

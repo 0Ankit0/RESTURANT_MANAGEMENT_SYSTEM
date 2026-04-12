@@ -32,6 +32,11 @@ final restaurantWaitlistProvider = FutureProvider<CursorPage<RestaurantWaitlistI
   return ref.watch(restaurantRepositoryProvider).getWaitlist(branchId);
 });
 
+final restaurantReservationsProvider = FutureProvider<List<RestaurantReservationItem>>((ref) {
+  final branchId = ref.watch(selectedBranchIdProvider);
+  return ref.watch(restaurantRepositoryProvider).getReservations(branchId);
+});
+
 final restaurantKitchenTicketsProvider = FutureProvider<CursorPage<KitchenTicketItem>>((ref) {
   final branchId = ref.watch(selectedBranchIdProvider);
   return ref.watch(restaurantRepositoryProvider).getKitchenTickets(branchId: branchId);
@@ -62,6 +67,8 @@ enum RestaurantActionType {
   createReservation,
   seatTable,
   promoteWaitlist,
+  transitionReservation,
+  advanceOrder,
   updateKitchenTicket,
   settleBill,
 }
@@ -293,6 +300,45 @@ class RestaurantActionController extends StateNotifier<RestaurantActionState> {
         ref.invalidate(restaurantBranchReportProvider);
       },
       retryAction: () => settleFirstOpenBill(branchId: branchId),
+    );
+  }
+
+  Future<void> transitionReservation({
+    required int branchId,
+    required int reservationId,
+    required String nextStatus,
+  }) {
+    return _execute(
+      type: RestaurantActionType.transitionReservation,
+      branchId: branchId,
+      successMessage: 'Reservation #$reservationId moved to $nextStatus.',
+      successEvent: RestaurantAnalyticsEvents.reservationTransitioned,
+      failureEvent: RestaurantAnalyticsEvents.reservationTransitionFailed,
+      eventProperties: {'branch_id': branchId, 'reservation_id': reservationId, 'status': nextStatus},
+      action: () => ref.read(restaurantRepositoryProvider).transitionReservation(
+            reservationId: reservationId,
+            status: nextStatus,
+          ),
+      onSuccess: () => ref.invalidate(restaurantReservationsProvider),
+      retryAction: () => transitionReservation(branchId: branchId, reservationId: reservationId, nextStatus: nextStatus),
+    );
+  }
+
+  Future<void> advanceOrder({
+    required int branchId,
+    required int orderId,
+    required String nextStatus,
+  }) {
+    return _execute(
+      type: RestaurantActionType.advanceOrder,
+      branchId: branchId,
+      successMessage: 'Order #$orderId moved to $nextStatus.',
+      successEvent: RestaurantAnalyticsEvents.orderTransitioned,
+      failureEvent: RestaurantAnalyticsEvents.orderTransitionFailed,
+      eventProperties: {'branch_id': branchId, 'order_id': orderId, 'status': nextStatus},
+      action: () => ref.read(restaurantRepositoryProvider).updateOrderStatus(orderId: orderId, status: nextStatus),
+      onSuccess: () => ref.invalidate(restaurantOrdersProvider),
+      retryAction: () => advanceOrder(branchId: branchId, orderId: orderId, nextStatus: nextStatus),
     );
   }
 

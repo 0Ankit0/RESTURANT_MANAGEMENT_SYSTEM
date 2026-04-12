@@ -1031,3 +1031,75 @@ async def test_ops_outbox_status_endpoint_lists_dead_letters(client):
     status_all = await client.get(f"/api/v1/operations/outbox?branch_id={branch['id']}")
     assert status_all.status_code == 200
     assert len(status_all.json()) >= 1
+
+
+@pytest.mark.asyncio
+async def test_transition_validation_matrix_and_settlement_rollback(client):
+    branch = (await client.post("/api/v1/branches", json={"name": "Matrix", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={"code": "M1", "seats": 4})).json()
+    menu = (await client.post(f"/api/v1/branches/{branch['id']}/menu-items", json={"name": "Pasta", "price": 10})).json()
+
+    reservation = (
+        await client.post(
+            "/api/v1/reservations",
+            json={
+                "branch_id": branch["id"],
+                "guest_name": "Matrix Guest",
+                "guest_phone": "+1001001000",
+                "party_size": 2,
+                "reservation_time": "2026-04-12T18:00:00Z",
+            },
+        )
+    ).json()
+    invalid_reservation = await client.patch(f"/api/v1/reservations/{reservation['id']}", json={"status": "seated"})
+    assert invalid_reservation.status_code == 409
+    assert invalid_reservation.json()["detail"]["code"] == "reservation.invalid_transition"
+
+    order_payload = (
+        await client.post(
+            "/api/v1/orders",
+            json={
+                "branch_id": branch["id"],
+                "order_source": "dine_in",
+                "table_id": table["id"],
+                "waiter_id": 12,
+                "items": [{"menu_item_id": menu["id"], "quantity": 1, "course_no": 1}],
+            },
+        )
+    ).json()
+    order_id = order_payload["order"]["id"]
+    bill_id = order_payload["bill"]["id"]
+
+    invalid_order = await client.patch(f"/api/v1/orders/{order_id}", json={"status": "draft"})
+    assert invalid_order.status_code == 409
+    assert invalid_order.json()["detail"]["code"] == "order.invalid_transition"
+
+    ticket_id = (await client.get("/api/v1/kitchen/tickets")).json()["items"][0]["id"]
+    invalid_ticket = await client.patch(f"/api/v1/kitchen/tickets/{ticket_id}", json={"status": "served"})
+    assert invalid_ticket.status_code == 409
+    assert invalid_ticket.json()["detail"]["code"] == "kitchen_ticket.invalid_transition"
+
+    settlement = await client.post(
+        f"/api/v1/bills/{bill_id}/settlements",
+        json={"cashier_id": 300, "settlements": [{"payment_method": "cash", "amount": 11.5}]},
+    )
+    assert settlement.status_code == 409
+    assert settlement.json()["detail"]["code"] == "settlement.drawer_session_required"
+
+    no_change_bill = await client.get(f"/api/v1/bills/{bill_id}")
+    assert no_change_bill.status_code == 200
+    assert no_change_bill.json()["status"] == "open"
+    assert no_change_bill.json()["paid_amount"] == 0
+
+    drawer = await client.post(
+        f"/api/v1/branches/{branch['id']}/drawer-sessions",
+        json={"cashier_id": 300, "opening_balance": 50},
+    )
+    assert drawer.status_code == 201
+
+    valid_settlement = await client.post(
+        f"/api/v1/bills/{bill_id}/settlements",
+        json={"cashier_id": 300, "settlements": [{"payment_method": "cash", "amount": 11.5}]},
+    )
+    assert valid_settlement.status_code == 200
+    assert valid_settlement.json()["status"] == "paid"

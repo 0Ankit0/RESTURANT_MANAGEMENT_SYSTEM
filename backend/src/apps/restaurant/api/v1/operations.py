@@ -11,13 +11,19 @@ from src.apps.core.config import settings
 from src.apps.iam.api.deps import get_db
 from src.apps.observability.service import create_log_entry
 from src.apps.restaurant.access import require_restaurant_access
-from src.apps.restaurant.domains.billing import apply_settlement, bill_totals
+from src.apps.restaurant.domains.billing import (
+    apply_settlement,
+    bill_totals,
+    validate_bill_transition,
+    validate_drawer_session_transition,
+)
 from src.apps.restaurant.domains.inventory import apply_inventory_delta, recipe_component_delta, variance as inventory_variance
-from src.apps.restaurant.domains.kitchen import can_transition_ticket
+from src.apps.restaurant.domains.kitchen import validate_ticket_transition
 from src.apps.restaurant.domains.procurement import enforce_po_transition, po_status
-from src.apps.restaurant.domains.orders import can_patch_order, order_subtotal
+from src.apps.restaurant.domains.orders import can_patch_order, order_subtotal, validate_order_transition
 from src.apps.restaurant.domains.menu import line_total
-from src.apps.restaurant.domains.seating import evaluate_table_assignment
+from src.apps.restaurant.domains.seating import evaluate_table_assignment, validate_reservation_transition
+from src.apps.restaurant.domains.reporting import validate_day_close_transition
 from src.apps.restaurant.domains.workforce import validate_shift_window
 from src.apps.restaurant.domains.access import PRIVILEGED_ACTIONS
 from src.apps.restaurant.services.ops_event_outbox import ops_event_outbox_dispatcher
@@ -361,6 +367,18 @@ def _event_payload(*, stage: str, action: str, resource_id: int | None = None, s
         payload["status"] = status
     payload.update(extra)
     return payload
+
+
+def _transition_error(*, code: str, message: str, current_status: str, next_status: str) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": code,
+            "message": message,
+            "current_status": current_status,
+            "next_status": next_status,
+        },
+    )
 
 
 def _cursor_result(items: list, limit: int) -> dict:
@@ -783,6 +801,13 @@ async def open_drawer_session(branch_id: int, payload: DrawerSessionCreate, db: 
     await _get_branch_or_404(branch_id, db)
     session = CashDrawerSession(branch_id=branch_id, **payload.model_dump())
     db.add(session)
+    await _emit_operational_event(
+        db=db,
+        branch_id=branch_id,
+        event_name="drawer.opened",
+        actor_user_id=payload.cashier_id,
+        payload=_event_payload(stage="drawer", action="open", resource_id=session.id, status=str(session.status)),
+    )
     await db.commit()
     await db.refresh(session)
     return session
@@ -878,6 +903,17 @@ async def cancel_reservation(reservation_id: int, request: Request, db: AsyncSes
         await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
         await db.commit()
         return payload_out
+    is_valid, reason = validate_reservation_transition(
+        current_status=str(reservation.status),
+        next_status=ReservationStatus.CANCELLED.value,
+    )
+    if not is_valid:
+        raise _transition_error(
+            code="reservation.invalid_transition",
+            message=reason,
+            current_status=str(reservation.status),
+            next_status=ReservationStatus.CANCELLED.value,
+        )
     reservation.status = ReservationStatus.CANCELLED
     await _emit_operational_event(
         db=db,
@@ -904,6 +940,17 @@ async def patch_reservation(reservation_id: int, payload: ReservationUpdate, req
     if reservation.status == ReservationStatus.CANCELLED:
         raise HTTPException(status_code=409, detail="Cancelled reservations cannot be modified")
     if payload.status is not None:
+        is_valid, reason = validate_reservation_transition(
+            current_status=str(reservation.status),
+            next_status=payload.status.value,
+        )
+        if not is_valid:
+            raise _transition_error(
+                code="reservation.invalid_transition",
+                message=reason,
+                current_status=str(reservation.status),
+                next_status=payload.status.value,
+            )
         reservation.status = payload.status
     if payload.notes is not None:
         reservation.notes = payload.notes
@@ -945,6 +992,17 @@ async def seat_party(table_id: int, payload: SeatTableRequest, request: Request,
         reservation = await db.get(Reservation, payload.reservation_id)
         if not reservation or reservation.branch_id != table.branch_id:
             raise HTTPException(status_code=404, detail="Reservation not found")
+        is_valid, reason = validate_reservation_transition(
+            current_status=str(reservation.status),
+            next_status=ReservationStatus.SEATED.value,
+        )
+        if not is_valid:
+            raise _transition_error(
+                code="reservation.invalid_transition",
+                message=reason,
+                current_status=str(reservation.status),
+                next_status=ReservationStatus.SEATED.value,
+            )
         reservation.status = ReservationStatus.SEATED
         reservation.table_id = table.id
 
@@ -1131,6 +1189,17 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, request: R
         raise HTTPException(status_code=409, detail="Post-fire order edits require approval")
 
     if payload.status is not None:
+        is_valid, reason = validate_order_transition(
+            current_status=str(previous_status),
+            next_status=payload.status.value,
+        )
+        if not is_valid:
+            raise _transition_error(
+                code="order.invalid_transition",
+                message=reason,
+                current_status=str(previous_status),
+                next_status=payload.status.value,
+            )
         if payload.status == OrderStatus.CANCELLED and previous_status in {
             OrderStatus.SUBMITTED,
             OrderStatus.IN_PROGRESS,
@@ -1239,8 +1308,14 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, requ
         raise HTTPException(status_code=404, detail="Ticket not found")
     previous_status = ticket.status
     elapsed_seconds = max(0, int((datetime.utcnow() - ticket.updated_at).total_seconds()))
-    if not can_transition_ticket(current_status=ticket.status, next_status=payload.status):
-        raise HTTPException(status_code=409, detail="Invalid kitchen ticket status transition")
+    is_valid, reason = validate_ticket_transition(current_status=str(ticket.status), next_status=payload.status.value)
+    if not is_valid:
+        raise _transition_error(
+            code="kitchen_ticket.invalid_transition",
+            message=reason,
+            current_status=str(ticket.status),
+            next_status=payload.status.value,
+        )
     ticket.status = payload.status
     ticket.updated_at = datetime.utcnow()
     db.add(
@@ -1268,21 +1343,20 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, requ
             },
         )
 
-    if payload.status == KitchenTicketStatus.READY:
-        if order:
-            await _emit_operational_event(
-                db=db,
-                branch_id=order.branch_id,
-                event_name="kitchen.ticket_ready",
-                actor_user_id=payload.updated_by,
-                payload=_event_payload(
-                    stage="kitchen",
-                    action="ticket_ready",
-                    resource_id=ticket.id,
-                    status=str(payload.status),
-                    from_status=str(previous_status),
-                ),
-            )
+    if order:
+        await _emit_operational_event(
+            db=db,
+            branch_id=order.branch_id,
+            event_name="kitchen.ticket_transitioned",
+            actor_user_id=payload.updated_by,
+            payload=_event_payload(
+                stage="kitchen",
+                action="transition",
+                resource_id=ticket.id,
+                status=str(payload.status),
+                from_status=str(previous_status),
+            ),
+        )
     await db.commit()
     await db.refresh(ticket)
     payload_out = ticket.model_dump()
@@ -1809,12 +1883,68 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    settlement_rows: list[Settlement] = []
     for settlement_data in payload.settlements:
-        db.add(Settlement(bill_id=bill.id, cashier_id=payload.cashier_id, **settlement_data.model_dump()))
+        row = Settlement(bill_id=bill.id, cashier_id=payload.cashier_id, **settlement_data.model_dump())
+        settlement_rows.append(row)
+        db.add(row)
+    await db.flush()
+
+    current_bill_status = str(bill.status)
+    next_bill_status = BillStatus.PAID.value if next_status == "paid" else BillStatus.PARTIALLY_PAID.value
+    is_valid_bill_transition, reason = validate_bill_transition(
+        current_status=current_bill_status,
+        next_status=next_bill_status,
+    )
+    if not is_valid_bill_transition:
+        raise _transition_error(
+            code="bill.invalid_transition",
+            message=reason,
+            current_status=current_bill_status,
+            next_status=next_bill_status,
+        )
 
     bill.paid_amount = next_paid
-    bill.status = BillStatus.PAID if next_status == "paid" else BillStatus.PARTIALLY_PAID
+    bill.status = BillStatus(next_bill_status)
     order = await db.get(Order, bill.order_id)
+    if order and payload.cashier_id is not None:
+        active_drawer = (
+            await db.execute(
+                select(CashDrawerSession).where(
+                    CashDrawerSession.branch_id == order.branch_id,
+                    CashDrawerSession.cashier_id == payload.cashier_id,
+                    CashDrawerSession.status == DrawerStatus.OPEN,
+                )
+            )
+        ).scalars().first()
+        if not active_drawer:
+            bill.paid_amount = round(bill.paid_amount - total_new, 2)
+            bill.status = BillStatus(current_bill_status)
+            await db.execute(
+                delete(Settlement).where(
+                    Settlement.id.in_([row.id for row in settlement_rows if row.id is not None]),
+                )
+            )
+            await _emit_operational_event(
+                db=db,
+                branch_id=order.branch_id,
+                event_name="settlement.rollback",
+                severity=OperationalSeverity.WARNING,
+                actor_user_id=payload.cashier_id,
+                payload=_event_payload(
+                    stage="settlement",
+                    action="rollback",
+                    resource_id=bill.id,
+                    status=current_bill_status,
+                    reason="no_open_drawer_session",
+                ),
+                is_exception=True,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "settlement.drawer_session_required", "message": "Open drawer session is required for settlement"},
+            )
+
     if order:
         await _emit_operational_event(
             db=db,
@@ -2044,6 +2174,17 @@ async def close_drawer_session(session_id: int, payload: DrawerCloseRequest, db:
         raise HTTPException(status_code=404, detail="Drawer session not found")
     if session.status == DrawerStatus.CLOSED:
         raise HTTPException(status_code=409, detail="Drawer session already closed")
+    is_valid, reason = validate_drawer_session_transition(
+        current_status=str(session.status),
+        next_status=DrawerStatus.CLOSED.value,
+    )
+    if not is_valid:
+        raise _transition_error(
+            code="cash_drawer_session.invalid_transition",
+            message=reason,
+            current_status=str(session.status),
+            next_status=DrawerStatus.CLOSED.value,
+        )
 
     session.status = DrawerStatus.CLOSED
     session.closing_balance = payload.closing_balance
@@ -2563,6 +2704,17 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, reque
         raise HTTPException(status_code=404, detail="Day-close record not found")
     if record.status == DayCloseStatus.CLOSED:
         raise HTTPException(status_code=409, detail="Day-close already finalized")
+    is_valid, reason = validate_day_close_transition(
+        current_status=str(record.status),
+        next_status=DayCloseStatus.CLOSED.value,
+    )
+    if not is_valid:
+        raise _transition_error(
+            code="day_close.invalid_transition",
+            message=reason,
+            current_status=str(record.status),
+            next_status=DayCloseStatus.CLOSED.value,
+        )
 
     open_drawers = (
         await db.execute(

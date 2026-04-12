@@ -12,6 +12,7 @@ import {
   useBranchReservations,
   useBranchTables,
   useBranchWaitlist,
+  useCancelReservation,
   useCreateOrder,
   useCreateOrderEditApproval,
   useCreateReservation,
@@ -22,6 +23,7 @@ import {
   useRestaurantBranches,
   useSeatTable,
   useSettleBill,
+  useTransitionReservation,
   useUpdateKitchenTicket,
   useUpdateOrder,
 } from '@/hooks/use-restaurant';
@@ -110,12 +112,29 @@ export const nextTicketStatus = (status: KitchenTicketStatus): KitchenTicketStat
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (typeof error === 'object' && error !== null) {
-    const maybeResponse = error as { response?: { data?: { detail?: string } } };
-    if (maybeResponse.response?.data?.detail) {
-      return maybeResponse.response.data.detail;
+    const maybeResponse = error as { response?: { data?: { detail?: string | { message?: string; code?: string } } } };
+    const detail = maybeResponse.response?.data?.detail;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    if (detail && typeof detail === 'object') {
+      return [detail.message, detail.code].filter(Boolean).join(' · ') || fallback;
     }
   }
   return fallback;
+};
+
+const nextOrderStatus = (status: string): string | null => {
+  switch (status) {
+    case 'submitted':
+      return 'in_progress';
+    case 'in_progress':
+      return 'ready';
+    case 'ready':
+      return 'served';
+    default:
+      return null;
+  }
 };
 
 export default function RestaurantOpsPage() {
@@ -173,6 +192,8 @@ export default function RestaurantOpsPage() {
   const resolveApproval = useResolveOrderEditApproval();
   const updateOrder = useUpdateOrder();
   const settleBill = useSettleBill();
+  const cancelReservation = useCancelReservation();
+  const transitionReservation = useTransitionReservation();
 
   useEffect(() => {
     if (branchId > 0) {
@@ -360,6 +381,34 @@ export default function RestaurantOpsPage() {
     }
   };
 
+  const advanceOrder = async (orderId: number, currentStatus: string) => {
+    const next = nextOrderStatus(currentStatus);
+    if (!next) return;
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await updateOrder.mutateAsync({ orderId, branchId, status: next as 'in_progress' | 'ready' | 'served' });
+      setActionSuccess(`Order #${orderId} moved to ${next}.`);
+    } catch (error) {
+      setActionError(getErrorMessage(error, 'Unable to transition order.'));
+    }
+  };
+
+  const transitionReservationStatus = async (reservationId: number, nextStatus: 'confirmed' | 'cancelled') => {
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      if (nextStatus === 'cancelled') {
+        await cancelReservation.mutateAsync({ branchId, reservationId });
+      } else {
+        await transitionReservation.mutateAsync({ branchId, reservationId, status: nextStatus });
+      }
+      setActionSuccess(`Reservation #${reservationId} moved to ${nextStatus}.`);
+    } catch (error) {
+      setActionError(getErrorMessage(error, 'Unable to transition reservation.'));
+    }
+  };
+
   const settleFirstOpenBill = async () => {
     const target = bills.data?.find((bill) => bill.status !== 'paid');
     if (!target) {
@@ -501,9 +550,21 @@ export default function RestaurantOpsPage() {
           <CardHeader><CardTitle>Recent Reservations</CardTitle></CardHeader>
           <CardContent className="space-y-2 max-h-72 overflow-auto">
             {reservations.data?.map((reservation) => (
-              <div key={reservation.id} className="text-sm border rounded p-2">
+              <div key={reservation.id} className="text-sm border rounded p-2 space-y-2">
                 <div className="font-medium">{reservation.guest_name}</div>
                 <div className="text-gray-500">Party {reservation.party_size} · {reservation.status}</div>
+                <div className="flex gap-2">
+                  {reservation.status === 'pending' && (
+                    <Button size="sm" variant="outline" onClick={() => transitionReservationStatus(reservation.id, 'confirmed')}>
+                      Confirm
+                    </Button>
+                  )}
+                  {!['cancelled', 'seated'].includes(reservation.status) && (
+                    <Button size="sm" variant="outline" onClick={() => transitionReservationStatus(reservation.id, 'cancelled')}>
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </div>
             )) ?? <p className="text-sm text-gray-500">No reservations yet</p>}
           </CardContent>
@@ -521,6 +582,11 @@ export default function RestaurantOpsPage() {
                   <span className="text-gray-500">{order.status}</span>
                 </div>
                 <div className="flex gap-2">
+                  {nextOrderStatus(order.status) && (
+                    <Button size="sm" variant="outline" onClick={() => advanceOrder(order.id, order.status)}>
+                      Move to {nextOrderStatus(order.status)}
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => requestCancelApproval(order.id)} disabled={!hasEligibleStaffContext}>Request Cancel Approval</Button>
                   <Button size="sm" variant="outline" onClick={() => cancelOrderWithApproval(order.id)} disabled={!approvalByOrder[order.id]}>Cancel Order</Button>
                 </div>

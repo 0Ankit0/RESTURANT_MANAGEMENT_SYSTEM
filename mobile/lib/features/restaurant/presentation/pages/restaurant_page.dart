@@ -86,11 +86,44 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
         );
   }
 
+  Future<void> _transitionReservation(int reservationId, String nextStatus) {
+    final branchId = ref.read(selectedBranchIdProvider);
+    return ref.read(restaurantActionControllerProvider.notifier).transitionReservation(
+          branchId: branchId,
+          reservationId: reservationId,
+          nextStatus: nextStatus,
+        );
+  }
+
+  Future<void> _advanceOrder(int orderId, String currentStatus) {
+    final next = _nextOrderStatus(currentStatus);
+    if (next == null) return Future.value();
+    final branchId = ref.read(selectedBranchIdProvider);
+    return ref.read(restaurantActionControllerProvider.notifier).advanceOrder(
+          branchId: branchId,
+          orderId: orderId,
+          nextStatus: next,
+        );
+  }
+
   String? _nextKitchenStatus(String status) {
     switch (status) {
       case 'queued':
         return 'in_preparation';
       case 'in_preparation':
+        return 'ready';
+      case 'ready':
+        return 'served';
+      default:
+        return null;
+    }
+  }
+
+  String? _nextOrderStatus(String status) {
+    switch (status) {
+      case 'submitted':
+        return 'in_progress';
+      case 'in_progress':
         return 'ready';
       case 'ready':
         return 'served';
@@ -108,6 +141,7 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
     final reportAsync = ref.watch(restaurantBranchReportProvider);
     final ordersAsync = ref.watch(restaurantOrdersProvider);
     final waitlistAsync = ref.watch(restaurantWaitlistProvider);
+    final reservationsAsync = ref.watch(restaurantReservationsProvider);
     final kitchenAsync = ref.watch(restaurantKitchenTicketsProvider);
     final notificationsAsync = ref.watch(restaurantOperationalNotificationsProvider);
     final stockAlertsAsync = ref.watch(restaurantStockAlertsProvider);
@@ -270,6 +304,43 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
             error: (error, _) => Text('Failed to load waitlist: $error'),
           ),
           const SizedBox(height: 16),
+          const Text('Reservations', style: TextStyle(fontWeight: FontWeight.bold)),
+          reservationsAsync.when(
+            data: (reservations) => Column(
+              children: reservations
+                  .map(
+                    (reservation) => Card(
+                      child: ListTile(
+                        title: Text(reservation.guestName),
+                        subtitle: Text('Party ${reservation.partySize} · ${reservation.status}'),
+                        trailing: Wrap(
+                          spacing: 8,
+                          children: [
+                            if (reservation.status == 'pending')
+                              TextButton(
+                                onPressed: actionState.isLoading
+                                    ? null
+                                    : () => _transitionReservation(reservation.id, 'confirmed'),
+                                child: const Text('Confirm'),
+                              ),
+                            if (reservation.status != 'cancelled' && reservation.status != 'seated')
+                              TextButton(
+                                onPressed: actionState.isLoading
+                                    ? null
+                                    : () => _transitionReservation(reservation.id, 'cancelled'),
+                                child: const Text('Cancel'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Text('Failed to load reservations: $error'),
+          ),
+          const SizedBox(height: 16),
           const Text('Kitchen Queue', style: TextStyle(fontWeight: FontWeight.bold)),
           kitchenAsync.when(
             data: (kitchenPage) => Column(
@@ -363,7 +434,15 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
                     (order) => Card(
                       child: ListTile(
                         title: Text('Order #${order.id}'),
-                        trailing: Text(order.status),
+                        subtitle: Text(order.status),
+                        trailing: _nextOrderStatus(order.status) == null
+                            ? null
+                            : TextButton(
+                                onPressed: actionState.isLoading
+                                    ? null
+                                    : () => _advanceOrder(order.id, order.status),
+                                child: Text('To ${_nextOrderStatus(order.status)}'),
+                              ),
                       ),
                     ),
                   )

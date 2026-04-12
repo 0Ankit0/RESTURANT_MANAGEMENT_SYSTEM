@@ -61,4 +61,8 @@ class RestaurantAnalyticsEvents {
   static const String kitchenTicketUpdateFailed = 'restaurant_ops_kitchen_ticket_update_failed';
   static const String billSettled = 'restaurant_ops_bill_settled';
   static const String billSettleFailed = 'restaurant_ops_bill_settle_failed';
+  static const String reservationTransitioned = 'restaurant_ops_reservation_transitioned';
+  static const String reservationTransitionFailed = 'restaurant_ops_reservation_transition_failed';
+  static const String orderTransitioned = 'restaurant_ops_order_transitioned';
+  static const String orderTransitionFailed = 'restaurant_ops_order_transition_failed';
 }

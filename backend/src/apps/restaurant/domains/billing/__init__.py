@@ -1,5 +1,18 @@
 """Billing domain utilities."""
 
+from src.apps.restaurant.models import BillStatus, DrawerStatus
+
+BILL_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    BillStatus.OPEN.value: {BillStatus.PARTIALLY_PAID.value, BillStatus.PAID.value},
+    BillStatus.PARTIALLY_PAID.value: {BillStatus.PAID.value},
+    BillStatus.PAID.value: set(),
+}
+
+DRAWER_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    DrawerStatus.OPEN.value: {DrawerStatus.CLOSED.value},
+    DrawerStatus.CLOSED.value: set(),
+}
+
 
 def bill_totals(*, subtotal: float, tax_rate: float, service_charge_rate: float) -> dict[str, float]:
     if subtotal < 0:
@@ -22,3 +35,21 @@ def apply_settlement(*, paid_amount: float, incoming_amount: float, total_amount
     if next_paid == total_amount:
         return next_paid, "paid"
     return next_paid, "partially_paid"
+
+
+def validate_bill_transition(*, current_status: str, next_status: str) -> tuple[bool, str]:
+    allowed = BILL_ALLOWED_TRANSITIONS.get(current_status)
+    if allowed is None:
+        return False, "Unknown bill status"
+    if next_status not in allowed:
+        return False, "Bill status transition is not allowed"
+    return True, ""
+
+
+def validate_drawer_session_transition(*, current_status: str, next_status: str) -> tuple[bool, str]:
+    allowed = DRAWER_ALLOWED_TRANSITIONS.get(current_status)
+    if allowed is None:
+        return False, "Unknown cash drawer session status"
+    if next_status not in allowed:
+        return False, "Cash drawer session status transition is not allowed"
+    return True, ""
