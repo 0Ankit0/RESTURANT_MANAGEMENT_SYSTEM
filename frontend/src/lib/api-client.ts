@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '@/store/auth-store';
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -56,8 +57,10 @@ apiClient.interceptors.response.use(
       if (!refreshToken) {
         isRefreshing = false;
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          window.location.href = '/login';
+          const { markSessionInvalidated, logout } = useAuthStore.getState();
+          logout();
+          markSessionInvalidated('Your session has expired. Please sign in again.');
+          window.location.href = '/login?reason=session_expired';
         }
         return Promise.reject(error);
       }
@@ -81,9 +84,10 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          const { markSessionInvalidated, logout } = useAuthStore.getState();
+          logout();
+          markSessionInvalidated('Your session was revoked or is no longer valid. Please sign in again.');
+          window.location.href = '/login?reason=session_revoked';
         }
         return Promise.reject(refreshError);
       } finally {

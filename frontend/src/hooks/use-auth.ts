@@ -20,7 +20,7 @@ import type {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { user, setUser, setTokens, logout: storeLogout } = useAuthStore();
+  const { user, setUser, setTokens, logout: storeLogout, markSessionInvalidated } = useAuthStore();
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
@@ -71,8 +71,9 @@ export function useAuth() {
   const logout = async () => {
     try {
       await apiClient.post('/auth/logout/');
-    } catch {
-      // ignore logout errors
+    } catch (error) {
+      markSessionInvalidated('We could not confirm server logout, but your local session was cleared.');
+      throw error;
     } finally {
       analytics.capture(AuthEvents.LOGGED_OUT);
       analytics.reset();
@@ -215,4 +216,3 @@ export function useResendVerification() {
     },
   });
 }
-

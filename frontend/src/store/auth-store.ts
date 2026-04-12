@@ -6,10 +6,14 @@ interface AuthState {
   user: User | null;
   tenant: Tenant | null;
   isAuthenticated: boolean;
+  sessionInvalidated: boolean;
+  authMessage: string | null;
   _hasHydrated: boolean;
   setUser: (user: User | null) => void;
   setTokens: (access: string, refresh: string) => void;
   setTenant: (tenant: Tenant | null) => void;
+  markSessionInvalidated: (message: string) => void;
+  clearAuthMessage: () => void;
   logout: () => void;
   setHasHydrated: (state: boolean) => void;
 }
@@ -20,8 +24,10 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       tenant: null,
       isAuthenticated: false,
+      sessionInvalidated: false,
+      authMessage: null,
       _hasHydrated: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setUser: (user) => set({ user, isAuthenticated: !!user, sessionInvalidated: false }),
       setTokens: (access, refresh) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('access_token', access);
@@ -31,12 +37,21 @@ export const useAuthStore = create<AuthState>()(
       setTenant: (tenant) => {
         set({ tenant });
       },
+      markSessionInvalidated: (message) =>
+        set({ sessionInvalidated: true, authMessage: message, user: null, isAuthenticated: false }),
+      clearAuthMessage: () => set({ authMessage: null }),
       logout: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
         }
-        set({ user: null, tenant: null, isAuthenticated: false });
+        set({
+          user: null,
+          tenant: null,
+          isAuthenticated: false,
+          sessionInvalidated: false,
+          authMessage: null,
+        });
       },
       setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),

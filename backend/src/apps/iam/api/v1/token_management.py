@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+import logging
 from sqlmodel import select, desc, func, col
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from src.apps.analytics.events import UserEvents
 from src.apps.observability.service import record_token_event
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=PaginatedResponse[TokenTrackingResponse])
@@ -69,6 +71,10 @@ async def list_active_tokens(
         
         return response
     except Exception:
+        logger.exception(
+            "token_management.list_active.failed",
+            extra={"operation": "list_active_tokens", "user_id": current_user.id},
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred fetching active tokens"
@@ -135,6 +141,10 @@ async def revoke_token(
     except HTTPException:
         raise
     except Exception:
+        logger.exception(
+            "token_management.revoke.failed",
+            extra={"operation": "revoke_token", "user_id": current_user.id, "token_id": token_id},
+        )
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -160,12 +170,12 @@ async def revoke_all_tokens(
             )
         )
         tokens = result.scalars().all()
-        
+
         for token_tracking in tokens:
             token_tracking.is_active = False
             token_tracking.revoked_at = datetime.now(timezone.utc)
             token_tracking.revoke_reason = "All tokens revoked by user"
-        
+
         await db.commit()
         if tokens:
             await record_token_event(
@@ -189,6 +199,10 @@ async def revoke_all_tokens(
 
         return {"message": f"Revoked {len(tokens)} active token(s)"}
     except Exception:
+        logger.exception(
+            "token_management.revoke_all.failed",
+            extra={"operation": "revoke_all_tokens", "user_id": current_user.id},
+        )
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

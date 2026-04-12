@@ -1,8 +1,9 @@
 from datetime import timedelta, datetime, timezone
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Body
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from jose import jwt
+from jose import jwt, JWTError
 from src.apps.core.config import settings
 from src.apps.core import security
 from src.apps.core.security import TokenType
@@ -16,6 +17,7 @@ from src.apps.iam.utils.ip_access import revoke_tokens_for_ip, get_client_ip
 from src.apps.observability.service import record_token_event
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/refresh/")
@@ -165,7 +167,16 @@ async def refresh_token(
         )
     except HTTPException:
         raise
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
     except Exception:
+        logger.exception(
+            "auth.refresh.failed",
+            extra={"operation": "refresh_token"},
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during token refresh"
