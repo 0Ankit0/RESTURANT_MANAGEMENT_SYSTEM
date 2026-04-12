@@ -709,3 +709,131 @@ async def test_stock_count_variance_workflow(client, db_session):
     ).scalars().all()
     assert len(ledger_rows) == 1
     assert ledger_rows[0].change_qty == -2
+async def test_lifecycle_idempotency_and_operational_events(client):
+    branch = (await client.post('/api/v1/branches', json={'name': 'Lifecycle', 'tax_rate': 0.1, 'service_charge_rate': 0.05})).json()
+    table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={'code': 'L1', 'seats': 4})).json()
+    menu = (await client.post(f"/api/v1/branches/{branch['id']}/menu-items", json={'name': 'Pasta', 'price': 12})).json()
+    drawer = (await client.post(f"/api/v1/branches/{branch['id']}/drawer-sessions", json={'cashier_id': 22, 'opening_balance': 50})).json()
+
+    reservation_payload = {
+        'branch_id': branch['id'],
+        'guest_name': 'Replay Guest',
+        'guest_phone': '+14445556666',
+        'party_size': 2,
+        'reservation_time': '2026-04-10T19:00:00Z',
+    }
+    reservation = await client.post('/api/v1/reservations', json=reservation_payload, headers={'Idempotency-Key': 'life-rsv-create'})
+    assert reservation.status_code == 201
+    reservation_id = reservation.json()['id']
+
+    reservation_replay = await client.post('/api/v1/reservations', json=reservation_payload, headers={'Idempotency-Key': 'life-rsv-create'})
+    assert reservation_replay.status_code == 201
+    assert reservation_replay.headers.get('X-Idempotent-Replay') == 'true'
+
+    seated = await client.post(
+        f"/api/v1/tables/{table['id']}/seat",
+        json={'reservation_id': reservation_id, 'party_size': 2},
+        headers={'Idempotency-Key': 'life-seat'},
+    )
+    assert seated.status_code == 200
+    seated_replay = await client.post(
+        f"/api/v1/tables/{table['id']}/seat",
+        json={'reservation_id': reservation_id, 'party_size': 2},
+        headers={'Idempotency-Key': 'life-seat'},
+    )
+    assert seated_replay.status_code == 200
+    assert seated_replay.headers.get('X-Idempotent-Replay') == 'true'
+
+    order = await client.post(
+        '/api/v1/orders',
+        json={
+            'branch_id': branch['id'],
+            'order_source': 'dine_in',
+            'table_id': table['id'],
+            'waiter_id': 4,
+            'items': [{'menu_item_id': menu['id'], 'quantity': 2, 'course_no': 1}],
+        },
+        headers={'Idempotency-Key': 'life-order'},
+    )
+    assert order.status_code == 201
+    order_id = order.json()['order']['id']
+    bill_id = order.json()['bill']['id']
+
+    order_patch = await client.patch(
+        f"/api/v1/orders/{order_id}",
+        json={'status': 'in_progress'},
+        headers={'Idempotency-Key': 'life-order-patch'},
+    )
+    assert order_patch.status_code == 200
+    patch_replay = await client.patch(
+        f"/api/v1/orders/{order_id}",
+        json={'status': 'in_progress'},
+        headers={'Idempotency-Key': 'life-order-patch'},
+    )
+    assert patch_replay.status_code == 200
+    assert patch_replay.headers.get('X-Idempotent-Replay') == 'true'
+
+    tickets = await client.get('/api/v1/kitchen/tickets')
+    ticket_id = tickets.json()['items'][0]['id']
+    kitchen = await client.patch(
+        f"/api/v1/kitchen/tickets/{ticket_id}",
+        json={'status': 'in_preparation', 'updated_by': 9},
+        headers={'Idempotency-Key': 'life-kitchen'},
+    )
+    assert kitchen.status_code == 200
+
+    settlement = await client.post(
+        f"/api/v1/bills/{bill_id}/settlements",
+        json={'cashier_id': 22, 'settlements': [{'payment_method': 'cash', 'amount': 27.6}]},
+        headers={'Idempotency-Key': 'life-settlement'},
+    )
+    assert settlement.status_code == 200
+    settlement_replay = await client.post(
+        f"/api/v1/bills/{bill_id}/settlements",
+        json={'cashier_id': 22, 'settlements': [{'payment_method': 'cash', 'amount': 27.6}]},
+        headers={'Idempotency-Key': 'life-settlement'},
+    )
+    assert settlement_replay.status_code == 200
+    assert settlement_replay.headers.get('X-Idempotent-Replay') == 'true'
+
+    close_drawer = await client.post(f"/api/v1/drawer-sessions/{drawer['id']}/close", json={'closing_balance': 77.6})
+    assert close_drawer.status_code == 200
+
+    day_close = await client.post(
+        '/api/v1/day-close',
+        json={'branch_id': branch['id'], 'business_date': '2026-04-10T00:00:00Z', 'notes': 'lifecycle close'},
+        headers={'Idempotency-Key': 'life-day-close-open'},
+    )
+    assert day_close.status_code == 201
+    day_close_id = day_close.json()['id']
+
+    checklist = await client.post(f"/api/v1/day-close/{day_close_id}/checklist-items", json={'item_key': 'ops_review', 'is_required': True})
+    assert checklist.status_code == 201
+    checked = await client.patch(
+        f"/api/v1/day-close/checklist-items/{checklist.json()['id']}",
+        json={'checked_by': 22, 'is_checked': True},
+    )
+    assert checked.status_code == 200
+
+    finalize = await client.patch(
+        f"/api/v1/day-close/{day_close_id}/finalize",
+        json={'closed_by': 22, 'notes': 'done'},
+        headers={'Idempotency-Key': 'life-day-close-finalize'},
+    )
+    assert finalize.status_code == 200
+    finalize_replay = await client.patch(
+        f"/api/v1/day-close/{day_close_id}/finalize",
+        json={'closed_by': 22, 'notes': 'done'},
+        headers={'Idempotency-Key': 'life-day-close-finalize'},
+    )
+    assert finalize_replay.status_code == 200
+    assert finalize_replay.headers.get('X-Idempotent-Replay') == 'true'
+
+    ops_events = await client.get(f"/api/v1/operations/notifications?branch_id={branch['id']}&limit=200")
+    assert ops_events.status_code == 200
+    event_names = {row['event_name'] for row in ops_events.json()}
+    assert 'reservation.created' in event_names
+    assert 'table.seated' in event_names
+    assert 'order.opened' in event_names
+    assert 'settlement.completed' in event_names
+    assert 'branch.day_closed' in event_names

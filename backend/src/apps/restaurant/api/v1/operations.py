@@ -15,6 +15,7 @@ from src.apps.restaurant.domains.billing import apply_settlement, bill_totals
 from src.apps.restaurant.domains.inventory import apply_inventory_delta, recipe_component_delta, variance as inventory_variance
 from src.apps.restaurant.domains.kitchen import can_transition_ticket
 from src.apps.restaurant.domains.procurement import enforce_po_transition, po_status
+from src.apps.restaurant.domains.orders import can_patch_order, order_subtotal
 from src.apps.restaurant.domains.menu import line_total
 from src.apps.restaurant.domains.seating import evaluate_table_assignment
 from src.apps.restaurant.domains.workforce import validate_shift_window
@@ -304,6 +305,15 @@ async def _emit_operational_event(
         flush=False,
     )
 
+
+def _event_payload(*, stage: str, action: str, resource_id: int | None = None, status: str | None = None, **extra: object) -> dict:
+    payload: dict[str, object] = {"stage": stage, "action": action}
+    if resource_id is not None:
+        payload["resource_id"] = resource_id
+    if status is not None:
+        payload["status"] = status
+    payload.update(extra)
+    return payload
 
 
 def _cursor_result(items: list, limit: int) -> dict:
@@ -750,19 +760,32 @@ async def create_branch_policy(branch_id: int, payload: BranchPolicyCreate, db: 
 
 
 @router.post("/reservations", response_model=ReservationRead, status_code=status.HTTP_201_CREATED)
-async def create_reservation(payload: ReservationCreate, db: AsyncSession = Depends(get_db)):
+async def create_reservation(payload: ReservationCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     await _get_branch_or_404(payload.branch_id, db)
     reservation = Reservation(**payload.model_dump(), status=ReservationStatus.CONFIRMED)
     db.add(reservation)
+    await db.flush()
     await _emit_operational_event(
         db=db,
         branch_id=payload.branch_id,
         event_name="reservation.created",
-        payload={"reservation_id": reservation.id, "party_size": payload.party_size},
+        payload=_event_payload(
+            stage="reservation",
+            action="create",
+            resource_id=reservation.id,
+            status=str(reservation.status),
+            party_size=payload.party_size,
+        ),
     )
     await db.commit()
     await db.refresh(reservation)
-    return reservation
+    payload_out = reservation.model_dump()
+    await _store_idempotency(request, db, status.HTTP_201_CREATED, payload_out)
+    await db.commit()
+    return payload_out
 
 
 
@@ -796,21 +819,43 @@ async def get_reservation(reservation_id: int, db: AsyncSession = Depends(get_db
 
 
 @router.post("/reservations/{reservation_id}/cancel", response_model=ReservationRead)
-async def cancel_reservation(reservation_id: int, db: AsyncSession = Depends(get_db)):
+async def cancel_reservation(reservation_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     reservation = await db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
+    if reservation.status == ReservationStatus.CANCELLED:
+        payload_out = reservation.model_dump()
+        await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+        await db.commit()
+        return payload_out
     reservation.status = ReservationStatus.CANCELLED
+    await _emit_operational_event(
+        db=db,
+        branch_id=reservation.branch_id,
+        event_name="reservation.cancelled",
+        payload=_event_payload(stage="reservation", action="cancel", resource_id=reservation.id, status=str(reservation.status)),
+    )
     await db.commit()
     await db.refresh(reservation)
-    return reservation
+    payload_out = reservation.model_dump()
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.patch("/reservations/{reservation_id}", response_model=ReservationRead)
-async def patch_reservation(reservation_id: int, payload: ReservationUpdate, db: AsyncSession = Depends(get_db)):
+async def patch_reservation(reservation_id: int, payload: ReservationUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     reservation = await db.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
+    if reservation.status == ReservationStatus.CANCELLED:
+        raise HTTPException(status_code=409, detail="Cancelled reservations cannot be modified")
     if payload.status is not None:
         reservation.status = payload.status
     if payload.notes is not None:
@@ -818,13 +863,25 @@ async def patch_reservation(reservation_id: int, payload: ReservationUpdate, db:
     if payload.table_id is not None:
         table = await _validate_table_for_branch(payload.table_id, reservation.branch_id, db)
         reservation.table_id = table.id
+    await _emit_operational_event(
+        db=db,
+        branch_id=reservation.branch_id,
+        event_name="reservation.updated",
+        payload=_event_payload(stage="reservation", action="update", resource_id=reservation.id, status=str(reservation.status), table_id=reservation.table_id),
+    )
     await db.commit()
     await db.refresh(reservation)
-    return reservation
+    payload_out = reservation.model_dump()
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.post("/tables/{table_id}/seat")
-async def seat_party(table_id: int, payload: SeatTableRequest, db: AsyncSession = Depends(get_db)):
+async def seat_party(table_id: int, payload: SeatTableRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     table = await db.get(RestaurantTable, table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
@@ -848,10 +905,20 @@ async def seat_party(table_id: int, payload: SeatTableRequest, db: AsyncSession 
         db=db,
         branch_id=table.branch_id,
         event_name="table.seated",
-        payload={"table_id": table.id, "party_size": payload.party_size, "reservation_id": payload.reservation_id},
+        payload=_event_payload(
+            stage="seating",
+            action="seat",
+            resource_id=table.id,
+            status=str(table.status),
+            party_size=payload.party_size,
+            reservation_id=payload.reservation_id,
+        ),
     )
     await db.commit()
-    return {"table_id": table.id, "status": table.status, "party_size": payload.party_size}
+    payload_out = {"table_id": table.id, "status": table.status, "party_size": payload.party_size}
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
@@ -894,11 +961,11 @@ async def create_order(payload: OrderCreate, request: Request, db: AsyncSession 
     db.add(order)
     await db.flush()
 
-    subtotal = 0.0
+    line_totals: list[float] = []
     for item_payload in payload.items:
         menu_item = menu_items[item_payload.menu_item_id]
         line_total_amount = line_total(menu_item.price, item_payload.quantity)
-        subtotal += line_total_amount
+        line_totals.append(line_total_amount)
         order_item = OrderItem(
             order_id=order.id,
             menu_item_id=item_payload.menu_item_id,
@@ -913,6 +980,7 @@ async def create_order(payload: OrderCreate, request: Request, db: AsyncSession 
     created_items = (await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))).scalars().all()
     await _apply_recipe_depletion(order, created_items, db)
 
+    subtotal = order_subtotal(line_totals)
     branch = await _get_branch_or_404(payload.branch_id, db)
     totals = bill_totals(
         subtotal=subtotal,
@@ -933,14 +1001,21 @@ async def create_order(payload: OrderCreate, request: Request, db: AsyncSession 
         branch_id=order.branch_id,
         event_name="order.opened",
         actor_user_id=order.waiter_id,
-        payload={"order_id": order.id, "item_count": len(payload.items), "source": str(order.order_source)},
+        payload=_event_payload(
+            stage="order",
+            action="open",
+            resource_id=order.id,
+            status=str(order.status),
+            item_count=len(payload.items),
+            source=str(order.order_source),
+        ),
     )
     await _emit_operational_event(
         db=db,
         branch_id=order.branch_id,
         event_name="order.item_added",
         actor_user_id=order.waiter_id,
-        payload={"order_id": order.id, "item_count": len(payload.items)},
+        payload=_event_payload(stage="order", action="item_add", resource_id=order.id, item_count=len(payload.items)),
     )
     await db.commit()
     await db.refresh(order)
@@ -980,13 +1055,33 @@ async def action_order_edit_approval(approval_id: int, payload: OrderEditApprova
 
 
 @router.patch("/orders/{order_id}", response_model=OrderRead)
-async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncSession = Depends(get_db)):
+async def patch_order(order_id: int, payload: OrderPatchWithApproval, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     previous_status = order.status
-    if previous_status == OrderStatus.CANCELLED and payload.items is not None:
-        raise HTTPException(status_code=409, detail="Cannot edit items on a cancelled order")
+    fired_tickets_count = (
+        await db.execute(
+            select(func.count(KitchenTicket.id))
+            .join(OrderItem, OrderItem.id == KitchenTicket.order_item_id)
+            .where(
+                OrderItem.order_id == order.id,
+                KitchenTicket.status != KitchenTicketStatus.QUEUED,
+            )
+        )
+    ).one()[0]
+    has_approval = payload.edit_approval_id is not None
+    if not can_patch_order(
+        is_cancelled=previous_status == OrderStatus.CANCELLED,
+        has_fired_tickets=fired_tickets_count > 0,
+        has_approval=has_approval,
+    ):
+        if previous_status == OrderStatus.CANCELLED:
+            raise HTTPException(status_code=409, detail="Cannot edit cancelled order")
+        raise HTTPException(status_code=409, detail="Post-fire order edits require approval")
 
     if payload.status is not None:
         if payload.status == OrderStatus.CANCELLED and previous_status in {
@@ -1003,16 +1098,6 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncS
         order.status = payload.status
 
     if payload.items is not None:
-        fired_tickets_count = (
-            await db.execute(
-                select(func.count(KitchenTicket.id))
-                .join(OrderItem, OrderItem.id == KitchenTicket.order_item_id)
-                .where(
-                    OrderItem.order_id == order.id,
-                    KitchenTicket.status != KitchenTicketStatus.QUEUED,
-                )
-            )
-        ).one()[0]
         if fired_tickets_count:
             if payload.edit_approval_id is None:
                 raise HTTPException(status_code=409, detail="Post-fire order edits require approval")
@@ -1025,13 +1110,13 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncS
         if old_item_ids:
             await db.execute(delete(KitchenTicket).where(KitchenTicket.order_item_id.in_(old_item_ids)))
         await db.execute(delete(OrderItem).where(OrderItem.order_id == order.id))
-        subtotal = 0.0
+        line_totals: list[float] = []
         for item_payload in payload.items:
             menu_item = await db.get(MenuItem, item_payload.menu_item_id)
             if not menu_item or menu_item.branch_id != order.branch_id:
                 raise HTTPException(status_code=400, detail=f"Invalid menu item {item_payload.menu_item_id}")
             line_total = round(menu_item.price * item_payload.quantity, 2)
-            subtotal += line_total
+            line_totals.append(line_total)
             order_item = OrderItem(
                     order_id=order.id,
                     menu_item_id=item_payload.menu_item_id,
@@ -1044,15 +1129,17 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncS
             await db.flush()
             db.add(KitchenTicket(order_item_id=order_item.id, status=KitchenTicketStatus.QUEUED))
 
+        subtotal = order_subtotal(line_totals)
         bill = (
             await db.execute(select(Bill).where(Bill.order_id == order.id))
         ).scalars().first()
         if bill:
             branch = await _get_branch_or_404(order.branch_id, db)
-            bill.subtotal = round(subtotal, 2)
-            bill.tax_amount = round(subtotal * branch.tax_rate, 2)
-            bill.service_charge = round(subtotal * branch.service_charge_rate, 2)
-            bill.total_amount = round(bill.subtotal + bill.tax_amount + bill.service_charge, 2)
+            totals = bill_totals(subtotal=subtotal, tax_rate=branch.tax_rate, service_charge_rate=branch.service_charge_rate)
+            bill.subtotal = totals["subtotal"]
+            bill.tax_amount = totals["tax_amount"]
+            bill.service_charge = totals["service_charge"]
+            bill.total_amount = totals["total_amount"]
             if bill.paid_amount == 0:
                 bill.status = BillStatus.OPEN
             elif bill.paid_amount < bill.total_amount:
@@ -1063,9 +1150,18 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, db: AsyncS
     if payload.status == OrderStatus.CANCELLED and previous_status != OrderStatus.CANCELLED:
         await _reverse_recipe_depletion(order, db)
     order.updated_at = datetime.utcnow()
+    await _emit_operational_event(
+        db=db,
+        branch_id=order.branch_id,
+        event_name="order.updated",
+        payload=_event_payload(stage="order", action="update", resource_id=order.id, status=str(order.status), previous_status=str(previous_status)),
+    )
     await db.commit()
     await db.refresh(order)
-    return order
+    payload_out = order.model_dump()
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.get("/kitchen/tickets", response_model=KitchenTicketCursorPage)
@@ -1087,7 +1183,10 @@ async def list_kitchen_tickets(
 
 
 @router.patch("/kitchen/tickets/{ticket_id}", response_model=KitchenTicketRead)
-async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, db: AsyncSession = Depends(get_db)):
+async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     ticket = await db.get(KitchenTicket, ticket_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -1115,11 +1214,20 @@ async def patch_kitchen_ticket(ticket_id: int, payload: KitchenTicketPatch, db: 
                 branch_id=order.branch_id,
                 event_name="kitchen.ticket_ready",
                 actor_user_id=payload.updated_by,
-                payload={"ticket_id": ticket.id, "from_status": str(previous_status)},
+                payload=_event_payload(
+                    stage="kitchen",
+                    action="ticket_ready",
+                    resource_id=ticket.id,
+                    status=str(payload.status),
+                    from_status=str(previous_status),
+                ),
             )
     await db.commit()
     await db.refresh(ticket)
-    return ticket
+    payload_out = ticket.model_dump()
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.get("/kitchen/events")
@@ -1652,7 +1760,13 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
             branch_id=order.branch_id,
             event_name="settlement.completed",
             actor_user_id=payload.cashier_id,
-            payload={"bill_id": bill.id, "paid_amount": bill.paid_amount, "status": str(bill.status)},
+            payload=_event_payload(
+                stage="settlement",
+                action="complete",
+                resource_id=bill.id,
+                status=str(bill.status),
+                paid_amount=bill.paid_amount,
+            ),
         )
         if bill.status == BillStatus.PAID:
             await _emit_operational_event(
@@ -1660,7 +1774,7 @@ async def settle_bill(bill_id: int, payload: BillSettlementCreate, request: Requ
                 branch_id=order.branch_id,
                 event_name="bill.closed",
                 actor_user_id=payload.cashier_id,
-                payload={"bill_id": bill.id, "total_amount": bill.total_amount},
+                payload=_event_payload(stage="billing", action="close", resource_id=bill.id, status=str(bill.status), total_amount=bill.total_amount),
             )
 
     await db.commit()
@@ -1717,7 +1831,10 @@ async def action_discount_approval(approval_id: int, payload: DiscountApprovalAc
 
 
 @router.post("/refunds", response_model=RefundRead, status_code=status.HTTP_201_CREATED)
-async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db)):
+async def create_refund(payload: RefundCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     await _get_branch_or_404(payload.branch_id, db)
     bill = await db.get(Bill, payload.bill_id)
     if not bill:
@@ -1769,9 +1886,28 @@ async def create_refund(payload: RefundCreate, db: AsyncSession = Depends(get_db
             "post_close_refund": post_close_refund,
         },
     )
+    await _emit_operational_event(
+        db=db,
+        branch_id=payload.branch_id,
+        event_name="billing.refund_created",
+        severity=OperationalSeverity.WARNING if post_close_refund else OperationalSeverity.INFO,
+        actor_user_id=payload.approved_by,
+        payload=_event_payload(
+            stage="billing",
+            action="refund",
+            resource_id=refund.id,
+            bill_id=payload.bill_id,
+            amount=payload.amount,
+            post_close_refund=post_close_refund,
+        ),
+        is_exception=post_close_refund,
+    )
     await db.commit()
     await db.refresh(refund)
-    return refund
+    payload_out = refund.model_dump()
+    await _store_idempotency(request, db, status.HTTP_201_CREATED, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.get("/refunds", response_model=RefundCursorPage)
@@ -2040,7 +2176,10 @@ async def list_waitlist(branch_id: int, cursor: int | None = None, limit: int = 
 
 
 @router.patch("/waitlist/{waitlist_id}/promote", response_model=WaitlistRead)
-async def promote_waitlist(waitlist_id: int, table_id: int, db: AsyncSession = Depends(get_db)):
+async def promote_waitlist(waitlist_id: int, table_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     entry = await db.get(WaitlistEntry, waitlist_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Waitlist entry not found")
@@ -2048,10 +2187,13 @@ async def promote_waitlist(waitlist_id: int, table_id: int, db: AsyncSession = D
         raise HTTPException(status_code=400, detail="Waitlist entry is not active")
 
     table = await _validate_table_for_branch(table_id, entry.branch_id, db)
-    if table.status == TableStatus.OCCUPIED:
-        raise HTTPException(status_code=409, detail="Table already occupied")
-    if entry.party_size > table.seats:
-        raise HTTPException(status_code=400, detail="Party size exceeds table capacity")
+    decision = evaluate_table_assignment(
+        table_seats=table.seats,
+        party_size=entry.party_size,
+        is_occupied=table.status == TableStatus.OCCUPIED,
+    )
+    if not decision.can_seat:
+        raise HTTPException(status_code=409 if decision.reason == "Table already occupied" else 400, detail=decision.reason)
 
     table.status = TableStatus.OCCUPIED
     entry.status = WaitlistStatus.SEATED
@@ -2059,21 +2201,41 @@ async def promote_waitlist(waitlist_id: int, table_id: int, db: AsyncSession = D
         db=db,
         branch_id=entry.branch_id,
         event_name="waitlist.promoted",
-        payload={"waitlist_id": entry.id, "table_id": table.id},
+        payload=_event_payload(stage="seating", action="waitlist_promote", resource_id=entry.id, status=str(entry.status), table_id=table.id),
     )
     await db.commit()
     await db.refresh(entry)
-    return entry
+    payload_out = entry.model_dump()
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.post("/tables/{table_id}/release")
-async def release_table(table_id: int, db: AsyncSession = Depends(get_db)):
+async def release_table(table_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     table = await db.get(RestaurantTable, table_id)
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
+    if table.status == TableStatus.AVAILABLE:
+        payload_out = {"table_id": table.id, "status": table.status}
+        await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+        await db.commit()
+        return payload_out
     table.status = TableStatus.AVAILABLE
+    await _emit_operational_event(
+        db=db,
+        branch_id=table.branch_id,
+        event_name="table.released",
+        payload=_event_payload(stage="seating", action="release", resource_id=table.id, status=str(table.status)),
+    )
     await db.commit()
-    return {"table_id": table.id, "status": table.status}
+    payload_out = {"table_id": table.id, "status": table.status}
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.get("/orders", response_model=OrderCursorPage)
@@ -2236,7 +2398,10 @@ async def list_accounting_export_retries(
 
 
 @router.post("/day-close", response_model=DayCloseRead, status_code=status.HTTP_201_CREATED)
-async def open_day_close(payload: DayCloseCreate, db: AsyncSession = Depends(get_db)):
+async def open_day_close(payload: DayCloseCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     await _get_branch_or_404(payload.branch_id, db)
     existing = (
         await db.execute(
@@ -2247,13 +2412,25 @@ async def open_day_close(payload: DayCloseCreate, db: AsyncSession = Depends(get
         raise HTTPException(status_code=409, detail="Day-close already exists for business date")
     record = DayClose(**payload.model_dump(), status=DayCloseStatus.OPEN)
     db.add(record)
+    await _emit_operational_event(
+        db=db,
+        branch_id=record.branch_id,
+        event_name="branch.day_close_opened",
+        payload=_event_payload(stage="day_close", action="open", resource_id=record.id, status=str(record.status), business_date=record.business_date.isoformat()),
+    )
     await db.commit()
     await db.refresh(record)
-    return record
+    payload_out = record.model_dump()
+    await _store_idempotency(request, db, status.HTTP_201_CREATED, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.patch("/day-close/{day_close_id}/finalize", response_model=DayCloseRead)
-async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: AsyncSession = Depends(get_db)):
+async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, request: Request, db: AsyncSession = Depends(get_db)):
+    replay = await _idempotency_replay(request, db)
+    if replay:
+        return replay
     record = await db.get(DayClose, day_close_id)
     if not record:
         raise HTTPException(status_code=404, detail="Day-close record not found")
@@ -2282,7 +2459,7 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
             event_name="branch.day_close_blocked",
             severity=OperationalSeverity.WARNING,
             actor_user_id=payload.closed_by,
-            payload={"open_drawers": open_drawers, "open_bills": open_bills},
+            payload=_event_payload(stage="day_close", action="blocked", resource_id=record.id, status=str(record.status), open_drawers=open_drawers, open_bills=open_bills),
             is_exception=True,
         )
         raise HTTPException(
@@ -2305,7 +2482,7 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
             event_name="branch.day_close_blocked",
             severity=OperationalSeverity.WARNING,
             actor_user_id=payload.closed_by,
-            payload={"pending_required_checklist": pending_required_checklist},
+            payload=_event_payload(stage="day_close", action="blocked", resource_id=record.id, status=str(record.status), pending_required_checklist=pending_required_checklist),
             is_exception=True,
         )
         raise HTTPException(status_code=409, detail=f"Day-close blocked: pending_required_checklist={pending_required_checklist}")
@@ -2320,11 +2497,14 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, db: A
         branch_id=record.branch_id,
         event_name="branch.day_closed",
         actor_user_id=payload.closed_by,
-        payload={"day_close_id": record.id, "business_date": record.business_date.isoformat()},
+        payload=_event_payload(stage="day_close", action="finalize", resource_id=record.id, status=str(record.status), business_date=record.business_date.isoformat()),
     )
     await db.commit()
     await db.refresh(record)
-    return record
+    payload_out = record.model_dump()
+    await _store_idempotency(request, db, status.HTTP_200_OK, payload_out)
+    await db.commit()
+    return payload_out
 
 
 @router.get("/day-close/{day_close_id}/blockers", response_model=DayCloseBlockersRead)
