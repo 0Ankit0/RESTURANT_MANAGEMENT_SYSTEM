@@ -62,8 +62,6 @@ class RestaurantRepository {
     }
   }
 
-
-
   Future<CursorPage<RestaurantWaitlistItem>> getWaitlist(int branchId) async {
     try {
       final response = await _dioClient.dio.get(
@@ -75,6 +73,113 @@ class RestaurantRepository {
           .map((item) => RestaurantWaitlistItem.fromJson(item as Map<String, dynamic>))
           .toList();
       return CursorPage(items: items, nextCursor: data['next_cursor'] as int?);
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<CursorPage<KitchenTicketItem>> getKitchenTickets({int? branchId}) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantKitchenTickets,
+        queryParameters: {if (branchId != null) 'branch_id': branchId},
+      );
+      final data = response.data as Map<String, dynamic>;
+      final items = (data['items'] as List<dynamic>? ?? [])
+          .map((item) => KitchenTicketItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+      return CursorPage(items: items, nextCursor: data['next_cursor'] as int?);
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<KitchenTicketItem> updateKitchenTicket({
+    required int ticketId,
+    required String status,
+    int? updatedBy,
+  }) async {
+    try {
+      final response = await _dioClient.dio.patch(
+        ApiEndpoints.restaurantKitchenTicket(ticketId),
+        data: {
+          'status': status,
+          if (updatedBy != null) 'updated_by': updatedBy,
+        },
+      );
+      return KitchenTicketItem.fromJson(response.data as Map<String, dynamic>);
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<List<StockAlertItem>> getStockAlerts(int branchId, {int limit = 20}) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantStockAlerts,
+        queryParameters: {'branch_id': branchId, 'limit': limit},
+      );
+      final data = response.data;
+      final items = data is Map<String, dynamic>
+          ? (data['items'] as List<dynamic>? ?? [])
+          : (data as List<dynamic>? ?? []);
+      return items
+          .map((item) => StockAlertItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<List<OperationalNotificationItem>> getOperationalNotifications(
+    int branchId, {
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantOperationalNotifications,
+        queryParameters: {'branch_id': branchId, 'limit': limit},
+      );
+      final list = response.data as List<dynamic>? ?? [];
+      return list
+          .map((item) => OperationalNotificationItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<List<RestaurantBillItem>> getBills(int branchId) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantBills,
+        queryParameters: {'branch_id': branchId},
+      );
+      final list = response.data as List<dynamic>? ?? [];
+      return list
+          .map((item) => RestaurantBillItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<void> settleBill({
+    required int billId,
+    required double amount,
+    required String paymentMethod,
+    int? cashierId,
+  }) async {
+    try {
+      await _dioClient.dio.post(
+        ApiEndpoints.restaurantBillSettlements(billId),
+        data: {
+          if (cashierId != null) 'cashier_id': cashierId,
+          'settlements': [
+            {'payment_method': paymentMethod, 'amount': amount},
+          ],
+        },
+      );
     } catch (e) {
       throw ErrorHandler.handle(e);
     }
@@ -123,7 +228,10 @@ class RestaurantRepository {
           'guest_name': guestName,
           'guest_phone': guestPhone,
           'party_size': partySize,
-          'reservation_time': DateTime.now().add(const Duration(minutes: 30)).toUtc().toIso8601String(),
+          'reservation_time': DateTime.now()
+              .add(const Duration(minutes: 30))
+              .toUtc()
+              .toIso8601String(),
         },
       );
     } catch (e) {

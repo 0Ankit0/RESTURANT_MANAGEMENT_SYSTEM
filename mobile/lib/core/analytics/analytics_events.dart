@@ -45,3 +45,20 @@ class TenantAnalyticsEvents {
   static const String memberInvited = 'tenant_member_invited';
   static const String memberJoined = 'tenant_member_joined';
 }
+
+
+class RestaurantAnalyticsEvents {
+  RestaurantAnalyticsEvents._();
+
+  static const String dashboardViewed = 'restaurant_ops_dashboard_viewed';
+  static const String reservationCreated = 'restaurant_ops_reservation_created';
+  static const String reservationCreateFailed = 'restaurant_ops_reservation_create_failed';
+  static const String tableSeated = 'restaurant_ops_table_seated';
+  static const String tableSeatFailed = 'restaurant_ops_table_seat_failed';
+  static const String waitlistPromoted = 'restaurant_ops_waitlist_promoted';
+  static const String waitlistPromoteFailed = 'restaurant_ops_waitlist_promote_failed';
+  static const String kitchenTicketUpdated = 'restaurant_ops_kitchen_ticket_updated';
+  static const String kitchenTicketUpdateFailed = 'restaurant_ops_kitchen_ticket_update_failed';
+  static const String billSettled = 'restaurant_ops_bill_settled';
+  static const String billSettleFailed = 'restaurant_ops_bill_settle_failed';
+}

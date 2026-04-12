@@ -16,6 +16,26 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
   final _partySizeController = TextEditingController(text: '2');
 
   @override
+  void initState() {
+    super.initState();
+    ref.listenManual<RestaurantActionState>(
+      restaurantActionControllerProvider,
+      (previous, next) {
+        if (!mounted) return;
+        if (next.error != null && next.error != previous?.error) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(next.error!), backgroundColor: Colors.red),
+          );
+        } else if (next.successMessage != null && next.successMessage != previous?.successMessage) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(next.successMessage!)),
+          );
+        }
+      },
+    );
+  }
+
+  @override
   void dispose() {
     _guestNameController.dispose();
     _guestPhoneController.dispose();
@@ -26,57 +46,71 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
   Future<void> _createReservation() async {
     final branchId = ref.read(selectedBranchIdProvider);
     final partySize = int.tryParse(_partySizeController.text) ?? 1;
-
-    await ref.read(restaurantRepositoryProvider).createReservation(
-      branchId: branchId,
-      guestName: _guestNameController.text,
-      guestPhone: _guestPhoneController.text,
-      partySize: partySize,
-    );
-
-    ref.invalidate(restaurantBranchReportProvider);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reservation created')),
-    );
+    await ref.read(restaurantActionControllerProvider.notifier).createReservation(
+          branchId: branchId,
+          guestName: _guestNameController.text,
+          guestPhone: _guestPhoneController.text,
+          partySize: partySize,
+        );
   }
 
-  Future<void> _seatFirstAvailableTable() async {
-    final tables = await ref.read(restaurantTablesProvider.future);
-    final available = tables.where((table) => table.status == 'available').toList();
-    if (available.isEmpty) return;
-
-    await ref.read(restaurantRepositoryProvider).seatTable(tableId: available.first.id, partySize: 2);
-    ref.invalidate(restaurantTablesProvider);
-    ref.invalidate(restaurantOrdersProvider);
+  Future<void> _seatFirstAvailableTable() {
+    final branchId = ref.read(selectedBranchIdProvider);
+    return ref.read(restaurantActionControllerProvider.notifier).seatFirstAvailableTable(
+          branchId: branchId,
+        );
   }
 
-  Future<void> _promoteFirstWaitlist() async {
-    final tables = await ref.read(restaurantTablesProvider.future);
-    final waitlist = await ref.read(restaurantWaitlistProvider.future);
+  Future<void> _promoteFirstWaitlist() {
+    final branchId = ref.read(selectedBranchIdProvider);
+    return ref.read(restaurantActionControllerProvider.notifier).promoteFirstWaitlist(
+          branchId: branchId,
+        );
+  }
 
-    final available = tables.where((table) => table.status == 'available').toList();
-    final waiting = waitlist.items.where((entry) => entry.status == 'waiting').toList();
-    if (available.isEmpty || waiting.isEmpty) return;
+  Future<void> _settleFirstOpenBill() {
+    final branchId = ref.read(selectedBranchIdProvider);
+    return ref.read(restaurantActionControllerProvider.notifier).settleFirstOpenBill(
+          branchId: branchId,
+        );
+  }
 
-    await ref.read(restaurantRepositoryProvider).promoteWaitlist(
-      waitlistId: waiting.first.id,
-      tableId: available.first.id,
-    );
+  Future<void> _advanceKitchenTicket(int ticketId, String currentStatus) {
+    final branchId = ref.read(selectedBranchIdProvider);
+    final next = _nextKitchenStatus(currentStatus);
+    if (next == null) return Future.value();
+    return ref.read(restaurantActionControllerProvider.notifier).advanceKitchenTicket(
+          branchId: branchId,
+          ticketId: ticketId,
+          nextStatus: next,
+        );
+  }
 
-    ref.invalidate(restaurantWaitlistProvider);
-    ref.invalidate(restaurantTablesProvider);
+  String? _nextKitchenStatus(String status) {
+    switch (status) {
+      case 'queued':
+        return 'in_preparation';
+      case 'in_preparation':
+        return 'ready';
+      case 'ready':
+        return 'served';
+      default:
+        return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final branchId = ref.watch(selectedBranchIdProvider);
+    final actionState = ref.watch(restaurantActionControllerProvider);
     final branchesAsync = ref.watch(restaurantBranchesProvider);
     final tablesAsync = ref.watch(restaurantTablesProvider);
     final reportAsync = ref.watch(restaurantBranchReportProvider);
     final ordersAsync = ref.watch(restaurantOrdersProvider);
     final waitlistAsync = ref.watch(restaurantWaitlistProvider);
+    final kitchenAsync = ref.watch(restaurantKitchenTicketsProvider);
+    final notificationsAsync = ref.watch(restaurantOperationalNotificationsProvider);
+    final stockAlertsAsync = ref.watch(restaurantStockAlertsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Restaurant Operations')),
@@ -113,8 +147,41 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
                 ),
                 error: (_, __) => const Text('Failed to load branches'),
               ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Refresh branch data',
+                onPressed: () {
+                  ref.invalidate(restaurantBranchReportProvider);
+                  ref.invalidate(restaurantTablesProvider);
+                  ref.invalidate(restaurantOrdersProvider);
+                  ref.invalidate(restaurantWaitlistProvider);
+                  ref.invalidate(restaurantKitchenTicketsProvider);
+                  ref.invalidate(restaurantStockAlertsProvider);
+                  ref.invalidate(restaurantOperationalNotificationsProvider);
+                },
+                icon: const Icon(Icons.refresh),
+              ),
             ],
           ),
+          if (actionState.canRetry) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Last action failed. Retry is available for branch #${actionState.branchId}.',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+                TextButton(
+                  onPressed: actionState.isLoading
+                      ? null
+                      : () => ref.read(restaurantActionControllerProvider.notifier).retryLastAction(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           reportAsync.when(
             data: (report) => Wrap(
@@ -143,10 +210,23 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
                   TextField(controller: _guestPhoneController, decoration: const InputDecoration(labelText: 'Guest phone')),
                   TextField(controller: _partySizeController, decoration: const InputDecoration(labelText: 'Party size')),
                   const SizedBox(height: 8),
-                  FilledButton(onPressed: _createReservation, child: const Text('Create Reservation')),
+                  FilledButton(
+                    onPressed: actionState.isLoading ? null : _createReservation,
+                    child: const Text('Create Reservation'),
+                  ),
                   const SizedBox(height: 8),
-                  OutlinedButton(onPressed: _seatFirstAvailableTable, child: const Text('Seat First Available Table')),
-                  OutlinedButton(onPressed: _promoteFirstWaitlist, child: const Text('Promote First Waitlist')),
+                  OutlinedButton(
+                    onPressed: actionState.isLoading ? null : _seatFirstAvailableTable,
+                    child: const Text('Seat First Available Table'),
+                  ),
+                  OutlinedButton(
+                    onPressed: actionState.isLoading ? null : _promoteFirstWaitlist,
+                    child: const Text('Promote First Waitlist'),
+                  ),
+                  OutlinedButton(
+                    onPressed: actionState.isLoading ? null : _settleFirstOpenBill,
+                    child: const Text('Settle First Open Bill'),
+                  ),
                 ],
               ),
             ),
@@ -188,6 +268,91 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Text('Failed to load waitlist: $error'),
+          ),
+          const SizedBox(height: 16),
+          const Text('Kitchen Queue', style: TextStyle(fontWeight: FontWeight.bold)),
+          kitchenAsync.when(
+            data: (kitchenPage) => Column(
+              children: kitchenPage.items
+                  .map(
+                    (ticket) => Card(
+                      child: ListTile(
+                        title: Text('Ticket #${ticket.id} (${ticket.station})'),
+                        subtitle: Text('Priority ${ticket.priority}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(ticket.status),
+                            const SizedBox(width: 8),
+                            if (_nextKitchenStatus(ticket.status) != null)
+                              TextButton(
+                                onPressed: actionState.isLoading
+                                    ? null
+                                    : () => _advanceKitchenTicket(ticket.id, ticket.status),
+                                child: const Text('Advance'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Text('Failed to load kitchen tickets: $error'),
+          ),
+          const SizedBox(height: 16),
+          const Text('Settlement Health', style: TextStyle(fontWeight: FontWeight.bold)),
+          reportAsync.when(
+            data: (report) => Card(
+              child: ListTile(
+                title: Text(
+                  'Open drawers ${report.settlementHealth.openDrawers} · '
+                  'Unpaid bills ${report.settlementHealth.unpaidBills} · '
+                  'Failed exports ${report.settlementHealth.failedExports}',
+                ),
+              ),
+            ),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 16),
+          const Text('Low Stock Alerts', style: TextStyle(fontWeight: FontWeight.bold)),
+          stockAlertsAsync.when(
+            data: (alerts) => Column(
+              children: alerts
+                  .map(
+                    (alert) => Card(
+                      child: ListTile(
+                        title: Text(alert.itemName),
+                        subtitle: Text('Units left: ${alert.availableUnits}'),
+                        trailing: Text(alert.severity),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Text('Failed to load stock alerts: $error'),
+          ),
+          const SizedBox(height: 16),
+          const Text('Operational Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
+          notificationsAsync.when(
+            data: (notifications) => Column(
+              children: notifications
+                  .map(
+                    (notice) => Card(
+                      child: ListTile(
+                        title: Text(notice.eventName),
+                        subtitle: Text(notice.occurredAt?.toLocal().toString() ?? '-'),
+                        trailing: Text(notice.severity),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Text('Failed to load notifications: $error'),
           ),
           const SizedBox(height: 16),
           const Text('Recent Orders', style: TextStyle(fontWeight: FontWeight.bold)),

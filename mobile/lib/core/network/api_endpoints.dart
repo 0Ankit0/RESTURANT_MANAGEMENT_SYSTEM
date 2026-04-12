@@ -56,6 +56,12 @@ class ApiEndpoints {
   static const String restaurantReservations = '/reservations';
   static const String restaurantWaitlist = '/waitlist';
   static const String restaurantMenuItems = '/menu-items';
+  static const String restaurantKitchenTickets = '/kitchen/tickets';
+  static String restaurantKitchenTicket(int ticketId) => '/kitchen/tickets/$ticketId';
+  static const String restaurantStockAlerts = '/inventory/stock-alerts';
+  static const String restaurantOperationalNotifications = '/operations/notifications';
+  static const String restaurantBills = '/bills';
+  static String restaurantBillSettlements(int billId) => '/bills/$billId/settlements';
   static const String restaurantBranchReport = '/reports/branch-operations';
   static String restaurantSeatTable(int tableId) => '/tables/$tableId/seat';
   static String restaurantPromoteWaitlist(int waitlistId) => '/waitlist/$waitlistId/promote';
