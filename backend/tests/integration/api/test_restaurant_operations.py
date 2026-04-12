@@ -1,7 +1,7 @@
 import pytest
 from sqlmodel import select
 
-from src.apps.restaurant.models import PurchaseOrderLine
+from src.apps.restaurant.models import Ingredient, PurchaseOrderLine, StockLedgerEntry
 
 
 @pytest.mark.asyncio
@@ -599,6 +599,116 @@ async def test_edge_case_controls_and_audit_trace(client):
 
 
 @pytest.mark.asyncio
+async def test_purchase_order_to_stock_workflow(client, db_session):
+    branch = (await client.post("/api/v1/branches", json={"name": "PO Branch", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    ingredient = (
+        await client.post(
+            f"/api/v1/branches/{branch['id']}/ingredients",
+            json={"name": "Rice", "unit": "kg", "quantity_on_hand": 2, "reorder_threshold": 1},
+        )
+    ).json()
+
+    po = (
+        await client.post(
+            "/api/v1/purchase-orders",
+            json={
+                "branch_id": branch["id"],
+                "created_by": 9,
+                "lines": [{"ingredient_id": ingredient["id"], "ordered_qty": 5, "unit_cost": 1.2}],
+            },
+        )
+    ).json()
+    assert po["status"] == "requested"
+
+    mark_in_transit = await client.patch(f"/api/v1/purchase-orders/{po['id']}", json={"action": "mark_in_transit", "approved_by": 1})
+    assert mark_in_transit.status_code == 200
+    assert mark_in_transit.json()["status"] == "in_transit"
+
+    po_line = (
+        await db_session.execute(select(PurchaseOrderLine).where(PurchaseOrderLine.purchase_order_id == po["id"]))
+    ).scalars().first()
+    assert po_line is not None
+
+    partial_receipt = await client.post(
+        f"/api/v1/purchase-orders/{po['id']}/receipts",
+        json={"lines": [{"line_id": po_line.id, "received_qty": 3}], "discrepancy_notes": "supplier short ship"},
+    )
+    assert partial_receipt.status_code == 200
+    assert partial_receipt.json()["status"] == "discrepancy"
+
+    final_receipt = await client.post(
+        f"/api/v1/purchase-orders/{po['id']}/receipts",
+        json={"lines": [{"line_id": po_line.id, "received_qty": 2}]},
+    )
+    assert final_receipt.status_code == 200
+    assert final_receipt.json()["status"] == "received"
+
+    ingredient_row = await db_session.get(Ingredient, ingredient["id"])
+    assert ingredient_row is not None
+    assert ingredient_row.quantity_on_hand == 7
+
+    ledger_rows = (
+        await db_session.execute(
+            select(StockLedgerEntry).where(
+                StockLedgerEntry.reference_type == "purchase_order",
+                StockLedgerEntry.reference_id == po["id"],
+                StockLedgerEntry.reason == "goods_receipt",
+            )
+        )
+    ).scalars().all()
+    assert len(ledger_rows) == 2
+
+
+@pytest.mark.asyncio
+async def test_stock_count_variance_workflow(client, db_session):
+    branch = (await client.post("/api/v1/branches", json={"name": "Count Branch", "tax_rate": 0.05, "service_charge_rate": 0.02})).json()
+    ingredient = (
+        await client.post(
+            f"/api/v1/branches/{branch['id']}/ingredients",
+            json={"name": "Milk", "unit": "ltr", "quantity_on_hand": 10, "reorder_threshold": 2},
+        )
+    ).json()
+
+    session = (
+        await client.post(
+            "/api/v1/inventory/stock-count-sessions",
+            json={"branch_id": branch["id"], "opened_by": 3},
+        )
+    ).json()
+
+    line = await client.post(
+        f"/api/v1/inventory/stock-count-sessions/{session['id']}/lines",
+        json={"ingredient_id": ingredient["id"], "counted_qty": 8, "notes": "breakage"},
+    )
+    assert line.status_code == 201
+    assert line.json()["variance_qty"] == -2
+
+    submitted = await client.patch(f"/api/v1/inventory/stock-count-sessions/{session['id']}/submit?submitted_by=3")
+    assert submitted.status_code == 200
+    assert submitted.json()["status"] == "submitted"
+
+    reviewed = await client.patch(
+        f"/api/v1/inventory/stock-count-sessions/{session['id']}/review",
+        json={"action": "approve", "reviewer_id": 1},
+    )
+    assert reviewed.status_code == 200
+    assert reviewed.json()["status"] == "approved"
+
+    ingredient_row = await db_session.get(Ingredient, ingredient["id"])
+    assert ingredient_row is not None
+    assert ingredient_row.quantity_on_hand == 8
+
+    ledger_rows = (
+        await db_session.execute(
+            select(StockLedgerEntry).where(
+                StockLedgerEntry.reference_type == "stock_count_session",
+                StockLedgerEntry.reference_id == session["id"],
+                StockLedgerEntry.reason == "stock_count_variance",
+            )
+        )
+    ).scalars().all()
+    assert len(ledger_rows) == 1
+    assert ledger_rows[0].change_qty == -2
 async def test_lifecycle_idempotency_and_operational_events(client):
     branch = (await client.post('/api/v1/branches', json={'name': 'Lifecycle', 'tax_rate': 0.1, 'service_charge_rate': 0.05})).json()
     table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={'code': 'L1', 'seats': 4})).json()

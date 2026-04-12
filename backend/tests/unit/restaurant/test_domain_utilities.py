@@ -6,7 +6,7 @@ from src.apps.restaurant.domains.inventory import apply_inventory_delta, varianc
 from src.apps.restaurant.domains.kitchen import can_transition_ticket
 from src.apps.restaurant.domains.menu import line_total, validate_modifier_selection
 from src.apps.restaurant.domains.orders import can_patch_order, order_subtotal
-from src.apps.restaurant.domains.procurement import outstanding_quantity, po_status
+from src.apps.restaurant.domains.procurement import enforce_po_transition, outstanding_quantity, po_status
 from src.apps.restaurant.domains.reporting import build_branch_snapshot
 from src.apps.restaurant.domains.seating import evaluate_table_assignment
 from src.apps.restaurant.domains.workforce import attendance_state, validate_shift_window
@@ -35,7 +35,10 @@ class DomainUtilitiesTests(unittest.TestCase):
 
     def test_procurement_helpers(self):
         self.assertEqual(outstanding_quantity(ordered_qty=10, received_qty=4), 6)
-        self.assertEqual(po_status(lines_fully_received=0, total_lines=2), "open")
+        self.assertEqual(po_status(lines_fully_received=0, total_lines=2), "in_transit")
+        self.assertEqual(po_status(lines_fully_received=1, total_lines=2), "partial")
+        self.assertEqual(po_status(lines_fully_received=1, total_lines=2, has_discrepancy=True), "discrepancy")
+        self.assertEqual(enforce_po_transition(current_status="requested", action="mark_in_transit"), "in_transit")
 
     def test_billing_helpers(self):
         totals = bill_totals(subtotal=100, tax_rate=0.1, service_charge_rate=0.05)
