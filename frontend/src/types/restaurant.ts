@@ -1,6 +1,7 @@
 export type TableStatus = 'available' | 'occupied' | 'reserved' | 'out_of_service';
 export type WaitlistStatus = 'waiting' | 'seated' | 'cancelled';
 export type OrderStatus = 'draft' | 'submitted' | 'in_progress' | 'ready' | 'served' | 'cancelled';
+export type KitchenTicketStatus = 'queued' | 'in_preparation' | 'ready' | 'served' | 'delayed' | 'voided';
 
 export interface RestaurantBranch {
   id: number;
@@ -52,7 +53,7 @@ export interface KitchenTicket {
   id: number;
   order_item_id: number;
   station: string;
-  status: string;
+  status: KitchenTicketStatus;
   priority: number;
   updated_at: string;
 }
@@ -71,6 +72,26 @@ export interface RestaurantOrder {
   status: OrderStatus;
   created_at: string;
   updated_at: string;
+}
+
+export interface Bill {
+  id: number;
+  order_id: number;
+  subtotal: number;
+  tax_amount: number;
+  service_charge: number;
+  total_amount: number;
+  paid_amount: number;
+  status: 'open' | 'partially_paid' | 'paid' | 'voided';
+}
+
+export interface OrderEditApproval {
+  id: number;
+  order_id: number;
+  requested_by: number;
+  approved_by: number | null;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 export interface BranchOperationsReport {

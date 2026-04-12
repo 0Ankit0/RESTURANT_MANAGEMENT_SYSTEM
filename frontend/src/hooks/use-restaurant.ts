@@ -3,19 +3,41 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type {
+  Bill,
   BranchOperationsReport,
-  RestaurantBranch,
   CursorPage,
   KitchenTicket,
+  KitchenTicketStatus,
   MenuItem,
   OperationalNotification,
+  OrderEditApproval,
   Reservation,
+  RestaurantBranch,
   RestaurantOrder,
   RestaurantTable,
   WaitlistEntry,
 } from '@/types/restaurant';
 
+type SeatTableResponse = {
+  table_id: number;
+  status: string;
+  party_size: number;
+};
 
+const branchQueryKeys = (branchId: number) => [
+  ['restaurant', 'tables', branchId],
+  ['restaurant', 'orders', branchId],
+  ['restaurant', 'waitlist', branchId],
+  ['restaurant', 'reservations', branchId],
+  ['restaurant', 'branch-report', branchId],
+  ['restaurant', 'bills', branchId],
+] as const;
+
+function invalidateBranchQueries(queryClient: ReturnType<typeof useQueryClient>, branchId: number) {
+  branchQueryKeys(branchId).forEach((queryKey) => {
+    queryClient.invalidateQueries({ queryKey });
+  });
+}
 
 export function useRestaurantBranches() {
   return useQuery({
@@ -98,8 +120,6 @@ export function useOperationalNotifications(branchId: number) {
   });
 }
 
-
-
 export function useBranchMenuItems(branchId: number) {
   return useQuery({
     queryKey: ['restaurant', 'menu-items', branchId],
@@ -122,6 +142,17 @@ export function useBranchReservations(branchId: number) {
   });
 }
 
+export function useBranchBills(branchId: number) {
+  return useQuery({
+    queryKey: ['restaurant', 'bills', branchId],
+    queryFn: async () => {
+      const response = await apiClient.get<Bill[]>('/bills', { params: { branch_id: branchId } });
+      return response.data;
+    },
+    enabled: branchId > 0,
+  });
+}
+
 export function useCreateReservation() {
   const queryClient = useQueryClient();
 
@@ -137,27 +168,60 @@ export function useCreateReservation() {
       const response = await apiClient.post<Reservation>('/reservations', payload);
       return response.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['restaurant', 'waitlist', data.branch_id] });
-      queryClient.invalidateQueries({ queryKey: ['restaurant', 'tables', data.branch_id] });
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ['restaurant', 'reservations', payload.branch_id] });
+      const previous = queryClient.getQueryData<Reservation[]>(['restaurant', 'reservations', payload.branch_id]) ?? [];
+      const optimistic: Reservation = {
+        id: -Date.now(),
+        branch_id: payload.branch_id,
+        guest_name: payload.guest_name,
+        guest_phone: payload.guest_phone,
+        party_size: payload.party_size,
+        reservation_time: payload.reservation_time,
+        table_id: null,
+        status: 'pending',
+        notes: payload.notes,
+      };
+      queryClient.setQueryData<Reservation[]>(['restaurant', 'reservations', payload.branch_id], [optimistic, ...previous]);
+      return { previous, branchId: payload.branch_id };
+    },
+    onError: (_error, _payload, context) => {
+      if (context) {
+        queryClient.setQueryData(['restaurant', 'reservations', context.branchId], context.previous);
+      }
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branch_id);
     },
   });
 }
-
 
 export function useSeatTable() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { tableId: number; reservationId?: number; partySize: number }) => {
-      const response = await apiClient.post(`/tables/${payload.tableId}/seat`, {
+    mutationFn: async (payload: { branchId: number; tableId: number; reservationId?: number; partySize: number }) => {
+      const response = await apiClient.post<SeatTableResponse>(`/tables/${payload.tableId}/seat`, {
         reservation_id: payload.reservationId,
         party_size: payload.partySize,
       });
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurant'] });
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ['restaurant', 'tables', payload.branchId] });
+      const previous = queryClient.getQueryData<RestaurantTable[]>(['restaurant', 'tables', payload.branchId]) ?? [];
+      queryClient.setQueryData<RestaurantTable[]>(['restaurant', 'tables', payload.branchId], (current = []) =>
+        current.map((table) => (table.id === payload.tableId ? { ...table, status: 'occupied' } : table))
+      );
+      return { previous, branchId: payload.branchId };
+    },
+    onError: (_error, _payload, context) => {
+      if (context) {
+        queryClient.setQueryData(['restaurant', 'tables', context.branchId], context.previous);
+      }
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branchId);
     },
   });
 }
@@ -166,14 +230,33 @@ export function usePromoteWaitlist() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { waitlistId: number; tableId: number }) => {
-      const response = await apiClient.patch(`/waitlist/${payload.waitlistId}/promote`, null, {
+    mutationFn: async (payload: { branchId: number; waitlistId: number; tableId: number }) => {
+      const response = await apiClient.patch<WaitlistEntry>(`/waitlist/${payload.waitlistId}/promote`, null, {
         params: { table_id: payload.tableId },
       });
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurant'] });
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ['restaurant', 'waitlist', payload.branchId] });
+      const previous = queryClient.getQueryData<CursorPage<WaitlistEntry>>(['restaurant', 'waitlist', payload.branchId]);
+      queryClient.setQueryData<CursorPage<WaitlistEntry>>(['restaurant', 'waitlist', payload.branchId], (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: current.items.map((entry) =>
+            entry.id === payload.waitlistId ? { ...entry, status: 'seated' } : entry
+          ),
+        };
+      });
+      return { previous, branchId: payload.branchId };
+    },
+    onError: (_error, _payload, context) => {
+      if (context) {
+        queryClient.setQueryData(['restaurant', 'waitlist', context.branchId], context.previous);
+      }
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branchId);
     },
   });
 }
@@ -189,7 +272,7 @@ export function useCreateOrder() {
       menu_item_id: number;
       quantity?: number;
     }) => {
-      const response = await apiClient.post('/orders', {
+      const response = await apiClient.post<{ order: RestaurantOrder; bill: Bill }>('/orders', {
         branch_id: payload.branch_id,
         order_source: 'dine_in',
         table_id: payload.table_id,
@@ -204,8 +287,112 @@ export function useCreateOrder() {
       });
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurant'] });
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ['restaurant', 'orders', payload.branch_id] });
+      const previous = queryClient.getQueryData<CursorPage<RestaurantOrder>>(['restaurant', 'orders', payload.branch_id]);
+      const optimisticOrder: RestaurantOrder = {
+        id: -Date.now(),
+        branch_id: payload.branch_id,
+        table_id: payload.table_id,
+        waiter_id: payload.waiter_id ?? null,
+        order_source: 'dine_in',
+        status: 'submitted',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      queryClient.setQueryData<CursorPage<RestaurantOrder>>(['restaurant', 'orders', payload.branch_id], (current) => ({
+        items: [optimisticOrder, ...(current?.items ?? [])],
+        next_cursor: current?.next_cursor ?? null,
+      }));
+      return { previous, branchId: payload.branch_id };
+    },
+    onError: (_error, _payload, context) => {
+      if (context) {
+        queryClient.setQueryData(['restaurant', 'orders', context.branchId], context.previous);
+      }
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branch_id);
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'kitchen-tickets'] });
+    },
+  });
+}
+
+export function useUpdateKitchenTicket() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { ticketId: number; status: KitchenTicketStatus; updatedBy?: number | null }) => {
+      const response = await apiClient.patch<KitchenTicket>(`/kitchen/tickets/${payload.ticketId}`, {
+        status: payload.status,
+        updated_by: payload.updatedBy ?? null,
+      });
+      return response.data;
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'kitchen-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'branch-report'] });
+    },
+  });
+}
+
+export function useCreateOrderEditApproval() {
+  return useMutation({
+    mutationFn: async (payload: { order_id: number; requested_by: number; reason: string }) => {
+      const response = await apiClient.post<OrderEditApproval>('/orders/edit-approvals', payload);
+      return response.data;
+    },
+  });
+}
+
+export function useResolveOrderEditApproval() {
+  return useMutation({
+    mutationFn: async (payload: { approvalId: number; status: 'approved' | 'rejected'; approved_by?: number | null }) => {
+      const response = await apiClient.patch<OrderEditApproval>(`/orders/edit-approvals/${payload.approvalId}`, {
+        status: payload.status,
+        approved_by: payload.approved_by ?? null,
+      });
+      return response.data;
+    },
+  });
+}
+
+export function useUpdateOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      orderId: number;
+      branchId: number;
+      status?: RestaurantOrder['status'];
+      edit_approval_id?: number;
+    }) => {
+      const response = await apiClient.patch<RestaurantOrder>(`/orders/${payload.orderId}`, {
+        status: payload.status,
+        edit_approval_id: payload.edit_approval_id,
+      });
+      return response.data;
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branchId);
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'kitchen-tickets'] });
+    },
+  });
+}
+
+export function useSettleBill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: { branchId: number; billId: number; cashierId?: number | null; amount: number; paymentMethod: string }) => {
+      const response = await apiClient.post<Bill>(`/bills/${payload.billId}/settlements`, {
+        cashier_id: payload.cashierId ?? null,
+        settlements: [{ payment_method: payload.paymentMethod, amount: payload.amount }],
+      });
+      return response.data;
+    },
+    onSettled: (_data, _error, payload) => {
+      invalidateBranchQueries(queryClient, payload.branchId);
     },
   });
 }
