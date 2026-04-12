@@ -520,7 +520,11 @@ class _TransactionTile extends StatelessWidget {
         ),
         title: Text(tx.purchaseOrderName,
             style: const TextStyle(fontWeight: FontWeight.w500)),
-        subtitle: Text('${tx.provider.displayName} · $amountDisplay'),
+        subtitle: Text(
+          tx.failureReason == null || tx.failureReason!.isEmpty
+              ? '${tx.provider.displayName} · $amountDisplay'
+              : '${tx.provider.displayName} · $amountDisplay\n${tx.failureReason}',
+        ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(

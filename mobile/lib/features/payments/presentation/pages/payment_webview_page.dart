@@ -141,15 +141,12 @@ class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
       }
 
       final result = await repo.verifyPayment(verifyReq);
+      final statusMessage = _statusToMessage(result.status);
       if (!mounted) return;
       Navigator.of(context).pop(
         PaymentResult(
           success: result.status == PaymentStatus.completed,
-          message: result.status == PaymentStatus.completed
-              ? 'Payment completed successfully!'
-              : result.status == PaymentStatus.pending || result.status == PaymentStatus.initiated
-                  ? 'Payment ${result.status.name}. Awaiting provider confirmation.'
-                  : 'Payment status: ${result.status.name}',
+          message: statusMessage,
           response: result,
         ),
       );
@@ -158,6 +155,22 @@ class _PaymentWebViewPageState extends ConsumerState<PaymentWebViewPage> {
       Navigator.of(context).pop(
         PaymentResult(success: false, message: e.toString()),
       );
+    }
+  }
+
+  String _statusToMessage(PaymentStatus status) {
+    switch (status) {
+      case PaymentStatus.completed:
+        return 'Payment completed successfully.';
+      case PaymentStatus.pending:
+      case PaymentStatus.initiated:
+        return 'Payment is processing. We are waiting for provider confirmation.';
+      case PaymentStatus.failed:
+        return 'Payment failed. Please retry your payment.';
+      case PaymentStatus.cancelled:
+        return 'Payment was cancelled.';
+      case PaymentStatus.refunded:
+        return 'Payment was refunded.';
     }
   }
 

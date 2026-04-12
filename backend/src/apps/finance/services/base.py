@@ -4,7 +4,11 @@ from datetime import datetime
 from typing import Iterable
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.finance.models.payment import PaymentStatus, PaymentTransaction
+from src.apps.finance.models.payment import (
+    PaymentStatus,
+    PaymentTransaction,
+    transition_payment_status,
+)
 from src.apps.finance.schemas.payment import (
     InitiatePaymentRequest,
     InitiatePaymentResponse,
@@ -80,7 +84,7 @@ class BasePaymentProvider(ABC):
         target_status: PaymentStatus,
     ) -> None:
         """Guard transaction state transitions from service code."""
-        if not tx.can_transition_to(target_status):
+        if not transition_payment_status(tx.status, target_status):
             raise ValueError(
                 f"Invalid transition {tx.status.value} -> {target_status.value} "
                 f"for transaction {tx.id}"

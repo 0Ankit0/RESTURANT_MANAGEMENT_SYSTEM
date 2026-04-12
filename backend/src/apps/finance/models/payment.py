@@ -39,6 +39,21 @@ ALLOWED_PAYMENT_TRANSITIONS: dict[PaymentStatus, set[PaymentStatus]] = {
 }
 
 
+def transition_payment_status(
+    current: PaymentStatus,
+    target: PaymentStatus,
+) -> bool:
+    """
+    Canonical payment status transition rules shared by all providers.
+
+    This function is intentionally provider-agnostic and should be the only
+    transition gate used by service/API layers.
+    """
+    if current == target:
+        return True
+    return target in ALLOWED_PAYMENT_TRANSITIONS.get(current, set())
+
+
 class PaymentTransactionBase(SQLModel):
     """Fields shared between table model and validation schemas."""
     provider: PaymentProvider = Field(
@@ -112,11 +127,18 @@ class PaymentTransaction(PaymentTransactionBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+    retry_count: int = Field(default=0, ge=0)
+    reconcile_after: Optional[datetime] = Field(default=None, index=True)
+    last_reconciled_at: Optional[datetime] = Field(default=None)
+    processing_lease_until: Optional[datetime] = Field(default=None, index=True)
+    processing_lease_owner: Optional[str] = Field(default=None, max_length=100)
+    raw_callback_payload: Optional[str] = Field(
+        default=None,
+        description="Most recent raw callback payload snapshot for audit",
+    )
 
     def can_transition_to(self, target: PaymentStatus) -> bool:
-        if self.status == target:
-            return True
-        return target in ALLOWED_PAYMENT_TRANSITIONS.get(self.status, set())
+        return transition_payment_status(self.status, target)
 
 
 class PaymentWebhookBase(SQLModel):
@@ -143,6 +165,18 @@ class PaymentWebhookBase(SQLModel):
         default=None,
         max_length=45,
         description="IP address the webhook was received from"
+    )
+    delivery_id: Optional[str] = Field(
+        default=None,
+        max_length=255,
+        index=True,
+        description="Provider delivery/event identifier for idempotency",
+    )
+    payload_hash: Optional[str] = Field(
+        default=None,
+        max_length=128,
+        index=True,
+        description="SHA-256 hash of raw payload for duplicate detection",
     )
 
 
