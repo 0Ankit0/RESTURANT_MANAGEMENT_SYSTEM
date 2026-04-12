@@ -6,7 +6,11 @@ import FinancesPage from './page';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const financeHooks = vi.hoisted(() => ({ useTransactions: vi.fn() }));
+const financeHooks = vi.hoisted(() => ({
+  useTransactions: vi.fn(),
+  useReconcileTransaction: vi.fn(),
+  useRetryTransaction: vi.fn(),
+}));
 vi.mock('@/hooks/use-finances', () => financeHooks);
 vi.mock('@/components/finances/stripe-payment-form', () => ({
   PaymentInitiateForm: ({ onSuccess }: { onSuccess: () => void }) => (
@@ -35,6 +39,8 @@ describe('FinancesPage', () => {
       ],
       isLoading: false,
     });
+    financeHooks.useReconcileTransaction.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    financeHooks.useRetryTransaction.mockReturnValue({ mutate: vi.fn(), isPending: false });
   });
 
   afterEach(() => {

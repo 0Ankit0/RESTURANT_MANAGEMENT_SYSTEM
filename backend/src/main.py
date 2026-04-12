@@ -30,6 +30,7 @@ from src.apps.observability.api import router as observability_router
 from src.apps.observability.service import prune_old_log_entries
 from src.apps.restaurant.api import restaurant_router
 from src.apps.restaurant.services.ops_event_outbox import ops_event_outbox_dispatcher
+from src.apps.finance.services.reconciliation_worker import finance_reconciliation_worker
 from src.apps.core.storage import storage_uses_local_filesystem
 
 configure_logging()
@@ -66,11 +67,13 @@ async def lifespan(app: FastAPI):
         await session.commit()
 
     await ops_event_outbox_dispatcher.start()
+    await finance_reconciliation_worker.start()
 
     yield
 
     # Cleanup on shutdown
     await ops_event_outbox_dispatcher.stop()
+    await finance_reconciliation_worker.stop()
     await ws_manager.teardown()
     await RedisCache.close()
     await shutdown_analytics()

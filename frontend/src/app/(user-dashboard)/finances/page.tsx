@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTransactions } from '@/hooks/use-finances';
+import { useReconcileTransaction, useRetryTransaction, useTransactions } from '@/hooks/use-finances';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button, Skeleton } from '@/components/ui';
 import { CreditCard, DollarSign, Plus } from 'lucide-react';
@@ -20,6 +20,9 @@ const STATUS_COLORS: Record<string, string> = {
 function TransactionRow({ tx }: { tx: PaymentTransaction }) {
   const color = STATUS_COLORS[tx.status] ?? 'bg-gray-100 text-gray-700';
   const divisor = tx.provider === 'khalti' ? 100 : 1;
+  const reconcileMutation = useReconcileTransaction();
+  const retryMutation = useRetryTransaction();
+  const canRetry = tx.status === 'failed' || tx.status === 'pending' || tx.status === 'initiated';
   return (
     <tr className="border-b border-gray-100 last:border-0">
       <td className="py-3 text-sm text-gray-500">
@@ -33,6 +36,34 @@ function TransactionRow({ tx }: { tx: PaymentTransaction }) {
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
           {tx.status}
         </span>
+        {tx.failure_reason && (
+          <p className="mt-1 text-xs text-red-600">Reason: {tx.failure_reason}</p>
+        )}
+        {(tx.status === 'pending' || tx.status === 'initiated') && (
+          <p className="text-xs text-gray-500">Reconciliation pending</p>
+        )}
+      </td>
+      <td className="py-3 text-sm">
+        {canRetry && (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => retryMutation.mutate(tx.id)}
+              disabled={retryMutation.isPending}
+            >
+              Retry
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => reconcileMutation.mutate(tx.id)}
+              disabled={reconcileMutation.isPending}
+            >
+              Reconcile
+            </Button>
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -97,6 +128,7 @@ export default function FinancesPage() {
                     <th className="pb-3 text-sm font-medium text-gray-500">Provider</th>
                     <th className="pb-3 text-sm font-medium text-gray-500">Amount</th>
                     <th className="pb-3 text-sm font-medium text-gray-500">Status</th>
+                    <th className="pb-3 text-sm font-medium text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody>

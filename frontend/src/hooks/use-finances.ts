@@ -60,6 +60,28 @@ export function useVerifyPayment() {
   });
 }
 
+export function useReconcileTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      const response = await apiClient.post<VerifyPaymentResponse>(`/payments/reconcile/${transactionId}/`);
+      return response.data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  });
+}
+
+export function useRetryTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      const response = await apiClient.post<VerifyPaymentResponse>(`/payments/retry/${transactionId}/`);
+      return response.data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  });
+}
+
 export function useTransaction(transactionId: string) {
   return useQuery({
     queryKey: ['transactions', transactionId],

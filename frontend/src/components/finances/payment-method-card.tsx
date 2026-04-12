@@ -40,6 +40,9 @@ export function TransactionCard({ transaction }: TransactionCardProps) {
         >
           {transaction.status}
         </span>
+        {transaction.failure_reason && (
+          <p className="text-xs text-red-600 mt-1">{transaction.failure_reason}</p>
+        )}
       </div>
     </div>
   );
