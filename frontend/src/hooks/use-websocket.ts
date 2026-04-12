@@ -10,6 +10,12 @@ interface WSBaseMessage {
   [key: string]: unknown;
 }
 
+interface WSEventMetadataMessage extends WSBaseMessage {
+  event_id?: string;
+  occurred_at?: string;
+  attempt?: number;
+}
+
 interface WSEncryptedFrame {
   type: string;
   iv: string;
@@ -172,11 +178,23 @@ export function useNotificationWebSocket() {
 export function useRestaurantOpsWebSocket(branchId: number) {
   const queryClient = useQueryClient();
   const wsBase = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+  const seenEventIdsRef = useRef<Set<string>>(new Set());
 
   return useWebSocket({
     url: branchId > 0 ? `${wsBase}/api/v1/ws/room/branch:${branchId}:ops/` : '',
     onMessage: (message) => {
       if (message.type !== 'event') return;
+      const metadata = message as WSEventMetadataMessage;
+      if (typeof metadata.event_id === 'string' && metadata.event_id.length > 0) {
+        if (seenEventIdsRef.current.has(metadata.event_id)) {
+          return;
+        }
+        seenEventIdsRef.current.add(metadata.event_id);
+        if (seenEventIdsRef.current.size > 500) {
+          const oldest = seenEventIdsRef.current.values().next().value as string | undefined;
+          if (oldest) seenEventIdsRef.current.delete(oldest);
+        }
+      }
       const event = typeof message.event === 'string' ? message.event : '';
       if (!event.startsWith('restaurant.')) return;
 

@@ -177,20 +177,42 @@ class ConnectionManager:
 
     # ── high-level push helpers (for use from REST handlers / tasks) ──────
 
-    async def push_event(self, user_id: int, event: str, data: Any) -> None:
+    async def push_event(
+        self,
+        user_id: int,
+        event: str,
+        data: Any,
+        event_id: str | None = None,
+        occurred_at: str | None = None,
+        attempt: int | None = None,
+    ) -> None:
         """Push a typed EVENT to a specific connected user."""
-        await self.send_personal_model(user_id, WSEventMessage(event=event, data=data))
+        await self.send_personal_model(
+            user_id,
+            WSEventMessage(event=event, data=data, event_id=event_id, occurred_at=occurred_at, attempt=attempt),
+        )
 
     async def push_event_to_room(
         self,
         room: str,
         event: str,
         data: Any,
+        event_id: str | None = None,
+        occurred_at: str | None = None,
+        attempt: int | None = None,
         sender_id: Optional[int] = None,
         exclude_user: Optional[int] = None,
     ) -> None:
         """Push a typed EVENT to all members of a room."""
-        msg = WSEventMessage(event=event, data=data, room=room, sender_id=sender_id)
+        msg = WSEventMessage(
+            event=event,
+            data=data,
+            event_id=event_id,
+            occurred_at=occurred_at,
+            attempt=attempt,
+            room=room,
+            sender_id=sender_id,
+        )
         await self.broadcast_room(room, msg, exclude_user=exclude_user)
 
     async def push_system(self, user_id: int, text: str) -> None:

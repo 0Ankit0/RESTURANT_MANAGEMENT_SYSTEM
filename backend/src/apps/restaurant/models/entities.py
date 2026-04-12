@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Optional
+from uuid import uuid4
 
 from sqlmodel import Field, SQLModel
 
@@ -110,6 +111,14 @@ class OperationalSeverity(str, Enum):
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
+
+
+class OpsEventOutboxStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    RETRY = "retry"
+    SENT = "sent"
+    DEAD_LETTER = "dead_letter"
 
 
 
@@ -320,6 +329,25 @@ class OperationalEventLog(SQLModel, table=True):
     is_operational_exception: bool = Field(default=False, index=True)
     retention_until: Optional[datetime] = Field(default=None, index=True)
     occurred_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class OpsEventOutbox(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(default_factory=lambda: str(uuid4()), max_length=64, index=True)
+    branch_id: int = Field(foreign_key="branch.id", index=True)
+    room: str = Field(max_length=160, index=True)
+    event_name: str = Field(max_length=120, index=True)
+    severity: OperationalSeverity = Field(default=OperationalSeverity.INFO, index=True)
+    payload_json: str = Field(default="{}", max_length=4000)
+    status: OpsEventOutboxStatus = Field(default=OpsEventOutboxStatus.PENDING, index=True)
+    attempt_count: int = Field(default=0, ge=0)
+    max_attempts: int = Field(default=6, ge=1)
+    next_attempt_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    last_error: Optional[str] = Field(default=None, max_length=1000)
+    dead_lettered_at: Optional[datetime] = Field(default=None, index=True)
+    occurred_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    sent_at: Optional[datetime] = Field(default=None, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class WaitlistEntry(SQLModel, table=True):

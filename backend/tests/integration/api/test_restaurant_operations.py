@@ -1,7 +1,15 @@
 import pytest
 from sqlmodel import select
 
-from src.apps.restaurant.models import Ingredient, PurchaseOrderLine, StockLedgerEntry
+from src.apps.restaurant.models import (
+    Ingredient,
+    OperationalSeverity,
+    OpsEventOutbox,
+    OpsEventOutboxStatus,
+    PurchaseOrderLine,
+    StockLedgerEntry,
+)
+from src.apps.restaurant.services.ops_event_outbox import ops_event_outbox_dispatcher
 
 
 @pytest.mark.asyncio
@@ -924,3 +932,102 @@ async def test_release_workflow_gate_scenarios(client):
         json={'closing_balance': 100},
     )
     assert closed.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_ops_outbox_retry_dispatch_success(client, monkeypatch):
+    branch = (await client.post("/api/v1/branches", json={"name": "Outbox Branch", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    reservation = await client.post(
+        "/api/v1/reservations",
+        json={
+            "branch_id": branch["id"],
+            "guest_name": "Retry Guest",
+            "guest_phone": "+1555111000",
+            "party_size": 2,
+            "reservation_time": "2026-04-12T18:30:00Z",
+        },
+    )
+    assert reservation.status_code == 201
+
+    attempts = {"count": 0}
+
+    async def flaky_push_event_to_room(*args, **kwargs):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise RuntimeError("simulated disconnect")
+        return None
+
+    monkeypatch.setattr("src.apps.restaurant.services.ops_event_outbox.ws_manager.push_event_to_room", flaky_push_event_to_room)
+
+    processed_first = await ops_event_outbox_dispatcher.dispatch_once()
+    assert processed_first >= 1
+    processed_second = await ops_event_outbox_dispatcher.dispatch_once()
+    assert processed_second >= 1
+
+    outbox_rows = (await client.get(f"/api/v1/operations/outbox?branch_id={branch['id']}")).json()
+    assert outbox_rows
+    assert outbox_rows[0]["status"] == OpsEventOutboxStatus.SENT.value
+    assert outbox_rows[0]["attempt_count"] >= 2
+
+
+@pytest.mark.asyncio
+async def test_ops_outbox_dead_letter_requeue_and_replay(client, db_session, monkeypatch):
+    branch = (await client.post("/api/v1/branches", json={"name": "DeadLetter Branch", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    row = OpsEventOutbox(
+        branch_id=branch["id"],
+        room=f"branch:{branch['id']}:ops",
+        event_name="restaurant.synthetic.test",
+        severity=OperationalSeverity.INFO,
+        payload_json='{\"ok\": true}',
+        status=OpsEventOutboxStatus.PENDING,
+        max_attempts=1,
+    )
+    db_session.add(row)
+    await db_session.commit()
+    await db_session.refresh(row)
+
+    async def always_fail(*args, **kwargs):
+        raise RuntimeError("always fail")
+
+    monkeypatch.setattr("src.apps.restaurant.services.ops_event_outbox.ws_manager.push_event_to_room", always_fail)
+    processed = await ops_event_outbox_dispatcher.dispatch_once()
+    assert processed >= 1
+
+    failed_row = await db_session.get(OpsEventOutbox, row.id)
+    assert failed_row is not None
+    assert failed_row.status == OpsEventOutboxStatus.DEAD_LETTER
+
+    requeue = await client.post(f"/api/v1/operations/outbox/{row.id}/requeue")
+    assert requeue.status_code == 200
+    assert requeue.json()["status"] == OpsEventOutboxStatus.RETRY.value
+
+    async def always_ok(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("src.apps.restaurant.services.ops_event_outbox.ws_manager.push_event_to_room", always_ok)
+    processed_replay = await ops_event_outbox_dispatcher.dispatch_once()
+    assert processed_replay >= 1
+
+    replayed_row = await db_session.get(OpsEventOutbox, row.id)
+    assert replayed_row is not None
+    assert replayed_row.status == OpsEventOutboxStatus.SENT
+
+
+@pytest.mark.asyncio
+async def test_ops_outbox_status_endpoint_lists_dead_letters(client):
+    branch = (await client.post("/api/v1/branches", json={"name": "Inspect Branch", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    reservation = await client.post(
+        "/api/v1/reservations",
+        json={
+            "branch_id": branch["id"],
+            "guest_name": "Inspect Guest",
+            "guest_phone": "+1555222000",
+            "party_size": 2,
+            "reservation_time": "2026-04-12T19:30:00Z",
+        },
+    )
+    assert reservation.status_code == 201
+
+    status_all = await client.get(f"/api/v1/operations/outbox?branch_id={branch['id']}")
+    assert status_all.status_code == 200
+    assert len(status_all.json()) >= 1

@@ -187,6 +187,9 @@ class WSEventMessage(WSOutboundMessage):
     type: WSMessageType = WSMessageType.EVENT
     event: str
     data: Any
+    event_id: Optional[str] = None
+    occurred_at: Optional[str] = None
+    attempt: Optional[int] = None
     room: Optional[str] = None      # None → personal delivery
     sender_id: Optional[int] = None
 
