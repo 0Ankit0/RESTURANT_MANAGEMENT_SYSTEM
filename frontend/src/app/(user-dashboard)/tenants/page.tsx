@@ -13,6 +13,7 @@ import {
   useTenantInvitations,
   useCreateInvitation,
   useDeleteInvitation,
+  useAcceptInvitation,
 } from '@/hooks/use-tenants';
 import { useAuthStore } from '@/store/auth-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -250,6 +251,8 @@ export default function TenantsPage() {
   const [newName, setNewName] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
+  const acceptInvitation = useAcceptInvitation();
 
   const handleCreate = async () => {
     if (!newName.trim() || !newSlug.trim()) return;
@@ -320,6 +323,25 @@ export default function TenantsPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader><CardTitle>Accept Invitation</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-2">
+            <Input
+              placeholder="Paste invitation token"
+              value={inviteToken}
+              onChange={(e) => setInviteToken(e.target.value)}
+            />
+            <Button
+              onClick={() => acceptInvitation.mutate(inviteToken, { onSuccess: () => setInviteToken('') })}
+              disabled={!inviteToken.trim() || acceptInvitation.isPending}
+            >
+              Accept
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {tenants.length === 0 ? (
         <div className="text-center py-16">

@@ -82,6 +82,10 @@ async def _get_tenant_or_404(tenant_id: int, db: AsyncSession) -> Tenant:
     return tenant
 
 
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
 async def _require_tenant_role(
     tenant_id: int,
     user: User,
@@ -373,15 +377,14 @@ async def update_member_role(
     user_db_id = decode_id_or_404(user_id)
     await _require_tenant_role(tenant_db_id, current_user, db, min_role=TenantRole.ADMIN)
 
-    if data.role == TenantRole.OWNER:
-        # Only current owner can hand off ownership
-        await _require_tenant_role(tenant_db_id, current_user, db, min_role=TenantRole.OWNER)
+    acting_membership = await _require_tenant_role(tenant_db_id, current_user, db, min_role=TenantRole.ADMIN)
 
     membership = (
         await db.execute(
             select(TenantMember).where(
                 TenantMember.tenant_id == tenant_db_id,
                 TenantMember.user_id == user_db_id,
+                TenantMember.is_active == True,
             )
         )
     ).scalars().first()
@@ -393,12 +396,74 @@ async def update_member_role(
     if previous_role == data.role:
         return membership
 
+    # Only owners can demote or remove ownership from an owner membership.
+    if previous_role == TenantRole.OWNER and acting_membership.role != TenantRole.OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an owner can change an owner's role",
+        )
+
+    transfer_ownership = data.role == TenantRole.OWNER and previous_role != TenantRole.OWNER
+    previous_owner_membership: TenantMember | None = None
+    previous_owner_role: TenantRole | None = None
+    if transfer_ownership:
+        # Only current owner can hand off ownership.
+        if acting_membership.role != TenantRole.OWNER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the current owner can transfer ownership",
+            )
+        previous_owner_membership = acting_membership
+        previous_owner_role = acting_membership.role
+
     membership.role = data.role
+    if transfer_ownership and previous_owner_membership:
+        previous_owner_membership.role = TenantRole.ADMIN
+        tenant.owner_id = membership.user_id
+
     await db.flush()
+    casbin_applied: list[tuple[str, int, TenantRole]] = []
     try:
         await CasbinEnforcer.remove_role_for_user(str(user_db_id), previous_role, tenant.slug)
+        casbin_applied.append(("remove", user_db_id, previous_role))
         await CasbinEnforcer.add_role_for_user(str(user_db_id), data.role, tenant.slug)
+        casbin_applied.append(("add", user_db_id, data.role))
+        if transfer_ownership and previous_owner_membership and previous_owner_role is not None:
+            await CasbinEnforcer.remove_role_for_user(
+                str(previous_owner_membership.user_id),  # type: ignore[arg-type]
+                previous_owner_role,
+                tenant.slug,
+            )
+            casbin_applied.append(
+                ("remove", previous_owner_membership.user_id, previous_owner_role)  # type: ignore[arg-type]
+            )
+            await CasbinEnforcer.add_role_for_user(
+                str(previous_owner_membership.user_id),  # type: ignore[arg-type]
+                previous_owner_membership.role,
+                tenant.slug,
+            )
+            casbin_applied.append(
+                ("add", previous_owner_membership.user_id, previous_owner_membership.role)  # type: ignore[arg-type]
+            )
     except Exception:
+        for action, applied_user_id, applied_role in reversed(casbin_applied):
+            try:
+                if action == "add":
+                    await CasbinEnforcer.remove_role_for_user(str(applied_user_id), applied_role, tenant.slug)
+                else:
+                    await CasbinEnforcer.add_role_for_user(str(applied_user_id), applied_role, tenant.slug)
+            except Exception:
+                logger.exception(
+                    "multitenancy.update_member_role.casbin_partial_apply_recovery_failed",
+                    extra={
+                        "operation": "update_member_role",
+                        "tenant_id": tenant_db_id,
+                        "tenant_slug": tenant.slug,
+                        "user_id": applied_user_id,
+                        "role": applied_role,
+                        "action": action,
+                    },
+                )
         await db.rollback()
         raise
 
@@ -406,21 +471,24 @@ async def update_member_role(
         await db.commit()
     except Exception:
         await db.rollback()
-        try:
-            await CasbinEnforcer.remove_role_for_user(str(user_db_id), data.role, tenant.slug)
-            await CasbinEnforcer.add_role_for_user(str(user_db_id), previous_role, tenant.slug)
-        except Exception:
-            logger.exception(
-                "multitenancy.update_member_role.rollback_compensation_failed",
-                extra={
-                    "operation": "update_member_role",
-                    "tenant_id": tenant_db_id,
-                    "tenant_slug": tenant.slug,
-                    "user_id": user_db_id,
-                    "new_role": data.role,
-                    "previous_role": previous_role,
-                },
-            )
+        for action, applied_user_id, applied_role in reversed(casbin_applied):
+            try:
+                if action == "add":
+                    await CasbinEnforcer.remove_role_for_user(str(applied_user_id), applied_role, tenant.slug)
+                else:
+                    await CasbinEnforcer.add_role_for_user(str(applied_user_id), applied_role, tenant.slug)
+            except Exception:
+                logger.exception(
+                    "multitenancy.update_member_role.rollback_compensation_failed",
+                    extra={
+                        "operation": "update_member_role",
+                        "tenant_id": tenant_db_id,
+                        "tenant_slug": tenant.slug,
+                        "user_id": applied_user_id,
+                        "role": applied_role,
+                        "action": action,
+                    },
+                )
         raise
 
     await db.refresh(membership)
@@ -439,14 +507,16 @@ async def remove_member(
     """Remove a member from the tenant (admin/owner, or user removing themselves)."""
     tenant_db_id = decode_id_or_404(tenant_id)
     user_db_id = decode_id_or_404(user_id)
+    acting_membership: TenantMember | None = None
     if user_db_id != current_user.id:
-        await _require_tenant_role(tenant_db_id, current_user, db, min_role=TenantRole.ADMIN)
+        acting_membership = await _require_tenant_role(tenant_db_id, current_user, db, min_role=TenantRole.ADMIN)
 
     membership = (
         await db.execute(
             select(TenantMember).where(
                 TenantMember.tenant_id == tenant_db_id,
                 TenantMember.user_id == user_db_id,
+                TenantMember.is_active == True,
             )
         )
     ).scalars().first()
@@ -457,11 +527,17 @@ async def remove_member(
 
     # Prevent removing the last owner
     if membership.role == TenantRole.OWNER:
+        if acting_membership and acting_membership.role != TenantRole.OWNER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only an owner can remove another owner",
+            )
         owners_count = (
             await db.execute(
                 select(func.count(col(TenantMember.id))).where(
                     TenantMember.tenant_id == tenant_db_id,
                     TenantMember.role == TenantRole.OWNER,
+                    TenantMember.is_active == True,
                 )
             )
         ).scalar_one()
@@ -522,13 +598,30 @@ async def invite_member(
     await _require_tenant_role(tenant_db_id, current_user, db, min_role=TenantRole.ADMIN)
     await _get_tenant_or_404(tenant_db_id, db)
 
+    invite_email = _normalize_email(str(data.email))
+
+    # Expire stale pending invites first for this tenant/email to avoid false duplicate conflicts.
+    stale_pending = (
+        await db.execute(
+            select(TenantInvitation).where(
+                TenantInvitation.tenant_id == tenant_db_id,
+                TenantInvitation.email == invite_email,
+                TenantInvitation.status == InvitationStatus.PENDING,
+                TenantInvitation.expires_at < datetime.now(),
+            )
+        )
+    ).scalars().all()
+    for stale in stale_pending:
+        stale.status = InvitationStatus.EXPIRED
+
     # Check for active pending invitation for this email
     existing = (
         await db.execute(
             select(TenantInvitation).where(
                 TenantInvitation.tenant_id == tenant_db_id,
-                TenantInvitation.email == data.email,
+                TenantInvitation.email == invite_email,
                 TenantInvitation.status == InvitationStatus.PENDING,
+                TenantInvitation.expires_at >= datetime.now(),
             )
         )
     ).scalars().first()
@@ -538,9 +631,28 @@ async def invite_member(
             detail="An active invitation already exists for this email",
         )
 
+    existing_user = (
+        await db.execute(select(User).where(User.email == invite_email))
+    ).scalars().first()
+    if existing_user:
+        existing_member = (
+            await db.execute(
+                select(TenantMember).where(
+                    TenantMember.tenant_id == tenant_db_id,
+                    TenantMember.user_id == existing_user.id,
+                    TenantMember.is_active == True,
+                )
+            )
+        ).scalars().first()
+        if existing_member:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already a member of this tenant",
+            )
+
     invitation = TenantInvitation(
         tenant_id=tenant_db_id,
-        email=str(data.email),
+        email=invite_email,
         role=data.role,
         invited_by=current_user.id,
         token=str(uuid.uuid4()),
@@ -619,7 +731,7 @@ async def accept_invitation(
         await db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation has expired")
 
-    if invitation.email != current_user.email:
+    if _normalize_email(invitation.email) != _normalize_email(current_user.email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This invitation was sent to a different email address",
@@ -631,6 +743,7 @@ async def accept_invitation(
             select(TenantMember).where(
                 TenantMember.tenant_id == invitation.tenant_id,
                 TenantMember.user_id == current_user.id,
+                TenantMember.is_active == True,
             )
         )
     ).scalars().first()
