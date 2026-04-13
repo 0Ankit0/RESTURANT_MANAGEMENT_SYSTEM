@@ -19,3 +19,8 @@ def recipe_component_delta(component_qty: float, item_qty: int, *, reverse: bool
         raise ValueError("Recipe component and item quantities must be positive")
     change = round(component_qty * item_qty, 3)
     return change if reverse else -change
+
+
+def reconcile_inventory_target(current_net: float, target_net: float) -> float:
+    """Return delta needed to move current net movement to target net movement."""
+    return round(target_net - current_net, 3)

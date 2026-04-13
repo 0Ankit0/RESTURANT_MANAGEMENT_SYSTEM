@@ -20,8 +20,13 @@ const { mockCapture, mockState, hookMocks } = vi.hoisted(() => ({
   useBranchMenuItems: vi.fn(),
   useBranchReservations: vi.fn(),
   useKitchenTickets: vi.fn(),
+  useStockTransfers: vi.fn(),
+  useInventoryReconciliation: vi.fn(),
   useOperationalNotifications: vi.fn(),
   useBranchOperationsReport: vi.fn(),
+  useLatestOpenDayClose: vi.fn(),
+  useDayCloseBlockers: vi.fn(),
+  useDayCloseRemediation: vi.fn(),
   useCreateReservation: vi.fn(),
   useSeatTable: vi.fn(),
   usePromoteWaitlist: vi.fn(),
@@ -69,6 +74,8 @@ describe('RestaurantOpsPage', () => {
     hookMocks.useBranchMenuItems.mockReturnValue(qState([]));
     hookMocks.useBranchReservations.mockReturnValue(qState([]));
     hookMocks.useKitchenTickets.mockReturnValue(qState({ items: [], next_cursor: null }));
+    hookMocks.useStockTransfers.mockReturnValue(qState({ items: [], next_cursor: null }));
+    hookMocks.useInventoryReconciliation.mockReturnValue(qState({ rows: [] }));
     hookMocks.useOperationalNotifications.mockReturnValue(qState([]));
     hookMocks.useBranchOperationsReport.mockReturnValue(qState({
       orders_count: 0,
@@ -77,6 +84,9 @@ describe('RestaurantOpsPage', () => {
       low_stock_count: 0,
       settlement_health: { open_drawers: 0, unpaid_bills: 0, failed_exports: 0 },
     }));
+    hookMocks.useLatestOpenDayClose.mockReturnValue(qState(null));
+    hookMocks.useDayCloseBlockers.mockReturnValue(qState({ blockers: [] }));
+    hookMocks.useDayCloseRemediation.mockReturnValue(mState());
     hookMocks.useCreateReservation.mockReturnValue(mState());
     hookMocks.useSeatTable.mockReturnValue(mState());
     hookMocks.usePromoteWaitlist.mockReturnValue(mState());

@@ -372,6 +372,8 @@ class StockTransferCreate(BaseModel):
 class StockTransferAction(BaseModel):
     approved_by: int | None = None
     action: str = "mark_in_transit"
+    acknowledged_by: int | None = None
+    acknowledgement_note: str | None = None
     shipped_qty: float | None = Field(default=None, gt=0)
     received_qty: float | None = Field(default=None, gt=0)
     discrepancy_notes: str | None = None
