@@ -63,6 +63,17 @@ final restaurantBranchReportProvider = FutureProvider<BranchOperationsReport>((r
   return ref.watch(restaurantRepositoryProvider).getBranchReport(branchId);
 });
 
+final restaurantLatestDayCloseProvider = FutureProvider<DayCloseItem?>((ref) {
+  final branchId = ref.watch(selectedBranchIdProvider);
+  return ref.watch(restaurantRepositoryProvider).getLatestOpenDayClose(branchId);
+});
+
+final restaurantDayCloseBlockersProvider = FutureProvider<List<DayCloseBlockerItem>>((ref) async {
+  final dayClose = await ref.watch(restaurantLatestDayCloseProvider.future);
+  if (dayClose == null) return [];
+  return ref.watch(restaurantRepositoryProvider).getDayCloseBlockers(dayClose.id);
+});
+
 enum RestaurantActionType {
   createReservation,
   seatTable,
@@ -71,6 +82,7 @@ enum RestaurantActionType {
   advanceOrder,
   updateKitchenTicket,
   settleBill,
+  acknowledgeStaffingGap,
 }
 
 class RestaurantActionState {
@@ -339,6 +351,31 @@ class RestaurantActionController extends StateNotifier<RestaurantActionState> {
       action: () => ref.read(restaurantRepositoryProvider).updateOrderStatus(orderId: orderId, status: nextStatus),
       onSuccess: () => ref.invalidate(restaurantOrdersProvider),
       retryAction: () => advanceOrder(branchId: branchId, orderId: orderId, nextStatus: nextStatus),
+    );
+  }
+
+  Future<void> acknowledgeStaffingGap({
+    required int branchId,
+    required int dayCloseId,
+    required int acknowledgedBy,
+  }) {
+    return _execute(
+      type: RestaurantActionType.acknowledgeStaffingGap,
+      branchId: branchId,
+      successMessage: 'Staffing override acknowledged.',
+      successEvent: RestaurantAnalyticsEvents.staffingOverrideAcknowledged,
+      failureEvent: RestaurantAnalyticsEvents.staffingOverrideAcknowledgeFailed,
+      eventProperties: {'branch_id': branchId, 'day_close_id': dayCloseId},
+      action: () => ref.read(restaurantRepositoryProvider).acknowledgeStaffingGap(
+            dayCloseId: dayCloseId,
+            acknowledgedBy: acknowledgedBy,
+          ),
+      onSuccess: () => ref.invalidate(restaurantDayCloseBlockersProvider),
+      retryAction: () => acknowledgeStaffingGap(
+        branchId: branchId,
+        dayCloseId: dayCloseId,
+        acknowledgedBy: acknowledgedBy,
+      ),
     );
   }
 

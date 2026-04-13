@@ -65,4 +65,6 @@ class RestaurantAnalyticsEvents {
   static const String reservationTransitionFailed = 'restaurant_ops_reservation_transition_failed';
   static const String orderTransitioned = 'restaurant_ops_order_transitioned';
   static const String orderTransitionFailed = 'restaurant_ops_order_transition_failed';
+  static const String staffingOverrideAcknowledged = 'restaurant_ops_staffing_override_acknowledged';
+  static const String staffingOverrideAcknowledgeFailed = 'restaurant_ops_staffing_override_acknowledge_failed';
 }

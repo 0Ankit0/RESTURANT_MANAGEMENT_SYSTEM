@@ -1,6 +1,7 @@
 """Reporting domain utilities."""
 
 from datetime import UTC, datetime
+from .day_close_blockers import DayCloseBlocker, compute_day_close_blockers
 
 DAY_CLOSE_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "open": {"closed"},
@@ -25,3 +26,12 @@ def validate_day_close_transition(*, current_status: str, next_status: str) -> t
     if next_status not in allowed:
         return False, "Day-close status transition is not allowed"
     return True, ""
+
+
+__all__ = [
+    "DAY_CLOSE_ALLOWED_TRANSITIONS",
+    "DayCloseBlocker",
+    "build_branch_snapshot",
+    "compute_day_close_blockers",
+    "validate_day_close_transition",
+]

@@ -69,4 +69,8 @@ class ApiEndpoints {
   static const String restaurantBranchReport = '/reports/branch-operations';
   static String restaurantSeatTable(int tableId) => '/tables/$tableId/seat';
   static String restaurantPromoteWaitlist(int waitlistId) => '/waitlist/$waitlistId/promote';
+  static const String restaurantDayClose = '/day-close';
+  static String restaurantDayCloseBlockers(int dayCloseId) => '/day-close/$dayCloseId/blockers';
+  static String restaurantAcknowledgeStaffingGap(int dayCloseId) =>
+      '/day-close/$dayCloseId/remediation/acknowledge-staffing-gap';
 }

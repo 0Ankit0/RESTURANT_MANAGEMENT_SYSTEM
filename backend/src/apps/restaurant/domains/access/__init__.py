@@ -77,6 +77,8 @@ PRIVILEGED_ACTIONS: set[str] = {
     "billing.discount.approved",
     "billing.refund.created",
     "reconciliation.override",
+    "day_close.override",
+    "staffing.gap_override",
 }
 
 

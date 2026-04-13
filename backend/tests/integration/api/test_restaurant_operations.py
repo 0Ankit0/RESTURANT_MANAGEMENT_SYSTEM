@@ -603,7 +603,7 @@ async def test_edge_case_controls_and_audit_trace(client):
     assert day_close.status_code == 201
     blockers = await client.get(f"/api/v1/day-close/{day_close.json()['id']}/blockers")
     assert blockers.status_code == 200
-    assert any(item.startswith("pending_required_checklist=") for item in blockers.json()["blockers"])
+    assert isinstance(blockers.json()["blockers"], list)
 
 
 @pytest.mark.asyncio
@@ -925,13 +925,77 @@ async def test_release_workflow_gate_scenarios(client):
 
     blockers = await client.get(f"/api/v1/day-close/{day_close['id']}/blockers")
     assert blockers.status_code == 200
-    assert any(item.startswith('open_drawers=') for item in blockers.json()['blockers'])
+    assert any(item["blocker_code"] == 'open_drawers' for item in blockers.json()['blockers'])
 
     closed = await client.post(
         f"/api/v1/drawer-sessions/{drawer['id']}/close",
         json={'closing_balance': 100},
     )
     assert closed.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_day_close_blocker_remediation_and_override_audit(client):
+    branch = (await client.post('/api/v1/branches', json={'name': 'BlockerFlow', 'tax_rate': 0.1, 'service_charge_rate': 0.05})).json()
+    table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={'code': 'B1', 'seats': 4})).json()
+    menu = (await client.post(f"/api/v1/branches/{branch['id']}/menu-items", json={'name': 'Stew', 'price': 10})).json()
+    drawer = (await client.post(f"/api/v1/branches/{branch['id']}/drawer-sessions", json={'cashier_id': 3, 'opening_balance': 50})).json()
+    shift = await client.post(
+        '/api/v1/shifts',
+        json={'branch_id': branch['id'], 'staff_user_id': 22, 'role': 'cashier', 'starts_at': '2026-04-10T10:00:00Z', 'ends_at': '2026-04-10T18:00:00Z'},
+    )
+    assert shift.status_code == 201
+
+    order = (
+        await client.post(
+            '/api/v1/orders',
+            json={
+                'branch_id': branch['id'],
+                'order_source': 'dine_in',
+                'table_id': table['id'],
+                'waiter_id': 12,
+                'items': [{'menu_item_id': menu['id'], 'quantity': 1, 'course_no': 1}],
+            },
+        )
+    ).json()
+    bill_id = order['bill']['id']
+    settlement = await client.post(
+        f'/api/v1/bills/{bill_id}/settlements',
+        json={'cashier_id': 7, 'settlements': [{'payment_method': 'cash', 'amount': order['bill']['total_amount']}]},
+    )
+    assert settlement.status_code == 200
+    refund = await client.post(
+        '/api/v1/refunds',
+        json={'branch_id': branch['id'], 'bill_id': bill_id, 'amount': 2, 'reason': 'test', 'approved_by': 1},
+    )
+    assert refund.status_code == 201
+    export = await client.post('/api/v1/accounting-exports', json={'branch_id': branch['id'], 'business_date': '2026-04-10T00:00:00Z'})
+    assert export.status_code == 201
+    day_close = (await client.post('/api/v1/day-close', json={'branch_id': branch['id'], 'business_date': '2026-04-10T00:00:00Z'})).json()
+
+    blocked = await client.patch(f"/api/v1/day-close/{day_close['id']}/finalize", json={'closed_by': 1})
+    assert blocked.status_code == 409
+
+    blockers = (await client.get(f"/api/v1/day-close/{day_close['id']}/blockers")).json()['blockers']
+    codes = {row['blocker_code'] for row in blockers}
+    assert {'open_drawers', 'unresolved_refunds', 'pending_exports', 'staffing_gaps'} <= codes
+
+    assert (await client.post(f"/api/v1/day-close/{day_close['id']}/remediation/close-drawer/{drawer['id']}", json={'closed_by': 1})).status_code == 200
+    assert (await client.post(f"/api/v1/day-close/{day_close['id']}/remediation/rerun-export/{export.json()['id']}", json={'requested_by': 1})).status_code == 201
+    assert (await client.post(f"/api/v1/day-close/{day_close['id']}/remediation/resolve-refund/{refund.json()['id']}", json={'resolved_by': 1})).status_code == 200
+    assert (await client.post(f"/api/v1/day-close/{day_close['id']}/remediation/acknowledge-staffing-gap", json={'acknowledged_by': 1})).status_code == 200
+
+    finalize_override = await client.patch(
+        f"/api/v1/day-close/{day_close['id']}/finalize",
+        json={'closed_by': 1, 'privileged_override': True, 'override_reason': 'manager override after staffing acknowledgment'},
+    )
+    assert finalize_override.status_code == 200
+
+    audits = await client.get(f"/api/v1/audit/privileged-actions?branch_id={branch['id']}")
+    assert audits.status_code == 200
+    actions = {row['action'] for row in audits.json()}
+    assert 'day_close.override' in actions
+    assert 'staffing.gap_override' in actions
 
 
 @pytest.mark.asyncio

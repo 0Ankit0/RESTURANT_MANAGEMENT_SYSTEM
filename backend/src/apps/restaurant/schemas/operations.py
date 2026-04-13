@@ -673,6 +673,8 @@ class DayCloseCreate(BaseModel):
 class DayCloseFinalize(BaseModel):
     closed_by: int | None = None
     notes: str | None = None
+    privileged_override: bool = False
+    override_reason: str | None = None
 
 
 class DayCloseRead(BaseModel):
@@ -871,7 +873,44 @@ class PrivilegedActionAuditRead(BaseModel):
 
 class DayCloseBlockersRead(BaseModel):
     day_close_id: int
-    blockers: list[str]
+    blockers: list["DayCloseBlockerRead"]
+
+
+class DayCloseBlockerRead(BaseModel):
+    blocker_code: str
+    blocker_type: str
+    severity: OperationalSeverity
+    count: int = 0
+    summary: str
+    remediation_action: str
+    metadata: dict = Field(default_factory=dict)
+
+
+class DayCloseDrawerRemediation(BaseModel):
+    closed_by: int | None = None
+    closing_balance: float | None = None
+    note: str | None = None
+
+
+class DayCloseExportRemediation(BaseModel):
+    requested_by: int | None = None
+    reason: str | None = None
+
+
+class DayCloseRefundSettlementRemediation(BaseModel):
+    settlement_id: int | None = None
+    resolved_by: int | None = None
+    note: str | None = None
+
+
+class DayCloseStaffingOverrideAcknowledge(BaseModel):
+    acknowledged_by: int
+    note: str | None = None
+
+
+class DayCloseSettlementRemediation(BaseModel):
+    cashier_id: int | None = None
+    payment_method: str = "cash"
 
 
 class RefundRerunCreate(BaseModel):

@@ -145,6 +145,8 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
     final kitchenAsync = ref.watch(restaurantKitchenTicketsProvider);
     final notificationsAsync = ref.watch(restaurantOperationalNotificationsProvider);
     final stockAlertsAsync = ref.watch(restaurantStockAlertsProvider);
+    final latestDayCloseAsync = ref.watch(restaurantLatestDayCloseProvider);
+    final dayCloseBlockersAsync = ref.watch(restaurantDayCloseBlockersProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Restaurant Operations')),
@@ -230,6 +232,62 @@ class _RestaurantPageState extends ConsumerState<RestaurantPage> {
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Text('Failed to load report: $error'),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Day-close blocker summary',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  latestDayCloseAsync.when(
+                    data: (dayClose) {
+                      if (dayClose == null) {
+                        return const Text('No open day-close for this branch.');
+                      }
+                      return dayCloseBlockersAsync.when(
+                        data: (blockers) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Open blockers: ${blockers.length}'),
+                            const SizedBox(height: 8),
+                            ...blockers.take(3).map(
+                                  (blocker) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Text(
+                                      '• ${blocker.summary} (${blocker.severity})',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ),
+                            if (blockers.any((b) => b.blockerCode == 'staffing_gaps'))
+                              OutlinedButton(
+                                onPressed: actionState.isLoading
+                                    ? null
+                                    : () => ref
+                                        .read(restaurantActionControllerProvider.notifier)
+                                        .acknowledgeStaffingGap(
+                                          branchId: branchId,
+                                          dayCloseId: dayClose.id,
+                                          acknowledgedBy: 1,
+                                        ),
+                                child: const Text('Acknowledge Staffing Gap'),
+                              ),
+                          ],
+                        ),
+                        loading: () => const CircularProgressIndicator(strokeWidth: 2),
+                        error: (error, _) => Text('Failed to load blockers: $error'),
+                      );
+                    },
+                    loading: () => const CircularProgressIndicator(strokeWidth: 2),
+                    error: (error, _) => Text('Failed to load day-close: $error'),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Card(

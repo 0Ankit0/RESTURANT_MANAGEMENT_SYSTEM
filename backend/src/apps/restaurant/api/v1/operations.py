@@ -23,7 +23,7 @@ from src.apps.restaurant.domains.procurement import enforce_po_transition, po_st
 from src.apps.restaurant.domains.orders import can_patch_order, order_subtotal, validate_order_transition
 from src.apps.restaurant.domains.menu import line_total
 from src.apps.restaurant.domains.seating import evaluate_table_assignment, validate_reservation_transition
-from src.apps.restaurant.domains.reporting import validate_day_close_transition
+from src.apps.restaurant.domains.reporting import compute_day_close_blockers, validate_day_close_transition
 from src.apps.restaurant.domains.workforce import validate_shift_window
 from src.apps.restaurant.domains.access import PRIVILEGED_ACTIONS
 from src.apps.restaurant.services.ops_event_outbox import ops_event_outbox_dispatcher
@@ -115,10 +115,15 @@ from src.apps.restaurant.schemas.operations import (
     DayCloseChecklistCheck,
     DayCloseChecklistCreate,
     DayCloseChecklistRead,
+    DayCloseDrawerRemediation,
     DayCloseBlockersRead,
+    DayCloseExportRemediation,
     DayCloseCursorPage,
     DayCloseFinalize,
+    DayCloseRefundSettlementRemediation,
     DayCloseRead,
+    DayCloseSettlementRemediation,
+    DayCloseStaffingOverrideAcknowledge,
     DiscountApprovalAction,
     BranchPrinterCreate,
     BranchPrinterRead,
@@ -2716,34 +2721,35 @@ async def finalize_day_close(day_close_id: int, payload: DayCloseFinalize, reque
             next_status=DayCloseStatus.CLOSED.value,
         )
 
-    open_drawers = (
-        await db.execute(
-            select(func.count(CashDrawerSession.id)).where(
-                CashDrawerSession.branch_id == record.branch_id,
-                CashDrawerSession.status == DrawerStatus.OPEN,
-            )
-        )
-    ).one()[0]
-    open_bills = (
-        await db.execute(
-            select(func.count(Bill.id))
-            .join(Order, Order.id == Bill.order_id)
-            .where(Order.branch_id == record.branch_id, Bill.status != BillStatus.PAID)
-        )
-    ).one()[0]
-    if open_drawers or open_bills:
+    blockers = await compute_day_close_blockers(db=db, day_close=record)
+    if blockers and not payload.privileged_override:
         await _emit_operational_event(
             db=db,
             branch_id=record.branch_id,
             event_name="branch.day_close_blocked",
             severity=OperationalSeverity.WARNING,
             actor_user_id=payload.closed_by,
-            payload=_event_payload(stage="day_close", action="blocked", resource_id=record.id, status=str(record.status), open_drawers=open_drawers, open_bills=open_bills),
+            payload=_event_payload(
+                stage="day_close",
+                action="blocked",
+                resource_id=record.id,
+                status=str(record.status),
+                blockers=[blocker.blocker_code for blocker in blockers],
+            ),
             is_exception=True,
         )
-        raise HTTPException(
-            status_code=409,
-            detail=f"Day-close blocked: open_drawers={open_drawers}, open_bills={open_bills}",
+        raise HTTPException(status_code=409, detail={"message": "Day-close blocked by unresolved blockers", "blockers": [b.blocker_code for b in blockers]})
+    if blockers and payload.privileged_override:
+        if not payload.override_reason:
+            raise HTTPException(status_code=400, detail="override_reason is required when privileged_override is true")
+        await _audit_privileged_action(
+            db=db,
+            action="day_close.override",
+            branch_id=record.branch_id,
+            actor_user_id=payload.closed_by,
+            resource_type="day_close",
+            resource_id=record.id,
+            payload={"override_reason": payload.override_reason, "blockers": [b.blocker_code for b in blockers]},
         )
     pending_required_checklist = (
         await db.execute(
@@ -2791,29 +2797,183 @@ async def get_day_close_blockers(day_close_id: int, db: AsyncSession = Depends(g
     record = await db.get(DayClose, day_close_id)
     if not record:
         raise HTTPException(status_code=404, detail="Day-close record not found")
-    blockers: list[str] = []
-    open_drawers = (
-        await db.execute(
-            select(func.count(CashDrawerSession.id)).where(
-                CashDrawerSession.branch_id == record.branch_id,
-                CashDrawerSession.status == DrawerStatus.OPEN,
-            )
-        )
-    ).one()[0]
-    if open_drawers:
-        blockers.append(f"open_drawers={open_drawers}")
-    pending_required_checklist = (
-        await db.execute(
-            select(func.count(DayCloseChecklistItem.id)).where(
-                DayCloseChecklistItem.day_close_id == day_close_id,
-                DayCloseChecklistItem.is_required == True,
-                DayCloseChecklistItem.is_checked == False,
-            )
-        )
-    ).one()[0]
-    if pending_required_checklist:
-        blockers.append(f"pending_required_checklist={pending_required_checklist}")
-    return {"day_close_id": day_close_id, "blockers": blockers}
+    blockers = await compute_day_close_blockers(db=db, day_close=record)
+    return {
+        "day_close_id": day_close_id,
+        "blockers": [
+            {
+                "blocker_code": blocker.blocker_code,
+                "blocker_type": blocker.blocker_type,
+                "severity": blocker.severity,
+                "count": blocker.count,
+                "summary": blocker.summary,
+                "remediation_action": blocker.remediation_action,
+                "metadata": blocker.metadata,
+            }
+            for blocker in blockers
+        ],
+    }
+
+
+@router.post("/day-close/{day_close_id}/remediation/close-drawer/{session_id}", response_model=DrawerSessionRead)
+async def remediate_day_close_drawer(
+    day_close_id: int,
+    session_id: int,
+    payload: DayCloseDrawerRemediation,
+    db: AsyncSession = Depends(get_db),
+):
+    day_close = await db.get(DayClose, day_close_id)
+    if not day_close:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    session = await db.get(CashDrawerSession, session_id)
+    if not session or session.branch_id != day_close.branch_id:
+        raise HTTPException(status_code=404, detail="Drawer session not found for day-close branch")
+    if session.status == DrawerStatus.CLOSED:
+        return session
+    session.status = DrawerStatus.CLOSED
+    session.closed_at = datetime.utcnow()
+    session.closing_balance = payload.closing_balance if payload.closing_balance is not None else session.opening_balance
+    db.add(session)
+    await _emit_operational_event(
+        db=db,
+        branch_id=day_close.branch_id,
+        event_name="branch.day_close_remediation.drawer_closed",
+        actor_user_id=payload.closed_by,
+        payload={"day_close_id": day_close_id, "drawer_session_id": session_id, "note": payload.note},
+    )
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+@router.post("/day-close/{day_close_id}/remediation/rerun-export/{export_id}", response_model=AccountingExportRetryRead)
+async def remediate_day_close_export(
+    day_close_id: int,
+    export_id: int,
+    payload: DayCloseExportRemediation,
+    db: AsyncSession = Depends(get_db),
+):
+    day_close = await db.get(DayClose, day_close_id)
+    if not day_close:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    export = await db.get(AccountingExport, export_id)
+    if not export or export.branch_id != day_close.branch_id:
+        raise HTTPException(status_code=404, detail="Accounting export not found for day-close branch")
+    retry = AccountingExportRetry(
+        accounting_export_id=export_id,
+        requested_by=payload.requested_by,
+        status=AccountingExportRetryStatus.COMPLETED,
+        message=payload.reason or "Day-close remediation export rerun",
+        completed_at=datetime.utcnow(),
+    )
+    export.status = AccountingExportStatus.SENT
+    db.add(retry)
+    db.add(export)
+    await db.commit()
+    await db.refresh(retry)
+    return retry
+
+
+@router.post("/day-close/{day_close_id}/remediation/resolve-refund/{refund_id}", response_model=RefundRead)
+async def remediate_day_close_refund_settlement(
+    day_close_id: int,
+    refund_id: int,
+    payload: DayCloseRefundSettlementRemediation,
+    db: AsyncSession = Depends(get_db),
+):
+    day_close = await db.get(DayClose, day_close_id)
+    if not day_close:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    refund = await db.get(Refund, refund_id)
+    if not refund or refund.branch_id != day_close.branch_id:
+        raise HTTPException(status_code=404, detail="Refund not found for day-close branch")
+    settlement_id = payload.settlement_id
+    if settlement_id is None:
+        settlement_id = (
+            await db.execute(select(Settlement.id).where(Settlement.bill_id == refund.bill_id).order_by(Settlement.id.desc()).limit(1))
+        ).scalars().first()
+    if settlement_id is None:
+        raise HTTPException(status_code=400, detail="No settlement available to attach to refund")
+    settlement = await db.get(Settlement, settlement_id)
+    if not settlement:
+        raise HTTPException(status_code=404, detail="Settlement not found")
+    refund.settlement_id = settlement_id
+    db.add(refund)
+    await _emit_operational_event(
+        db=db,
+        branch_id=day_close.branch_id,
+        event_name="branch.day_close_remediation.refund_resolved",
+        actor_user_id=payload.resolved_by,
+        payload={"day_close_id": day_close_id, "refund_id": refund_id, "settlement_id": settlement_id, "note": payload.note},
+    )
+    await db.commit()
+    await db.refresh(refund)
+    return refund
+
+
+@router.post("/day-close/{day_close_id}/remediation/acknowledge-staffing-gap")
+async def acknowledge_day_close_staffing_gap(
+    day_close_id: int,
+    payload: DayCloseStaffingOverrideAcknowledge,
+    db: AsyncSession = Depends(get_db),
+):
+    day_close = await db.get(DayClose, day_close_id)
+    if not day_close:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    await _audit_privileged_action(
+        db=db,
+        action="staffing.gap_override",
+        branch_id=day_close.branch_id,
+        actor_user_id=payload.acknowledged_by,
+        resource_type="day_close",
+        resource_id=day_close_id,
+        payload={"note": payload.note},
+    )
+    await _emit_operational_event(
+        db=db,
+        branch_id=day_close.branch_id,
+        event_name="branch.day_close_remediation.staffing_override_acknowledged",
+        severity=OperationalSeverity.WARNING,
+        actor_user_id=payload.acknowledged_by,
+        payload={"day_close_id": day_close_id, "note": payload.note},
+        is_exception=True,
+    )
+    await db.commit()
+    return {"status": "acknowledged"}
+
+
+@router.post("/day-close/{day_close_id}/remediation/resolve-bill/{bill_id}", response_model=BillRead)
+async def remediate_day_close_bill_settlement(
+    day_close_id: int,
+    bill_id: int,
+    payload: DayCloseSettlementRemediation,
+    db: AsyncSession = Depends(get_db),
+):
+    day_close = await db.get(DayClose, day_close_id)
+    if not day_close:
+        raise HTTPException(status_code=404, detail="Day-close record not found")
+    bill = await db.get(Bill, bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    order = await db.get(Order, bill.order_id)
+    if not order or order.branch_id != day_close.branch_id:
+        raise HTTPException(status_code=404, detail="Bill not found for day-close branch")
+    remaining = round(max(0, bill.total_amount - bill.paid_amount), 2)
+    if remaining <= 0:
+        return bill
+    bill.paid_amount = round(bill.paid_amount + remaining, 2)
+    bill.status = BillStatus.PAID
+    settlement = Settlement(
+        bill_id=bill.id,
+        cashier_id=payload.cashier_id,
+        payment_method=payload.payment_method,
+        amount=remaining,
+    )
+    db.add(settlement)
+    db.add(bill)
+    await db.commit()
+    await db.refresh(bill)
+    return bill
 
 
 @router.post("/day-close/{day_close_id}/checklist-items", response_model=DayCloseChecklistRead, status_code=status.HTTP_201_CREATED)
