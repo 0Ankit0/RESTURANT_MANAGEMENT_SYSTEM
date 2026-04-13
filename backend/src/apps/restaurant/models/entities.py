@@ -98,6 +98,7 @@ class StockTransferLifecycleStatus(str, Enum):
     REQUESTED = "requested"
     IN_TRANSIT = "in_transit"
     RECEIVED = "received"
+    DISCREPANCY = "discrepancy"
     REJECTED = "rejected"
 
 

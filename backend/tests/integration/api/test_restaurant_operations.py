@@ -246,14 +246,26 @@ async def test_restaurant_flow(client, db_session):
 
     res = await client.patch(
         f"/api/v1/stock-transfers/{transfer_id}",
-        json={"approved_by": 1, "action": "mark_in_transit", "shipped_qty": 1.0},
+        json={
+            "approved_by": 1,
+            "acknowledged_by": 1,
+            "acknowledgement_note": "picked and sealed",
+            "action": "mark_in_transit",
+            "shipped_qty": 1.0,
+        },
     )
     assert res.status_code == 200
     assert res.json()["status"] == "in_transit"
 
     res = await client.patch(
         f"/api/v1/stock-transfers/{transfer_id}",
-        json={"approved_by": 1, "action": "mark_received", "received_qty": 1.0},
+        json={
+            "approved_by": 1,
+            "acknowledged_by": 2,
+            "acknowledgement_note": "received in full",
+            "action": "mark_received",
+            "received_qty": 1.0,
+        },
     )
     assert res.status_code == 200
     assert res.json()["status"] == "received"
@@ -1167,3 +1179,129 @@ async def test_transition_validation_matrix_and_settlement_rollback(client):
     )
     assert valid_settlement.status_code == 200
     assert valid_settlement.json()["status"] == "paid"
+
+
+@pytest.mark.asyncio
+async def test_stock_transfer_partial_and_over_receipt_variance(client):
+    source = (await client.post("/api/v1/branches", json={"name": "Transfer Src", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    dest = (await client.post("/api/v1/branches", json={"name": "Transfer Dest", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    src_ing = (await client.post(f"/api/v1/branches/{source['id']}/ingredients", json={"name": "Flour", "unit": "kg", "quantity_on_hand": 30, "reorder_threshold": 5})).json()
+    dst_ing = (await client.post(f"/api/v1/branches/{dest['id']}/ingredients", json={"name": "Flour", "unit": "kg", "quantity_on_hand": 0, "reorder_threshold": 1})).json()
+
+    transfer = (await client.post("/api/v1/stock-transfers", json={
+        "from_branch_id": source["id"],
+        "to_branch_id": dest["id"],
+        "from_ingredient_id": src_ing["id"],
+        "to_ingredient_id": dst_ing["id"],
+        "quantity": 10,
+    })).json()
+
+    in_transit = await client.patch(f"/api/v1/stock-transfers/{transfer['id']}", json={
+        "action": "mark_in_transit",
+        "acknowledged_by": 11,
+        "acknowledgement_note": "truck dispatched",
+        "shipped_qty": 10,
+    })
+    assert in_transit.status_code == 200
+    assert in_transit.json()["status"] == "in_transit"
+
+    partial = await client.patch(f"/api/v1/stock-transfers/{transfer['id']}", json={
+        "action": "mark_received",
+        "acknowledged_by": 22,
+        "acknowledgement_note": "short landed",
+        "received_qty": 7,
+        "discrepancy_notes": "3kg missing",
+    })
+    assert partial.status_code == 200
+    assert partial.json()["status"] == "discrepancy"
+
+    transfer_over = (await client.post("/api/v1/stock-transfers", json={
+        "from_branch_id": source["id"],
+        "to_branch_id": dest["id"],
+        "from_ingredient_id": src_ing["id"],
+        "to_ingredient_id": dst_ing["id"],
+        "quantity": 5,
+    })).json()
+    await client.patch(f"/api/v1/stock-transfers/{transfer_over['id']}", json={
+        "action": "mark_in_transit",
+        "acknowledged_by": 11,
+        "acknowledgement_note": "truck dispatched",
+        "shipped_qty": 5,
+    })
+    over = await client.patch(f"/api/v1/stock-transfers/{transfer_over['id']}", json={
+        "action": "mark_received",
+        "acknowledged_by": 22,
+        "acknowledgement_note": "received extra",
+        "received_qty": 6,
+        "discrepancy_notes": "supplier over-shipped",
+    })
+    assert over.status_code == 200
+    assert over.json()["status"] == "discrepancy"
+
+
+@pytest.mark.asyncio
+async def test_stock_count_mismatch_requires_review_outcome(client, db_session):
+    branch = (await client.post("/api/v1/branches", json={"name": "Count Review", "tax_rate": 0.05, "service_charge_rate": 0.02})).json()
+    ing = (await client.post(f"/api/v1/branches/{branch['id']}/ingredients", json={"name": "Oil", "unit": "ltr", "quantity_on_hand": 25, "reorder_threshold": 5})).json()
+    session = (await client.post("/api/v1/inventory/stock-count-sessions", json={"branch_id": branch["id"], "opened_by": 9})).json()
+    await client.post(f"/api/v1/inventory/stock-count-sessions/{session['id']}/lines", json={"ingredient_id": ing["id"], "counted_qty": 18, "notes": "major leak"})
+    await client.patch(f"/api/v1/inventory/stock-count-sessions/{session['id']}/submit?submitted_by=9")
+
+    reject = await client.patch(
+        f"/api/v1/inventory/stock-count-sessions/{session['id']}/review",
+        json={"action": "reject", "reviewer_id": 2, "rejection_reason": "recount required"},
+    )
+    assert reject.status_code == 200
+    assert reject.json()["status"] == "rejected"
+
+    session2 = (await client.post("/api/v1/inventory/stock-count-sessions", json={"branch_id": branch["id"], "opened_by": 9})).json()
+    await client.post(f"/api/v1/inventory/stock-count-sessions/{session2['id']}/lines", json={"ingredient_id": ing["id"], "counted_qty": 18, "notes": "major leak"})
+    await client.patch(f"/api/v1/inventory/stock-count-sessions/{session2['id']}/submit?submitted_by=9")
+    approve = await client.patch(
+        f"/api/v1/inventory/stock-count-sessions/{session2['id']}/review",
+        json={"action": "approve", "reviewer_id": 1},
+    )
+    assert approve.status_code == 200
+    assert approve.json()["status"] == "approved"
+
+    ledger_rows = (await db_session.execute(select(StockLedgerEntry).where(
+        StockLedgerEntry.reference_type == "stock_count_session",
+        StockLedgerEntry.reference_id == session2["id"],
+    ))).scalars().all()
+    assert len(ledger_rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_recipe_reversal_after_order_void_and_refund(client, db_session):
+    branch = (await client.post("/api/v1/branches", json={"name": "Lifecycle Stock", "tax_rate": 0.1, "service_charge_rate": 0.05})).json()
+    table = (await client.post(f"/api/v1/branches/{branch['id']}/tables", json={"code": "S1", "seats": 2})).json()
+    menu = (await client.post(f"/api/v1/branches/{branch['id']}/menu-items", json={"name": "Soup", "price": 8})).json()
+    ingredient = (await client.post(f"/api/v1/branches/{branch['id']}/ingredients", json={"name": "Stock", "unit": "ltr", "quantity_on_hand": 20, "reorder_threshold": 4})).json()
+    await client.post("/api/v1/recipes", json={"branch_id": branch["id"], "name": menu["name"], "items": [{"ingredient_id": ingredient["id"], "quantity": 1}]})
+
+    order_payload = (await client.post("/api/v1/orders", json={
+        "branch_id": branch["id"],
+        "order_source": "dine_in",
+        "table_id": table["id"],
+        "waiter_id": 10,
+        "items": [{"menu_item_id": menu["id"], "quantity": 2, "course_no": 1}],
+    })).json()
+    order_id = order_payload["order"]["id"]
+    bill_id = order_payload["bill"]["id"]
+    ing_row = await db_session.get(Ingredient, ingredient["id"])
+    assert ing_row.quantity_on_hand == 18
+
+    approval = (await client.post("/api/v1/orders/edit-approvals", json={"order_id": order_id, "requested_by": 10, "reason": "void"})).json()
+    await client.patch(f"/api/v1/orders/edit-approvals/{approval['id']}", json={"approved_by": 1, "status": "approved"})
+    cancel = await client.patch(f"/api/v1/orders/{order_id}", json={"status": "cancelled", "edit_approval_id": approval["id"]})
+    assert cancel.status_code == 200
+    ing_after_cancel = await db_session.get(Ingredient, ingredient["id"])
+    assert ing_after_cancel.quantity_on_hand == 20
+
+    drawer = await client.post(f"/api/v1/branches/{branch['id']}/drawer-sessions", json={"cashier_id": 10, "opening_balance": 100})
+    assert drawer.status_code == 201
+    await client.post(f"/api/v1/bills/{bill_id}/settlements", json={"cashier_id": 10, "settlements": [{"payment_method": "cash", "amount": 17.2}]})
+    refund = await client.post("/api/v1/refunds", json={"branch_id": branch["id"], "bill_id": bill_id, "amount": 17.2, "reason": "voided ticket", "approved_by": 1})
+    assert refund.status_code == 201
+    ing_after_refund = await db_session.get(Ingredient, ingredient["id"])
+    assert ing_after_refund.quantity_on_hand == 20

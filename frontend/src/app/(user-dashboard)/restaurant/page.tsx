@@ -19,6 +19,7 @@ import {
   useCreateOrder,
   useCreateOrderEditApproval,
   useCreateReservation,
+  useInventoryReconciliation,
   useKitchenTickets,
   useOperationalNotifications,
   usePromoteWaitlist,
@@ -26,6 +27,7 @@ import {
   useRestaurantBranches,
   useSeatTable,
   useSettleBill,
+  useStockTransfers,
   useTransitionReservation,
   useUpdateKitchenTicket,
   useUpdateOrder,
@@ -182,6 +184,8 @@ export default function RestaurantOpsPage() {
   const menuItems = useBranchMenuItems(branchId);
   const reservations = useBranchReservations(branchId);
   const kitchen = useKitchenTickets();
+  const stockTransfers = useStockTransfers(branchId);
+  const inventoryReconciliation = useInventoryReconciliation(branchId);
   const notifications = useOperationalNotifications(branchId);
   const report = useBranchOperationsReport(branchId);
   const latestDayClose = useLatestOpenDayClose(branchId);
@@ -503,6 +507,8 @@ export default function RestaurantOpsPage() {
               reservations.refetch();
               kitchen.refetch();
               bills.refetch();
+              stockTransfers.refetch();
+              inventoryReconciliation.refetch();
             }}
           >
             Refresh
@@ -677,6 +683,47 @@ export default function RestaurantOpsPage() {
                 </div>
               );
             }) ?? <p className="text-sm text-gray-500">No tickets available</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle>Transfer Discrepancies</CardTitle></CardHeader>
+          <CardContent className="space-y-2 max-h-72 overflow-auto">
+            {(stockTransfers.data?.items ?? [])
+              .filter((transfer) => transfer.status === 'discrepancy' || transfer.status === 'rejected')
+              .map((transfer) => (
+                <div key={transfer.id} className="text-sm border rounded p-2">
+                  <div className="font-medium">Transfer #{transfer.id} · {transfer.status}</div>
+                  <div className="text-gray-500">
+                    Shipped {transfer.shipped_qty} · Received {transfer.received_qty}
+                  </div>
+                  {transfer.discrepancy_notes && <div className="text-xs text-amber-700">{transfer.discrepancy_notes}</div>}
+                </div>
+              ))}
+            {!stockTransfers.data?.items?.length && <p className="text-sm text-gray-500">No transfers available.</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Inventory Variance Review</CardTitle></CardHeader>
+          <CardContent className="space-y-2 max-h-72 overflow-auto">
+            {(inventoryReconciliation.data?.rows ?? [])
+              .filter((row) => row.variance_qty !== 0)
+              .slice(0, 10)
+              .map((row) => (
+                <div key={row.ingredient_id} className="text-sm border rounded p-2">
+                  <div className="font-medium">{row.ingredient_name}</div>
+                  <div className="text-gray-500">
+                    Expected {row.expected_qty} · Actual {row.actual_qty} · Variance {row.variance_qty}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    Linked txns: {row.source_transactions.map((txn) => `${txn.reference_type}#${txn.reference_id ?? 'n/a'}`).join(', ')}
+                  </div>
+                </div>
+              ))}
+            {!inventoryReconciliation.data?.rows?.length && <p className="text-sm text-gray-500">No reconciliation rows available.</p>}
           </CardContent>
         </Card>
       </div>

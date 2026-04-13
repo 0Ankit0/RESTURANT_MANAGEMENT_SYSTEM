@@ -11,12 +11,14 @@ import type {
   KitchenTicket,
   KitchenTicketStatus,
   MenuItem,
+  InventoryReconciliationReport,
   OperationalNotification,
   OrderEditApproval,
   Reservation,
   RestaurantBranch,
   RestaurantOrder,
   RestaurantTable,
+  StockTransfer,
   WaitlistEntry,
 } from '@/types/restaurant';
 
@@ -152,6 +154,31 @@ export function useBranchBills(branchId: number) {
       return response.data;
     },
     enabled: branchId > 0,
+  });
+}
+
+export function useStockTransfers(branchId: number) {
+  return useQuery({
+    queryKey: ['restaurant', 'stock-transfers', branchId],
+    queryFn: async () => {
+      const response = await apiClient.get<CursorPage<StockTransfer>>('/stock-transfers', { params: { branch_id: branchId } });
+      return response.data;
+    },
+    enabled: branchId > 0,
+  });
+}
+
+export function useInventoryReconciliation(branchId: number) {
+  return useQuery({
+    queryKey: ['restaurant', 'inventory-reconciliation', branchId],
+    queryFn: async () => {
+      const response = await apiClient.get<InventoryReconciliationReport>('/inventory/reconciliation', {
+        params: { branch_id: branchId },
+      });
+      return response.data;
+    },
+    enabled: branchId > 0,
+    refetchInterval: 30_000,
   });
 }
 

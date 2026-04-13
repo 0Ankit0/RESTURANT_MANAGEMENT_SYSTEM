@@ -155,3 +155,34 @@ export interface DayCloseBlockersResponse {
   day_close_id: number;
   blockers: DayCloseBlocker[];
 }
+
+export interface StockTransfer {
+  id: number;
+  from_branch_id: number;
+  to_branch_id: number;
+  quantity: number;
+  shipped_qty: number;
+  received_qty: number;
+  status: 'requested' | 'in_transit' | 'received' | 'discrepancy' | 'rejected';
+  discrepancy_notes?: string | null;
+}
+
+export interface InventoryReconciliationRow {
+  ingredient_id: number;
+  ingredient_name: string;
+  expected_qty: number;
+  actual_qty: number;
+  variance_qty: number;
+  source_transactions: Array<{
+    reference_type: string;
+    reference_id: number | null;
+    reason: string;
+    change_qty: number;
+  }>;
+}
+
+export interface InventoryReconciliationReport {
+  branch_id: number;
+  rows: InventoryReconciliationRow[];
+  generated_at: string;
+}

@@ -17,7 +17,12 @@ from src.apps.restaurant.domains.billing import (
     validate_bill_transition,
     validate_drawer_session_transition,
 )
-from src.apps.restaurant.domains.inventory import apply_inventory_delta, recipe_component_delta, variance as inventory_variance
+from src.apps.restaurant.domains.inventory import (
+    apply_inventory_delta,
+    recipe_component_delta,
+    reconcile_inventory_target,
+    variance as inventory_variance,
+)
 from src.apps.restaurant.domains.kitchen import validate_ticket_transition
 from src.apps.restaurant.domains.procurement import enforce_po_transition, po_status
 from src.apps.restaurant.domains.orders import can_patch_order, order_subtotal, validate_order_transition
@@ -434,6 +439,79 @@ async def _apply_recipe_depletion(order: Order, order_items: list[OrderItem], db
                     reference_id=order.id,
                 )
             )
+
+
+async def _recipe_targets_by_ingredient(order: Order, order_items: list[OrderItem], db: AsyncSession) -> dict[int, float]:
+    targets: dict[int, float] = {}
+    for order_item in order_items:
+        menu_item = await db.get(MenuItem, order_item.menu_item_id)
+        if not menu_item:
+            continue
+        recipe = (
+            await db.execute(
+                select(Recipe)
+                .where(Recipe.branch_id == order.branch_id, Recipe.name == menu_item.name, Recipe.is_active == True)
+                .order_by(Recipe.version.desc())
+            )
+        ).scalars().first()
+        if not recipe:
+            continue
+        recipe_items = (await db.execute(select(RecipeItem).where(RecipeItem.recipe_id == recipe.id))).scalars().all()
+        for component in recipe_items:
+            ingredient = await db.get(Ingredient, component.ingredient_id)
+            if not ingredient:
+                continue
+            if ingredient.branch_id != order.branch_id:
+                raise HTTPException(status_code=409, detail=f"Ingredient {ingredient.id} does not belong to order branch")
+            delta = recipe_component_delta(component.quantity, order_item.quantity)
+            targets[ingredient.id] = round(targets.get(ingredient.id, 0.0) + delta, 3)
+    return targets
+
+
+async def _synchronize_order_recipe_ledger(order: Order, db: AsyncSession, *, reason: str = "recipe_lifecycle_sync") -> None:
+    order_items = (await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))).scalars().all()
+    target_movements = (
+        {}
+        if order.status == OrderStatus.CANCELLED
+        else await _recipe_targets_by_ingredient(order, order_items, db)
+    )
+    existing_rows = (
+        await db.execute(
+            select(StockLedgerEntry).where(
+                StockLedgerEntry.reference_type == "order",
+                StockLedgerEntry.reference_id == order.id,
+            )
+        )
+    ).scalars().all()
+    existing_net_by_ingredient: dict[int, float] = {}
+    for row in existing_rows:
+        existing_net_by_ingredient[row.ingredient_id] = round(
+            existing_net_by_ingredient.get(row.ingredient_id, 0.0) + row.change_qty,
+            3,
+        )
+
+    ingredient_ids = set(existing_net_by_ingredient) | set(target_movements)
+    for ingredient_id in ingredient_ids:
+        ingredient = await db.get(Ingredient, ingredient_id)
+        if not ingredient:
+            continue
+        target_net = target_movements.get(ingredient_id, 0.0)
+        current_net = existing_net_by_ingredient.get(ingredient_id, 0.0)
+        adjustment = reconcile_inventory_target(current_net=current_net, target_net=target_net)
+        if adjustment == 0:
+            continue
+        ingredient.quantity_on_hand = apply_inventory_delta(ingredient.quantity_on_hand, adjustment)
+        ingredient.updated_at = datetime.utcnow()
+        db.add(ingredient)
+        db.add(
+            StockLedgerEntry(
+                ingredient_id=ingredient_id,
+                change_qty=adjustment,
+                reason=reason,
+                reference_type="order",
+                reference_id=order.id,
+            )
+        )
 
 
 async def _reverse_recipe_depletion(order: Order, db: AsyncSession, *, reason: str = "recipe_reversal_cancelled") -> None:
@@ -1267,9 +1345,10 @@ async def patch_order(order_id: int, payload: OrderPatchWithApproval, request: R
                 bill.status = BillStatus.PARTIALLY_PAID
             else:
                 bill.status = BillStatus.PAID
+        await _synchronize_order_recipe_ledger(order, db)
 
     if payload.status == OrderStatus.CANCELLED and previous_status != OrderStatus.CANCELLED:
-        await _reverse_recipe_depletion(order, db)
+        await _synchronize_order_recipe_ledger(order, db, reason="recipe_reversal_cancelled")
     order.updated_at = datetime.utcnow()
     await _emit_operational_event(
         db=db,
@@ -1516,8 +1595,13 @@ async def review_stock_count_session(session_id: int, payload: StockCountReviewA
     if session.status != StockCountSessionStatus.SUBMITTED:
         raise HTTPException(status_code=409, detail="Only submitted stock count sessions can be reviewed")
 
+    lines = (await db.execute(select(StockCountLine).where(StockCountLine.session_id == session_id))).scalars().all()
+    max_abs_variance = max((abs(line.variance_qty) for line in lines), default=0.0)
+    approval_threshold = 2.0
+    requires_approval = max_abs_variance > approval_threshold
     if payload.action == "approve":
-        lines = (await db.execute(select(StockCountLine).where(StockCountLine.session_id == session_id))).scalars().all()
+        if requires_approval and payload.reviewer_id is None:
+            raise HTTPException(status_code=400, detail="Reviewer acknowledgement is required for high-variance approvals")
         for line in lines:
             ingredient = await db.get(Ingredient, line.ingredient_id)
             if not ingredient:
@@ -1541,6 +1625,8 @@ async def review_stock_count_session(session_id: int, payload: StockCountReviewA
         session.approved_by = payload.reviewer_id
         session.approved_at = datetime.utcnow()
     elif payload.action == "reject":
+        if requires_approval and not payload.rejection_reason:
+            raise HTTPException(status_code=400, detail="Rejection reason is required for high-variance counts")
         session.status = StockCountSessionStatus.REJECTED
         session.rejection_reason = payload.rejection_reason
         session.approved_by = payload.reviewer_id
@@ -1621,9 +1707,11 @@ async def action_stock_transfer(transfer_id: int, payload: StockTransferAction, 
     if payload.action == "mark_in_transit":
         if transfer.status != "requested":
             raise HTTPException(status_code=409, detail="Only requested transfers can move to in_transit")
+        if payload.acknowledged_by is None or not payload.acknowledgement_note:
+            raise HTTPException(status_code=400, detail="Shipment acknowledgement payload is required")
         shipped_qty = payload.shipped_qty or transfer.quantity
-        if shipped_qty > transfer.quantity:
-            raise HTTPException(status_code=400, detail="Shipped quantity cannot exceed requested quantity")
+        if shipped_qty <= 0:
+            raise HTTPException(status_code=400, detail="Shipped quantity must be positive")
         from_ingredient = await db.get(Ingredient, transfer.from_ingredient_id)
         if not from_ingredient or from_ingredient.branch_id != transfer.from_branch_id:
             raise HTTPException(status_code=400, detail="Transfer source ingredient is missing")
@@ -1646,17 +1734,25 @@ async def action_stock_transfer(transfer_id: int, payload: StockTransferAction, 
     elif payload.action == "mark_received":
         if transfer.status != "in_transit":
             raise HTTPException(status_code=409, detail="Transfer must be in transit before receive")
+        if payload.acknowledged_by is None or not payload.acknowledgement_note:
+            raise HTTPException(status_code=400, detail="Receipt acknowledgement payload is required")
         to_ingredient = await db.get(Ingredient, transfer.to_ingredient_id)
         if not to_ingredient or to_ingredient.branch_id != transfer.to_branch_id:
             raise HTTPException(status_code=400, detail="Transfer destination ingredient is missing")
         receive_qty = payload.received_qty or transfer.shipped_qty or transfer.quantity
         if receive_qty > transfer.shipped_qty:
-            raise HTTPException(status_code=400, detail="Received quantity cannot exceed shipped quantity")
+            transfer.status = "discrepancy"
+            transfer.discrepancy_notes = payload.discrepancy_notes or "Over-receipt variance captured"
+            transfer.received_qty = receive_qty
+            db.add(transfer)
+            await db.commit()
+            await db.refresh(transfer)
+            return transfer
         if receive_qty < transfer.shipped_qty and not payload.discrepancy_notes:
             raise HTTPException(status_code=400, detail="Discrepancy notes are required for short receipts")
         transfer.received_qty = receive_qty
         transfer.discrepancy_notes = payload.discrepancy_notes
-        transfer.status = "received"
+        transfer.status = "received" if receive_qty == transfer.shipped_qty else "discrepancy"
         to_ingredient.quantity_on_hand = apply_inventory_delta(to_ingredient.quantity_on_hand, receive_qty)
         to_ingredient.updated_at = datetime.utcnow()
         db.add(
@@ -1693,6 +1789,34 @@ async def action_stock_transfer(transfer_id: int, payload: StockTransferAction, 
     await db.commit()
     await db.refresh(transfer)
     return transfer
+
+
+@router.get("/inventory/reconciliation")
+async def inventory_reconciliation_report(branch_id: int, db: AsyncSession = Depends(get_db)):
+    await _get_branch_or_404(branch_id, db)
+    ingredients = (
+        await db.execute(select(Ingredient).where(Ingredient.branch_id == branch_id).order_by(Ingredient.id.asc()))
+    ).scalars().all()
+    rows = []
+    for ingredient in ingredients:
+        ledger_rows = (
+            await db.execute(select(StockLedgerEntry).where(StockLedgerEntry.ingredient_id == ingredient.id))
+        ).scalars().all()
+        expected_qty = round(sum(row.change_qty for row in ledger_rows), 3)
+        rows.append(
+            {
+                "ingredient_id": ingredient.id,
+                "ingredient_name": ingredient.name,
+                "expected_qty": expected_qty,
+                "actual_qty": ingredient.quantity_on_hand,
+                "variance_qty": round(ingredient.quantity_on_hand - expected_qty, 3),
+                "source_transactions": [
+                    {"reference_type": row.reference_type, "reference_id": row.reference_id, "reason": row.reason, "change_qty": row.change_qty}
+                    for row in ledger_rows[-20:]
+                ],
+            }
+        )
+    return {"branch_id": branch_id, "rows": rows, "generated_at": datetime.utcnow()}
 
 
 @router.get("/stock-transfers", response_model=StockTransferCursorPage)
@@ -2074,7 +2198,7 @@ async def create_refund(payload: RefundCreate, request: Request, db: AsyncSessio
     if order and bill.paid_amount == 0 and order.status != OrderStatus.CANCELLED:
         order.status = OrderStatus.CANCELLED
         order.updated_at = datetime.utcnow()
-        await _reverse_recipe_depletion(order, db, reason="recipe_reversal_refunded")
+        await _synchronize_order_recipe_ledger(order, db, reason="recipe_reversal_refunded")
         db.add(order)
 
     db.add(refund)
