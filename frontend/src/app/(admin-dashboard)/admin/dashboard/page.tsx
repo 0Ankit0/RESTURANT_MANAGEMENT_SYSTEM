@@ -6,6 +6,7 @@ import { useListUsers } from '@/hooks/use-users';
 import { useTokens } from '@/hooks/use-tokens';
 import { useRoles } from '@/hooks/use-rbac';
 import { useObservabilitySummary } from '@/hooks/use-observability';
+import { useDayCloseBlockers, useLatestOpenDayClose, useRestaurantBranches } from '@/hooks/use-restaurant';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Activity,
@@ -25,6 +26,10 @@ export default function AdminDashboardPage() {
   const { data: tokenData } = useTokens({ limit: 1 });
   const { data: rolesData } = useRoles();
   const { data: observabilitySummary } = useObservabilitySummary();
+  const { data: branches = [] } = useRestaurantBranches();
+  const primaryBranchId = branches[0]?.id ?? 0;
+  const latestDayClose = useLatestOpenDayClose(primaryBranchId);
+  const blockers = useDayCloseBlockers(latestDayClose.data?.id ?? null);
 
   const users = usersData?.items ?? [];
   const totalUsers = usersData?.total ?? users.length;
@@ -231,6 +236,24 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Operations blockers</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {!latestDayClose.data && <p className="text-gray-500">No active day-close found for monitored branch.</p>}
+          {blockers.data?.blockers?.map((blocker) => (
+            <div key={blocker.blocker_code} className="rounded border p-2">
+              <p className="font-medium">{blocker.summary}</p>
+              <p className="text-xs text-gray-500">Severity: {blocker.severity} · Count: {blocker.count}</p>
+            </div>
+          ))}
+          {latestDayClose.data && !blockers.data?.blockers?.length && (
+            <p className="text-emerald-700">No unresolved operations blockers.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

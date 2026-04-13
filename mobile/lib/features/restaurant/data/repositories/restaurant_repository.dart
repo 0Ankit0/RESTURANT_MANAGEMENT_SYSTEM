@@ -287,4 +287,48 @@ class RestaurantRepository {
       throw ErrorHandler.handle(e);
     }
   }
+
+  Future<DayCloseItem?> getLatestOpenDayClose(int branchId) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantDayClose,
+        queryParameters: {'branch_id': branchId, 'status_filter': 'open', 'limit': 1},
+      );
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final items = data['items'] as List<dynamic>? ?? [];
+      if (items.isEmpty) return null;
+      return DayCloseItem.fromJson(items.first as Map<String, dynamic>);
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<List<DayCloseBlockerItem>> getDayCloseBlockers(int dayCloseId) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.restaurantDayCloseBlockers(dayCloseId),
+      );
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final items = data['blockers'] as List<dynamic>? ?? [];
+      return items
+          .map((item) => DayCloseBlockerItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  Future<void> acknowledgeStaffingGap({
+    required int dayCloseId,
+    required int acknowledgedBy,
+  }) async {
+    try {
+      await _dioClient.dio.post(
+        ApiEndpoints.restaurantAcknowledgeStaffingGap(dayCloseId),
+        data: {'acknowledged_by': acknowledgedBy},
+      );
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
 }

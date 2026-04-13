@@ -13,6 +13,9 @@ import {
   useBranchTables,
   useBranchWaitlist,
   useCancelReservation,
+  useDayCloseBlockers,
+  useDayCloseRemediation,
+  useLatestOpenDayClose,
   useCreateOrder,
   useCreateOrderEditApproval,
   useCreateReservation,
@@ -181,6 +184,9 @@ export default function RestaurantOpsPage() {
   const kitchen = useKitchenTickets();
   const notifications = useOperationalNotifications(branchId);
   const report = useBranchOperationsReport(branchId);
+  const latestDayClose = useLatestOpenDayClose(branchId);
+  const dayCloseBlockers = useDayCloseBlockers(latestDayClose.data?.id ?? null);
+  const blockerRemediation = useDayCloseRemediation();
   const analytics = useAnalytics();
   useRestaurantOpsWebSocket(branchId);
   const createReservation = useCreateReservation();
@@ -409,6 +415,30 @@ export default function RestaurantOpsPage() {
     }
   };
 
+  const remediateBlocker = async (blockerCode: string, metadata: Record<string, unknown>) => {
+    const dayCloseId = latestDayClose.data?.id;
+    if (!dayCloseId) {
+      setActionError('No open day-close record to remediate.');
+      return;
+    }
+    const resourceId =
+      (metadata.drawer_session_ids as number[] | undefined)?.[0] ??
+      (metadata.export_ids as number[] | undefined)?.[0] ??
+      (metadata.refund_ids as number[] | undefined)?.[0] ??
+      (metadata.bill_ids as number[] | undefined)?.[0];
+    try {
+      await blockerRemediation.mutateAsync({
+        dayCloseId,
+        blockerCode,
+        resourceId,
+        actorUserId: staffContext.staffId,
+      });
+      setActionSuccess(`Remediation triggered for ${blockerCode}.`);
+    } catch (error) {
+      setActionError(getErrorMessage(error, `Failed to remediate ${blockerCode}.`));
+    }
+  };
+
   const settleFirstOpenBill = async () => {
     const target = bills.data?.find((bill) => bill.status !== 'paid');
     if (!target) {
@@ -497,6 +527,39 @@ export default function RestaurantOpsPage() {
         <Card><CardHeader><CardTitle className="text-sm">Gross Sales</CardTitle></CardHeader><CardContent className="text-2xl font-bold">${(report.data?.gross_sales ?? 0).toFixed(2)}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">Low Stock Alerts</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{report.data?.low_stock_count ?? 0}</CardContent></Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Day-close blockers</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!latestDayClose.data && <p className="text-sm text-gray-500">No open day-close window for this branch.</p>}
+          {dayCloseBlockers.data?.blockers?.length ? (
+            <div className="space-y-2">
+              {dayCloseBlockers.data.blockers.map((blocker) => (
+                <div key={blocker.blocker_code} className="rounded-md border p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-sm">{blocker.summary}</p>
+                    <p className="text-xs text-gray-500">
+                      Severity: {blocker.severity} · Count: {blocker.count}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={blockerRemediation.isPending}
+                    onClick={() => remediateBlocker(blocker.blocker_code, blocker.metadata as Record<string, unknown>)}
+                  >
+                    Remediate
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            latestDayClose.data && <p className="text-sm text-emerald-700">No active blockers detected.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <Card>

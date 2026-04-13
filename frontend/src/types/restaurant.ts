@@ -133,3 +133,25 @@ export interface OperationalNotification {
   is_operational_exception: boolean;
   occurred_at: string;
 }
+
+export interface DayClose {
+  id: number;
+  branch_id: number;
+  business_date: string;
+  status: 'open' | 'closed';
+}
+
+export interface DayCloseBlocker {
+  blocker_code: string;
+  blocker_type: string;
+  severity: 'info' | 'warning' | 'critical';
+  count: number;
+  summary: string;
+  remediation_action: 'close_drawer' | 'rerun_export' | 'resolve_refund_settlement' | 'resolve_pending_settlement' | 'acknowledge_staffing_override';
+  metadata: Record<string, unknown>;
+}
+
+export interface DayCloseBlockersResponse {
+  day_close_id: number;
+  blockers: DayCloseBlocker[];
+}

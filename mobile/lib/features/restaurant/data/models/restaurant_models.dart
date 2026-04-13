@@ -259,3 +259,46 @@ class BranchOperationsReport {
     );
   }
 }
+
+class DayCloseItem {
+  final int id;
+  final int branchId;
+  final String status;
+
+  DayCloseItem({
+    required this.id,
+    required this.branchId,
+    required this.status,
+  });
+
+  factory DayCloseItem.fromJson(Map<String, dynamic> json) {
+    return DayCloseItem(
+      id: json['id'] as int,
+      branchId: json['branch_id'] as int? ?? 0,
+      status: json['status'] as String? ?? 'open',
+    );
+  }
+}
+
+class DayCloseBlockerItem {
+  final String blockerCode;
+  final String severity;
+  final int count;
+  final String summary;
+
+  DayCloseBlockerItem({
+    required this.blockerCode,
+    required this.severity,
+    required this.count,
+    required this.summary,
+  });
+
+  factory DayCloseBlockerItem.fromJson(Map<String, dynamic> json) {
+    return DayCloseBlockerItem(
+      blockerCode: json['blocker_code'] as String? ?? 'unknown',
+      severity: json['severity'] as String? ?? 'warning',
+      count: json['count'] as int? ?? 0,
+      summary: json['summary'] as String? ?? 'Blocker detected',
+    );
+  }
+}

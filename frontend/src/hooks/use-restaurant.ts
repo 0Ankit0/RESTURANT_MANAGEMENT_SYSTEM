@@ -6,6 +6,8 @@ import type {
   Bill,
   BranchOperationsReport,
   CursorPage,
+  DayClose,
+  DayCloseBlockersResponse,
   KitchenTicket,
   KitchenTicketStatus,
   MenuItem,
@@ -419,6 +421,82 @@ export function useTransitionReservation() {
     },
     onSettled: (_data, _error, payload) => {
       invalidateBranchQueries(queryClient, payload.branchId);
+    },
+  });
+}
+
+export function useLatestOpenDayClose(branchId: number) {
+  return useQuery({
+    queryKey: ['restaurant', 'day-close', branchId],
+    queryFn: async () => {
+      const response = await apiClient.get<CursorPage<DayClose>>('/day-close', {
+        params: { branch_id: branchId, status_filter: 'open', limit: 1 },
+      });
+      return response.data.items[0] ?? null;
+    },
+    enabled: branchId > 0,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useDayCloseBlockers(dayCloseId: number | null) {
+  return useQuery({
+    queryKey: ['restaurant', 'day-close', dayCloseId, 'blockers'],
+    queryFn: async () => {
+      const response = await apiClient.get<DayCloseBlockersResponse>(`/day-close/${dayCloseId}/blockers`);
+      return response.data;
+    },
+    enabled: Boolean(dayCloseId),
+    refetchInterval: 15_000,
+  });
+}
+
+export function useDayCloseRemediation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      dayCloseId: number;
+      blockerCode: string;
+      resourceId?: number;
+      actorUserId?: number | null;
+    }) => {
+      if (payload.blockerCode === 'open_drawers' && payload.resourceId) {
+        await apiClient.post(`/day-close/${payload.dayCloseId}/remediation/close-drawer/${payload.resourceId}`, {
+          closed_by: payload.actorUserId ?? null,
+        });
+        return;
+      }
+      if (payload.blockerCode === 'pending_exports' && payload.resourceId) {
+        await apiClient.post(`/day-close/${payload.dayCloseId}/remediation/rerun-export/${payload.resourceId}`, {
+          requested_by: payload.actorUserId ?? null,
+        });
+        return;
+      }
+      if (payload.blockerCode === 'unresolved_refunds' && payload.resourceId) {
+        await apiClient.post(`/day-close/${payload.dayCloseId}/remediation/resolve-refund/${payload.resourceId}`, {
+          settlement_id: null,
+          resolved_by: payload.actorUserId ?? null,
+        });
+        return;
+      }
+      if (payload.blockerCode === 'staffing_gaps') {
+        await apiClient.post(`/day-close/${payload.dayCloseId}/remediation/acknowledge-staffing-gap`, {
+          acknowledged_by: payload.actorUserId ?? null,
+        });
+        return;
+      }
+      if (payload.blockerCode === 'unpaid_bills' && payload.resourceId) {
+        await apiClient.post(`/day-close/${payload.dayCloseId}/remediation/resolve-bill/${payload.resourceId}`, {
+          cashier_id: payload.actorUserId ?? null,
+        });
+        return;
+      }
+      throw new Error(`No remediation mapping for blocker ${payload.blockerCode}`);
+    },
+    onSettled: (_data, _error, payload) => {
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'day-close', payload.dayCloseId, 'blockers'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'day-close'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', 'branch-report'] });
     },
   });
 }
