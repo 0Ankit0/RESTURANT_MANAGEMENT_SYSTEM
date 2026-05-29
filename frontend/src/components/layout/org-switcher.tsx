@@ -6,6 +6,7 @@ import { ChevronsUpDown, Check, Building2, Plus } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useTenants, useSwitchTenant } from '@/hooks/use-tenants';
 import type { Tenant } from '@/types';
+import { useI18n } from '@/lib/i18n';
 
 function OrgAvatar({ name, className = '' }: { name: string; className?: string }) {
   const initials = name
@@ -29,6 +30,7 @@ function OrgAvatar({ name, className = '' }: { name: string; className?: string 
 }
 
 export function OrgSwitcher() {
+  const { t } = useI18n();
   const { tenant: activeTenant, setTenant } = useAuthStore();
   const { data } = useTenants({ limit: 50 });
   const switchTenant = useSwitchTenant();
@@ -73,7 +75,7 @@ export function OrgSwitcher() {
           </span>
         )}
         <span className="flex-1 truncate text-left">
-          {activeTenant ? activeTenant.name : 'Personal'}
+          {activeTenant ? activeTenant.name : t('org.personal')}
         </span>
         <ChevronsUpDown className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
       </button>
@@ -84,7 +86,7 @@ export function OrgSwitcher() {
           {/* Section: personal */}
           <div className="px-2 py-1.5">
             <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-              Account
+              {t('org.account')}
             </p>
             <button
               onClick={handlePersonal}
@@ -93,7 +95,7 @@ export function OrgSwitcher() {
               <span className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-gray-200">
                 <Building2 className="h-3.5 w-3.5 text-gray-500" />
               </span>
-              <span className="flex-1 truncate text-left">Personal</span>
+              <span className="flex-1 truncate text-left">{t('org.personal')}</span>
               {!activeTenant && <Check className="h-4 w-4 text-blue-600 flex-shrink-0" />}
             </button>
           </div>
@@ -102,7 +104,7 @@ export function OrgSwitcher() {
           {tenants.length > 0 && (
             <div className="border-t border-gray-100 px-2 py-1.5">
               <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                Organizations
+                {t('org.organizations')}
               </p>
               <ul className="max-h-48 overflow-y-auto" role="listbox">
                 {tenants.map((t) => {
@@ -132,7 +134,7 @@ export function OrgSwitcher() {
               className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
             >
               <Plus className="h-4 w-4 text-gray-400" />
-              Add organization
+              {t('org.addOrganization')}
             </Link>
           </div>
         </div>

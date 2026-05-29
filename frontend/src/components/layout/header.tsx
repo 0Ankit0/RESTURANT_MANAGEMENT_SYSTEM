@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useNotifications, useMarkAllNotificationsRead, useMarkNotificationRead } from '@/hooks/use-notifications';
 import { LanguageSwitcher } from './language-switcher';
 import { ThemeSelector } from '@/components/theme/theme-selector';
+import { useI18n } from '@/lib/i18n';
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () => void) {
   useEffect(() => {
@@ -21,6 +22,7 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () =
 }
 
 export function Header() {
+  const { t } = useI18n();
   const { logout } = useAuth();
   const { user, tenant } = useAuthStore();
 
@@ -56,7 +58,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           {tenant && (
             <span className="text-sm text-gray-500">
-              Organization: <span className="font-medium text-gray-900">{tenant.name}</span>
+              {t('header.organization')}: <span className="font-medium text-gray-900">{tenant.name}</span>
             </span>
           )}
         </div>
@@ -70,7 +72,7 @@ export function Header() {
             <button
               onClick={() => { setNotifOpen((o) => !o); setUserOpen(false); }}
               className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
-              aria-label="Notifications"
+              aria-label={t('header.notifications')}
             >
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
@@ -84,14 +86,14 @@ export function Header() {
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50">
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <span className="text-sm font-semibold text-gray-900">Notifications</span>
+                  <span className="text-sm font-semibold text-gray-900">{t('header.notifications')}</span>
                   {unreadCount > 0 && (
                     <button
                       onClick={() => markAll.mutate()}
                       className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
-                      Mark all read
+                      {t('header.markAllRead')}
                     </button>
                   )}
                 </div>
@@ -101,7 +103,7 @@ export function Header() {
                   {notifications.length === 0 ? (
                     <div className="py-8 text-center">
                       <Bell className="h-7 w-7 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">No notifications</p>
+                      <p className="text-sm text-gray-400">{t('header.noNotifications')}</p>
                     </div>
                   ) : (
                     notifications.map((n) => (
@@ -120,7 +122,7 @@ export function Header() {
                             onClick={() => markOne.mutate(n.id)}
                             className="text-[10px] text-blue-500 hover:text-blue-700 flex-shrink-0 mt-1"
                           >
-                            Mark read
+                            {t('header.markRead')}
                           </button>
                         )}
                       </div>
@@ -134,7 +136,7 @@ export function Header() {
                   onClick={() => setNotifOpen(false)}
                   className="flex items-center justify-center gap-1 px-4 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 border-t border-gray-100 transition-colors"
                 >
-                  View all notifications <ChevronRight className="h-3.5 w-3.5" />
+                  {t('header.viewAllNotifications')} <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             )}
@@ -145,13 +147,13 @@ export function Header() {
             <button
               onClick={() => { setUserOpen((o) => !o); setNotifOpen(false); }}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="User menu"
+              aria-label={t('header.user')}
             >
               <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                 <User className="h-4 w-4 text-blue-600" />
               </div>
               <span className="text-sm font-medium text-gray-700 max-w-[120px] truncate">
-                {user?.first_name || user?.username || user?.email || 'User'}
+                {user?.first_name || user?.username || user?.email || t('header.user')}
               </span>
             </button>
 
@@ -162,7 +164,7 @@ export function Header() {
                   <p className="text-sm font-semibold text-gray-900 truncate">
                     {user?.first_name && user?.last_name
                       ? `${user.first_name} ${user.last_name}`
-                      : user?.username || 'User'}
+                      : user?.username || t('header.user')}
                   </p>
                   <p className="text-xs text-gray-500 truncate mt-0.5">{user?.email}</p>
                 </div>
@@ -175,7 +177,7 @@ export function Header() {
                     className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <User className="h-4 w-4 text-gray-400" />
-                    Profile
+                    {t('header.profile')}
                   </Link>
                   <Link
                     to="/settings"
@@ -183,7 +185,7 @@ export function Header() {
                     className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <Settings className="h-4 w-4 text-gray-400" />
-                    Settings
+                    {t('header.settings')}
                   </Link>
                 </div>
 
@@ -194,7 +196,7 @@ export function Header() {
                     className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut className="h-4 w-4" />
-                    Sign out
+                    {t('header.signOut')}
                   </button>
                 </div>
               </div>
@@ -205,10 +207,10 @@ export function Header() {
 
       <ConfirmDialog
         open={showLogoutDialog}
-        title="Sign out?"
-        description="You will be signed out of your account and redirected to the login page."
-        confirmLabel="Sign out"
-        cancelLabel="Cancel"
+        title={t('header.signOutQuestion')}
+        description={t('header.signOutDescription')}
+        confirmLabel={t('header.signOut')}
+        cancelLabel={t('common.cancel')}
         onConfirm={handleLogoutConfirm}
         onCancel={() => setShowLogoutDialog(false)}
         isLoading={isLoggingOut}

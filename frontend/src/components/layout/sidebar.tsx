@@ -16,20 +16,22 @@ import {
 import { OrgSwitcher } from './org-switcher';
 import { useSystemCapabilities } from '@/hooks/use-system';
 import { useAuthStore } from '@/store/auth-store';
+import { useI18n } from '@/lib/i18n';
 
 const mainNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Profile', href: '/profile', icon: User },
-  { name: 'Tenants', href: '/tenants', icon: Building2, feature: 'multitenancy' },
-  { name: 'Payments', href: '/finances', icon: CreditCard, feature: 'finance' },
-  { name: 'Notifications', href: '/notifications', icon: Bell, feature: 'notifications' },
-  { name: 'Maps', href: '/maps', icon: Map, feature: 'maps' },
-  { name: 'Restaurant Ops', href: '/restaurant', icon: UtensilsCrossed },
-  { name: 'Active Sessions', href: '/tokens', icon: Key, feature: 'auth' },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { key: 'sidebar.dashboard', href: '/dashboard', icon: Home },
+  { key: 'sidebar.profile', href: '/profile', icon: User },
+  { key: 'sidebar.tenants', href: '/tenants', icon: Building2, feature: 'multitenancy' },
+  { key: 'sidebar.payments', href: '/finances', icon: CreditCard, feature: 'finance' },
+  { key: 'sidebar.notifications', href: '/notifications', icon: Bell, feature: 'notifications' },
+  { key: 'sidebar.maps', href: '/maps', icon: Map, feature: 'maps' },
+  { key: 'sidebar.restaurantOps', href: '/restaurant', icon: UtensilsCrossed },
+  { key: 'sidebar.activeSessions', href: '/tokens', icon: Key, feature: 'auth' },
+  { key: 'sidebar.settings', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
+  const { t } = useI18n();
   const pathname = useLocation().pathname;
   const { data: capabilities } = useSystemCapabilities();
   const user = useAuthStore((state) => state.user);
@@ -50,14 +52,14 @@ export function Sidebar() {
       <OrgSwitcher />
       <nav className="flex flex-col gap-1 p-4 pt-0">
         <div className="mb-2 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-          Workspace
+          {t('sidebar.workspace')}
         </div>
         {visibleNavigation.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
-              key={item.name}
+              key={item.key}
               to={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive
@@ -66,7 +68,7 @@ export function Sidebar() {
               }`}
             >
               <item.icon className="h-5 w-5" />
-              {item.name}
+              {t(item.key)}
             </Link>
           );
         })}
@@ -77,7 +79,7 @@ export function Sidebar() {
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
             >
               <ArrowRight className="h-5 w-5" />
-              Open Admin Panel
+              {t('sidebar.openAdminPanel')}
             </Link>
           </div>
         ) : null}
