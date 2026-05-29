@@ -43,7 +43,7 @@ def error_spike_window() -> timedelta:
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def build_request_log_context(request: Request) -> dict[str, Any]:
@@ -161,7 +161,9 @@ async def create_log_entry(
 
 
 async def prune_old_log_entries(db: AsyncSession) -> int:
-    cutoff = utc_now() - timedelta(days=settings.LOG_RETENTION_DAYS)
+    # ObservabilityLogEntry.timestamp is stored without timezone information,
+    # so use a naive UTC cutoff to avoid asyncpg datetime binding errors.
+    cutoff = (utc_now() - timedelta(days=settings.LOG_RETENTION_DAYS)).replace(tzinfo=None)
     stale_logs = (
         await db.execute(
             select(ObservabilityLogEntry).where(ObservabilityLogEntry.timestamp < cutoff)

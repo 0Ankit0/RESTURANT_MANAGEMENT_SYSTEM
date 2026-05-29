@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 from sqlmodel import select
 
-from src.apps.core.config import settings
 from src.apps.finance.models.payment import PaymentStatus, PaymentTransaction
 from src.apps.finance.services.base import BasePaymentProvider
 from src.db.session import async_session_factory
