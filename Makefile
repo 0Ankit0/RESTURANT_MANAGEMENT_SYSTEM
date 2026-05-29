@@ -21,6 +21,9 @@ backend-dev:
 backend-migrate:
 	cd backend && uv run task migrate
 
+backend-qa-seed:
+	cd backend && uv run task seed-qa
+
 frontend-lint:
 	cd frontend && npm run lint
 

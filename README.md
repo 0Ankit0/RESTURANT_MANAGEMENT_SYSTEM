@@ -19,7 +19,9 @@ The system targets multi-branch restaurant workflows across guest service, front
    - `make infra-up`
 3. Run migrations:
    - `make backend-migrate`
-4. Run apps in separate terminals:
+4. Seed reusable QA data:
+   - `make backend-qa-seed`
+5. Run apps in separate terminals:
    - `make backend-dev`
    - `make frontend-dev`
    - `make mobile-dev`
@@ -37,3 +39,4 @@ The system targets multi-branch restaurant workflows across guest service, front
 - System design source of truth: `docs/system-design/README.md`
 - Implementation planning: `docs/system-design/implementation/implementation-playbook.md`
 - Release checklist: `TEMPLATE_RELEASE_CHECKLIST.md`
+- QA seed data + manual role workflows: `docs/qa-testing-seed-data.md`
