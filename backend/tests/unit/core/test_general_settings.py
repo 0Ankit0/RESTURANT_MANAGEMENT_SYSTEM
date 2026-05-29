@@ -33,11 +33,12 @@ def test_build_effective_settings_prefers_enabled_database_value() -> None:
 
 
 def test_build_effective_settings_ignores_non_runtime_editable_keys() -> None:
+    blocked_override = "postgresql+asyncpg://override:override@db/override"
     resolved_settings = build_effective_settings(
         [
             {
                 "key": "DATABASE_URL",
-                "db_value": "sqlite+aiosqlite:///./override.db",
+                "db_value": blocked_override,
                 "use_db_value": True,
                 "is_runtime_editable": True,
             }
@@ -46,7 +47,7 @@ def test_build_effective_settings_ignores_non_runtime_editable_keys() -> None:
 
     assert "DATABASE_URL" in NON_RUNTIME_EDITABLE_SETTING_KEYS
     assert "SECRET_KEY" in NON_RUNTIME_EDITABLE_SETTING_KEYS
-    assert resolved_settings.DATABASE_URL != "sqlite+aiosqlite:///./override.db"
+    assert resolved_settings.DATABASE_URL != blocked_override
 
 
 def test_public_general_settings_payload_uses_safe_allowlist() -> None:

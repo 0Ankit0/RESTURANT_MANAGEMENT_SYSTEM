@@ -4,7 +4,6 @@ from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 
 from src.main import app
@@ -17,13 +16,16 @@ os.environ["TESTING"] = "True"
 
 @pytest.fixture(scope="function")
 async def test_engine():
-    """Create a test engine for each test function with unique database."""
-    # Use in-memory database with StaticPool
+    """Create a PostgreSQL test engine for each test function."""
+    test_database_url = os.getenv("TEST_DATABASE_URL")
+    if not test_database_url:
+        pytest.skip("TEST_DATABASE_URL must be set for PostgreSQL-backed tests.")
+    if not test_database_url.startswith("postgresql"):
+        pytest.skip("TEST_DATABASE_URL must point to a PostgreSQL database.")
+
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
+        test_database_url,
         echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool
     )
     
     async with engine.begin() as conn:
