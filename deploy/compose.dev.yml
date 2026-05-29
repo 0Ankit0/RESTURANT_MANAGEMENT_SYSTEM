@@ -5,12 +5,12 @@ services:
       POSTGRES_DB: restaurant_dev
       POSTGRES_USER: restaurant
       POSTGRES_PASSWORD: restaurant
-    ports: ["5432:5432"]
+    ports: ["55432:5432"]
     volumes: ["postgres_dev:/var/lib/postgresql/data"]
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["56379:6379"]
 
   minio:
     image: minio/minio:latest
