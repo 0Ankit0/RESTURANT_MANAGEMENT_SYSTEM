@@ -2,15 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
-
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const navigate = useNavigate();
@@ -47,8 +44,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
       // Try to exchange the refresh token for a new token pair
       try {
-        const refreshRes = await axios.post(
-          `${baseURL}/auth/refresh/`,
+        const refreshRes = await apiClient.post('/auth/refresh/',
           { refresh_token: refreshToken },
           { params: { set_cookie: false } }
         );

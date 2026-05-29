@@ -59,7 +59,7 @@ export function useAuth() {
   const { data: currentUser, refetch: refetchUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: async () => {
-      const response = await apiClient.get<User>('/users/me/');
+      const response = await apiClient.get<User>('/users/me');
       const u = response.data;
       setUser(u);
       analytics.identify(String(u.id), { email: u.email, username: u.username });

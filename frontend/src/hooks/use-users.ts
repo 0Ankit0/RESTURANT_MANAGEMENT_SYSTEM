@@ -13,7 +13,7 @@ export function useCurrentUser() {
   return useQuery({
     queryKey: ['currentUser'],
     queryFn: async () => {
-      const response = await apiClient.get<User>('/users/me/');
+      const response = await apiClient.get<User>('/users/me');
       setUser(response.data);
       return response.data;
     },

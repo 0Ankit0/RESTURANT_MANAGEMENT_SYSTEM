@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useInRouterContext, useLocation } from 'react-router-dom';
 import { analytics } from '@/lib/analytics';
 
 /**
@@ -13,7 +13,7 @@ import { analytics } from '@/lib/analytics';
  *
  * Renders nothing — purely a side-effect component.
  */
-export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+function RouterAnalyticsTracker() {
   const location = useLocation();
   const pathname = location.pathname;
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -32,5 +32,16 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     analytics.page(pathname, { url });
   }, [pathname, searchParams]);
 
-  return <>{children}</>;
+  return null;
+}
+
+export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  const inRouterContext = useInRouterContext();
+
+  return (
+    <>
+      {children}
+      {inRouterContext ? <RouterAnalyticsTracker /> : null}
+    </>
+  );
 }

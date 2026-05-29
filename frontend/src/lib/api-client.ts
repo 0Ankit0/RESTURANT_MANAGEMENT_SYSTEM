@@ -38,8 +38,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = String(originalRequest?.url || '');
+    const isAuthFlowRequest =
+      requestUrl.includes('/auth/login/') ||
+      requestUrl.includes('/auth/signup/') ||
+      requestUrl.includes('/auth/refresh/');
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthFlowRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
