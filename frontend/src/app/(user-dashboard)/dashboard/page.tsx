@@ -6,8 +6,10 @@ import { useTokens } from '@/hooks/use-tokens';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Bell, Shield, Key, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useI18n } from '@/lib/i18n';
 
 export default function DashboardPage() {
+  const { t } = useI18n();
   const { user } = useAuthStore();
   const { data: notifData, isLoading: loadingNotifs } = useNotifications({ limit: 5 });
   const { data: tokenData } = useTokens({ limit: 1 });
@@ -18,22 +20,22 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      name: 'Unread Notifications',
+      name: t('dashboard.unreadNotifications'),
       value: String(unreadCount),
       icon: Bell,
       href: '/notifications',
       color: 'text-blue-600 bg-blue-50',
     },
     {
-      name: 'Active Sessions',
+      name: t('dashboard.activeSessions'),
       value: String(activeSessions),
       icon: Key,
       href: '/tokens',
       color: 'text-purple-600 bg-purple-50',
     },
     {
-      name: '2FA Status',
-      value: user?.otp_enabled ? 'Enabled' : 'Disabled',
+      name: t('dashboard.twoFactorStatus'),
+      value: user?.otp_enabled ? t('dashboard.enabled') : t('dashboard.disabled'),
       icon: Shield,
       href: '/profile',
       color: user?.otp_enabled ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50',
@@ -43,9 +45,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('sidebar.dashboard')}</h1>
         <p className="text-gray-500">
-          Welcome back{user?.first_name ? `, ${user.first_name}` : user?.username ? `, ${user.username}` : ''}!
+          {t('dashboard.welcomeBack', {
+            name: user?.first_name || user?.username || t('header.user'),
+          })}
         </p>
       </div>
 
@@ -74,10 +78,10 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              Recent Notifications
+              {t('dashboard.recentNotifications')}
             </CardTitle>
             <Link to="/notifications" className="text-sm text-blue-600 hover:underline">
-              View all
+              {t('dashboard.viewAll')}
             </Link>
           </CardHeader>
           <CardContent>
@@ -90,7 +94,7 @@ export default function DashboardPage() {
             ) : recentNotifs.length === 0 ? (
               <div className="text-center py-8">
                 <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No notifications yet</p>
+                <p className="text-sm text-gray-500">{t('dashboard.noNotificationsYet')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -120,14 +124,32 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>{t('dashboard.quickActions')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { href: '/profile', icon: Shield, label: 'Security Settings', desc: 'Manage 2FA & password', color: 'text-blue-600' },
-                { href: '/tokens', icon: Key, label: 'Active Sessions', desc: 'View & revoke sessions', color: 'text-purple-600' },
-                { href: '/notifications', icon: Bell, label: 'Notifications', desc: `${unreadCount} unread`, color: 'text-orange-600' },
+                {
+                  href: '/profile',
+                  icon: Shield,
+                  label: t('dashboard.securitySettings'),
+                  desc: t('dashboard.manage2faPassword'),
+                  color: 'text-blue-600',
+                },
+                {
+                  href: '/tokens',
+                  icon: Key,
+                  label: t('dashboard.activeSessions'),
+                  desc: t('dashboard.viewRevokeSessions'),
+                  color: 'text-purple-600',
+                },
+                {
+                  href: '/notifications',
+                  icon: Bell,
+                  label: t('sidebar.notifications'),
+                  desc: t('dashboard.unreadCount', { count: unreadCount }),
+                  color: 'text-orange-600',
+                },
               ].map((item) => (
                 <Link
                   key={item.href}
@@ -152,9 +174,9 @@ export default function DashboardPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-yellow-800">Email not verified</p>
+                <p className="text-sm font-medium text-yellow-800">{t('dashboard.emailNotVerified')}</p>
                 <p className="text-xs text-yellow-700 mt-1">
-                  Please verify your email address to unlock all features.
+                  {t('dashboard.verifyEmailPrompt')}
                 </p>
               </div>
             </div>
@@ -169,9 +191,9 @@ export default function DashboardPage() {
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-orange-800">Two-factor authentication is disabled</p>
+                  <p className="text-sm font-medium text-orange-800">{t('dashboard.twoFactorDisabled')}</p>
                   <p className="text-xs text-orange-700 mt-1">
-                    Enable 2FA to add an extra layer of security to your account.
+                    {t('dashboard.enable2faPrompt')}
                   </p>
                 </div>
               </div>
@@ -179,7 +201,7 @@ export default function DashboardPage() {
                 to="/profile"
                 className="text-sm font-medium text-orange-700 hover:text-orange-900 underline flex-shrink-0"
               >
-                Enable 2FA
+                {t('dashboard.enable2fa')}
               </Link>
             </div>
           </CardContent>

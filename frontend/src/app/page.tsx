@@ -4,28 +4,45 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Shield, Zap, Users } from 'lucide-react';
+import {
+  ChefHat,
+  ClipboardCheck,
+  CreditCard,
+  LayoutDashboard,
+  Store,
+  Users,
+} from 'lucide-react';
 
 const features = [
   {
-    icon: ShoppingCart,
-    title: 'Fastapi Template Ready',
-    description: 'Complete Fastapi Template solution with payments, subscriptions, and billing.',
+    icon: LayoutDashboard,
+    title: 'Service Dashboard',
+    description: 'Track covers, table turns, kitchen load, and unresolved tickets in one live board.',
   },
   {
-    icon: Shield,
-    title: 'Secure by Default',
-    description: 'Built-in authentication, authorization, and secure API endpoints.',
+    icon: Store,
+    title: 'Branch Operations',
+    description: 'Run reservations, seating, waiter workflows, and cashier settlement per branch.',
   },
   {
-    icon: Zap,
-    title: 'Fast & Modern',
-    description: 'Built with React and Vite on top of Fastapi REST for optimal performance.',
+    icon: ChefHat,
+    title: 'Kitchen Flow',
+    description: 'Prioritize prep queues, identify bottlenecks, and close service windows faster.',
   },
   {
     icon: Users,
-    title: 'Multi-Tenant',
-    description: 'Support for organizations and teams with role-based access.',
+    title: 'Role-Based Access',
+    description: 'Give managers, hosts, floor staff, and admins the exact tools they need.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Payments & Settlements',
+    description: 'Capture transactions, reconcile payouts, and monitor failed exports in real time.',
+  },
+  {
+    icon: ClipboardCheck,
+    title: 'Audit-Ready Activity',
+    description: 'Token tracking, security review, and operational logs built into daily workflows.',
   },
 ];
 
@@ -40,17 +57,20 @@ export default function Home() {
   }, [isAuthenticated, navigate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,#fff2d9_0%,#fff7eb_35%,#fff_75%)] text-stone-900">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-amber-200/70 bg-white/85 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="text-xl font-bold text-blue-600">Fastapi Template</div>
+            <div className="flex items-center gap-2 text-xl font-bold text-amber-700">
+              <ChefHat className="h-5 w-5" />
+              Restaurant Command Center
+            </div>
             <div className="flex items-center gap-4">
               <Link to="/login">
                 <Button variant="ghost">Sign in</Button>
               </Link>
               <Link to="/signup">
-                <Button>Get Started</Button>
+                <Button className="bg-amber-600 hover:bg-amber-700">Start onboarding</Button>
               </Link>
             </div>
           </div>
@@ -58,68 +78,95 @@ export default function Home() {
       </header>
 
       <main className="pt-16">
-        <section className="py-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-              Modern Fastapi Template Platform
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              A powerful, scalable Fastapi Template solution built with React, Vite, and Fastapi REST API.
-              Multi-tenant, secure, and ready for production.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/signup">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Start Free Trial
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  Sign In
-                </Button>
-              </Link>
+        <section className="px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-2">
+            <div>
+              <p className="mb-4 inline-flex rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                Built for modern restaurant teams
+              </p>
+              <h1 className="mb-6 text-4xl font-bold leading-tight sm:text-5xl">
+                Run service, staff, and settlements from one restaurant operations platform.
+              </h1>
+              <p className="mb-8 max-w-2xl text-lg text-stone-600">
+                Coordinate front-of-house, kitchen, notifications, and finance with a unified system
+                designed for multi-branch restaurant management.
+              </p>
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <Link to="/signup">
+                  <Button size="lg" className="w-full bg-amber-600 hover:bg-amber-700 sm:w-auto">
+                    Launch your workspace
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button variant="outline" size="lg" className="w-full border-amber-300 text-amber-800 sm:w-auto">
+                    Sign in to operations
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-white p-6 shadow-xl shadow-amber-100">
+              <h2 className="mb-5 text-lg font-semibold">Live operations snapshot</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-amber-50 p-4">
+                  <p className="text-sm text-stone-500">Open tables</p>
+                  <p className="mt-2 text-3xl font-bold text-amber-700">24</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-4">
+                  <p className="text-sm text-stone-500">Kitchen tickets</p>
+                  <p className="mt-2 text-3xl font-bold text-emerald-700">11</p>
+                </div>
+                <div className="rounded-xl bg-sky-50 p-4">
+                  <p className="text-sm text-stone-500">Active sessions</p>
+                  <p className="mt-2 text-3xl font-bold text-sky-700">18</p>
+                </div>
+                <div className="rounded-xl bg-rose-50 p-4">
+                  <p className="text-sm text-stone-500">Pending blockers</p>
+                  <p className="mt-2 text-3xl font-bold text-rose-700">3</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-          <div className="max-w-7xl mx-auto">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-              Everything You Need
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <section className="bg-white px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <h2 className="mb-3 text-center text-3xl font-bold">Purpose-built for restaurant workflows</h2>
+            <p className="mx-auto mb-12 max-w-3xl text-center text-stone-600">
+              Everything from branch staffing to session security is available from the same operational hub.
+            </p>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {features.map((feature) => (
                 <div
                   key={feature.title}
-                  className="p-6 rounded-xl border border-gray-200 hover:border-blue-500 hover:shadow-lg transition-all"
+                  className="rounded-xl border border-stone-200 p-6 transition-all hover:-translate-y-1 hover:border-amber-400 hover:shadow-lg"
                 >
-                  <div className="h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center mb-4">
-                    <feature.icon className="h-6 w-6 text-blue-600" />
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100">
+                    <feature.icon className="h-6 w-6 text-amber-700" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
+                  <h3 className="mb-2 text-lg font-semibold text-stone-900">{feature.title}</h3>
+                  <p className="text-stone-600">{feature.description}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="py-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Ready to Get Started?</h2>
-            <p className="text-lg text-gray-600 mb-8">
-              Join thousands of businesses already using our platform.
+        <section className="px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-4xl rounded-2xl border border-amber-200 bg-amber-50 p-10 text-center">
+            <h2 className="mb-4 text-3xl font-bold text-stone-900">Open your first service-ready dashboard today</h2>
+            <p className="mb-8 text-stone-600">
+              Create your account, assign branch roles, and begin managing daily operations in minutes.
             </p>
             <Link to="/signup">
-              <Button size="lg">Create Your Account</Button>
+              <Button size="lg" className="bg-amber-600 hover:bg-amber-700">Create restaurant account</Button>
             </Link>
           </div>
         </section>
       </main>
 
-      <footer className="py-8 px-4 border-t border-gray-200">
-        <div className="max-w-7xl mx-auto text-center text-gray-500 text-sm">
-          © {new Date().getFullYear()} Fastapi Template Platform. All rights reserved.
+      <footer className="border-t border-amber-200 py-8 px-4">
+        <div className="mx-auto max-w-7xl text-center text-sm text-stone-500">
+          © {new Date().getFullYear()} Restaurant Command Center. Built for daily service excellence.
         </div>
       </footer>
     </div>

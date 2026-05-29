@@ -70,16 +70,6 @@ function UserEditor({
   const [phone, setPhone] = useState(user.phone ?? '');
   const [isActive, setIsActive] = useState(user.is_active);
   const [isSuperuser, setIsSuperuser] = useState(user.is_superuser);
-  const { data: availableRolesData } = useRoles({ limit: 200 });
-  const { data: userRolesData } = useUserRoles(user.id);
-  const assignRole = useAssignRole();
-  const removeRole = useRemoveRole();
-  const [selectedRoleId, setSelectedRoleId] = useState('');
-
-  const availableRoles = availableRolesData?.items ?? [];
-  const assignedRoles = userRolesData?.roles ?? [];
-  const assignedRoleIds = new Set(assignedRoles.map((role) => role.id));
-  const unassignedRoles = availableRoles.filter((role) => !assignedRoleIds.has(role.id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
@@ -153,13 +143,78 @@ function UserEditor({
           </label>
         </div>
 
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            isLoading={updateUser.isPending}
+            onClick={() =>
+              updateUser.mutate(
+                {
+                  userId: user.id,
+                  data: {
+                    email,
+                    first_name: firstName || undefined,
+                    last_name: lastName || undefined,
+                    phone: phone || undefined,
+                    is_active: isActive,
+                    is_superuser: isSuperuser,
+                  },
+                },
+                { onSuccess: onClose }
+              )
+            }
+          >
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickRoleAssigner({
+  user,
+  onClose,
+}: {
+  user: User;
+  onClose: () => void;
+}) {
+  const { data: availableRolesData } = useRoles({ limit: 200 });
+  const { data: userRolesData } = useUserRoles(user.id);
+  const assignRole = useAssignRole();
+  const removeRole = useRemoveRole();
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+
+  const availableRoles = availableRolesData?.items ?? [];
+  const assignedRoles = userRolesData?.roles ?? [];
+  const assignedRoleIds = new Set(assignedRoles.map((role) => role.id));
+  const unassignedRoles = availableRoles.filter((role) => !assignedRoleIds.has(role.id));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-xl rounded-[24px] border border-white/40 bg-[#fcfbf8] p-6 shadow-[0_16px_40px_rgba(15,23,42,0.12)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+              Quick Action
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-gray-900">Assign Roles</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage RBAC roles for @{user.username} directly from the users table.
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-gray-900">Assigned roles</p>
-              <p className="mt-1 text-xs text-gray-500">
-                Add or remove RBAC roles for this user directly from the admin dashboard.
-              </p>
+              <p className="mt-1 text-xs text-gray-500">Remove roles the user should no longer have.</p>
             </div>
             <ShieldCheck className="h-5 w-5 text-blue-600" />
           </div>
@@ -219,30 +274,9 @@ function UserEditor({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <div className="mt-6 flex justify-end">
           <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            isLoading={updateUser.isPending}
-            onClick={() =>
-              updateUser.mutate(
-                {
-                  userId: user.id,
-                  data: {
-                    email,
-                    first_name: firstName || undefined,
-                    last_name: lastName || undefined,
-                    phone: phone || undefined,
-                    is_active: isActive,
-                    is_superuser: isSuperuser,
-                  },
-                },
-                { onSuccess: onClose }
-              )
-            }
-          >
-            Save Changes
+            Done
           </Button>
         </div>
       </div>
@@ -257,6 +291,7 @@ export default function AdminUsersPage() {
   const deferredSearch = useDeferredValue(search);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [roleUser, setRoleUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const deleteUser = useDeleteUser();
 
@@ -456,12 +491,13 @@ export default function AdminUsersPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setEditingUser(user)}
+                            onClick={() => setRoleUser(user)}
                             title="Assign role"
                             aria-label="Assign role"
-                            className="px-2.5"
+                            className="gap-1.5 px-2.5"
                           >
                             <ShieldCheck className="h-3.5 w-3.5" />
+                            <span>Role</span>
                           </Button>
                           <Button
                             variant="ghost"
@@ -513,6 +549,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       {editingUser ? <UserEditor user={editingUser} onClose={() => setEditingUser(null)} /> : null}
+  {roleUser ? <QuickRoleAssigner user={roleUser} onClose={() => setRoleUser(null)} /> : null}
 
       <ConfirmDialog
         open={!!deletingUser}

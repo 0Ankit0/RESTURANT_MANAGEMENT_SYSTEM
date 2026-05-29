@@ -4,6 +4,7 @@ import { Providers } from '@/components/providers';
 import { appRouter } from '@/router';
 import { THEME_PRESETS } from '@/lib/themes';
 import { preloadCriticalRoutes } from '@/route-preload';
+import { I18nProvider } from '@/lib/i18n';
 
 function ThemeBootstrap() {
   useEffect(() => {
@@ -68,9 +69,11 @@ export function App() {
   }, []);
 
   return (
-    <Providers>
-      <ThemeBootstrap />
-      <RouterProvider router={appRouter} />
-    </Providers>
+    <I18nProvider>
+      <Providers>
+        <ThemeBootstrap />
+        <RouterProvider router={appRouter} />
+      </Providers>
+    </I18nProvider>
   );
 }
