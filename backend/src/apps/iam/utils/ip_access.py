@@ -50,7 +50,7 @@ async def revoke_active_tokens(
         .where(and_(*filters))
         .values(
             is_active=False,
-            revoked_at=datetime.now(timezone.utc),
+            revoked_at=datetime.now(timezone.utc).replace(tzinfo=None),
             revoke_reason=reason,
         )
     )

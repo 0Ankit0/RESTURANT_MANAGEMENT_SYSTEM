@@ -323,7 +323,7 @@ async def validate_otp_login(
             token_type=TokenType.ACCESS,
             ip_address=ip_address,
             user_agent=user_agent,
-            expires_at=datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc)
+            expires_at=datetime.fromtimestamp(access_payload["exp"], tz=timezone.utc).replace(tzinfo=None)
         )
         db.add(access_token_tracking)
         
@@ -334,7 +334,7 @@ async def validate_otp_login(
             token_type=TokenType.REFRESH,
             ip_address=ip_address,
             user_agent=user_agent,
-            expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc)
+            expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc).replace(tzinfo=None)
         )
         db.add(refresh_token_tracking)
         await db.commit()

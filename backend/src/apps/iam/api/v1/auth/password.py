@@ -153,7 +153,7 @@ async def confirm_password_reset(
         
         for token_tracking in tokens:
             token_tracking.is_active = False
-            token_tracking.revoked_at = datetime.now(timezone.utc)
+            token_tracking.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
             token_tracking.revoke_reason = "Password reset"
         
         await db.commit()
@@ -205,7 +205,7 @@ async def change_password(
         
         for token_tracking in tokens:
             token_tracking.is_active = False
-            token_tracking.revoked_at = datetime.now(timezone.utc)
+            token_tracking.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
             token_tracking.revoke_reason = "Password changed"
         
         await db.commit()
