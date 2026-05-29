@@ -429,8 +429,6 @@ class Settings(BaseSettings):
         if isinstance(value, str) and value:
             return value
         data = info.data
-        if data.get("DEBUG", True):
-            return f"sqlite+aiosqlite:///./{data.get('POSTGRES_DB')}.db"
         return (
             f"postgresql+asyncpg://{data.get('POSTGRES_USER')}:"
             f"{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}/"
@@ -443,13 +441,18 @@ class Settings(BaseSettings):
         if isinstance(value, str) and value:
             return value
         data = info.data
-        if data.get("DEBUG", True):
-            return f"sqlite:///./{data.get('POSTGRES_DB')}.db"
         return (
-            f"postgresql://{data.get('POSTGRES_USER')}:"
+            f"postgresql+psycopg://{data.get('POSTGRES_USER')}:"
             f"{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}/"
             f"{data.get('POSTGRES_DB')}"
         )
+
+    @field_validator("DATABASE_URL", "SYNC_DATABASE_URL")
+    @classmethod
+    def validate_postgres_only_database_urls(cls, value: str) -> str:
+        if not value.startswith("postgresql"):
+            raise ValueError("Only PostgreSQL database URLs are supported.")
+        return value
 
     @field_validator(
         "EMAIL_FALLBACK_PROVIDERS",

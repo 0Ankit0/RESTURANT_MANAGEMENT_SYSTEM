@@ -64,6 +64,8 @@ from .entities import (
     WaitlistStatus,
 )
 
+OperationalEvent = OperationalEventLog
+
 __all__ = [
     "Branch",
     "RestaurantTable",
@@ -85,6 +87,7 @@ __all__ = [
     "DiscountApproval",
     "IdempotencyRecord",
     "Order",
+    "OperationalEvent",
     "OperationalEventLog",
     "OpsEventOutbox",
     "PrivilegedActionAudit",
