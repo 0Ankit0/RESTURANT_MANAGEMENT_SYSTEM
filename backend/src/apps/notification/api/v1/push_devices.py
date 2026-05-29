@@ -75,7 +75,8 @@ async def get_notification_devices(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[NotificationDeviceRead]:
-    _require_push_enabled()
+    if not settings.PUSH_ENABLED:
+        return []
     assert isinstance(current_user.id, int), "User Id can't be None"
     devices = await list_devices(db, current_user.id)
     return [NotificationDeviceRead.model_validate(device) for device in devices]
@@ -144,7 +145,6 @@ async def delete_notification_device(
 
 @router.get("/push/config/")
 async def get_push_config() -> dict:
-    _require_push_enabled()
     return get_communications_service().get_push_public_config()
 
 
