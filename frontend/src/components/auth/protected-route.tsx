@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth-store';
 import { apiClient } from '@/lib/api-client';
@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { isAuthenticated, _hasHydrated, setUser, setTokens, logout } = useAuthStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -40,7 +40,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
       if (!refreshToken) {
         // No refresh token at all → go to login
-        router.push('/login');
+        navigate('/login');
         setIsInitializing(false);
         return;
       }
@@ -63,15 +63,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       } catch {
         // Refresh failed (token expired / revoked) → clear everything and go to login
         logout();
-        router.push('/login');
+        navigate('/login');
       } finally {
         setIsInitializing(false);
       }
     }
 
     initAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_hasHydrated]);
+  }, [_hasHydrated, isAuthenticated, logout, navigate, setTokens, setUser]);
 
   // While Zustand is rehydrating from localStorage or we're attempting a refresh
   if (!_hasHydrated || isInitializing) {

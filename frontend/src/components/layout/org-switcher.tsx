@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { ChevronsUpDown, Check, Building2, Plus } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useTenants, useSwitchTenant } from '@/hooks/use-tenants';
@@ -127,7 +127,7 @@ export function OrgSwitcher() {
           {/* Footer: create new org */}
           <div className="border-t border-gray-100">
             <Link
-              href="/tenants"
+              to="/tenants"
               onClick={() => setOpen(false)}
               className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
             >

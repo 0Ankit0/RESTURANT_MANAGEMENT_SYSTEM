@@ -1,13 +1,13 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAcceptInvitation } from '@/hooks/use-tenants';
 import { useAuthStore } from '@/store/auth-store';
 
 function AcceptInvitationPageInner() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const token = searchParams.get('token');
   const { isAuthenticated } = useAuthStore();
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -23,7 +23,7 @@ function AcceptInvitationPageInner() {
     }
 
     if (!isAuthenticated) {
-      router.push(`/login?redirect=/accept-invitation?token=${token}`);
+      navigate(`/login?redirect=/accept-invitation?token=${token}`);
       return;
     }
 
@@ -32,7 +32,7 @@ function AcceptInvitationPageInner() {
       onSuccess: () => {
         setStatus('success');
         setMessage('You have successfully joined the team!');
-        setTimeout(() => router.push('/tenants'), 2000);
+        setTimeout(() => navigate('/tenants'), 2000);
       },
       onError: (err: unknown) => {
         const axiosErr = err as { response?: { data?: { detail?: string } } };
@@ -40,7 +40,7 @@ function AcceptInvitationPageInner() {
         setMessage(axiosErr?.response?.data?.detail || 'Failed to accept invitation.');
       },
     });
-  }, [acceptInvitation, isAuthenticated, router, token]);
+  }, [acceptInvitation, isAuthenticated, navigate, token]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">

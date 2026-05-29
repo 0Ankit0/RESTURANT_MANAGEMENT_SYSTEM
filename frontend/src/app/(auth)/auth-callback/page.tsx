@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth-store';
 import { Loader2 } from 'lucide-react';
 
@@ -12,8 +12,8 @@ import { Loader2 } from 'lucide-react';
  * Usage: /auth-callback?access=TOKEN&refresh=TOKEN
  */
 function AuthCallbackInner() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { setTokens } = useAuthStore();
 
   useEffect(() => {
@@ -22,17 +22,17 @@ function AuthCallbackInner() {
     const error = searchParams.get('error');
 
     if (error) {
-      router.replace(`/login?error=${encodeURIComponent(error)}`);
+      navigate(`/login?error=${encodeURIComponent(error)}`, { replace: true });
       return;
     }
 
     if (access && refresh) {
       setTokens(access, refresh);
-      router.replace('/dashboard');
+      navigate('/dashboard', { replace: true });
     } else {
-      router.replace('/login?error=oauth_failed');
+      navigate('/login?error=oauth_failed', { replace: true });
     }
-  }, [searchParams, setTokens, router]);
+  }, [navigate, searchParams, setTokens]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">

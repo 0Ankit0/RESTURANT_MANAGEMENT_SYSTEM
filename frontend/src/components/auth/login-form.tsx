@@ -3,8 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
@@ -38,7 +37,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ enabledProviders }: LoginFormProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { loginAsync, isLoading, loginError } = useAuth();
   const { authMessage, clearAuthMessage } = useAuthStore();
 
@@ -56,9 +55,9 @@ export function LoginForm({ enabledProviders }: LoginFormProps) {
       const result = await loginAsync(data);
       if (result && 'requires_otp' in result) {
         const otpResult = result as OTPLoginResponse;
-        router.push(`/otp-verify?temp_token=${otpResult.temp_token}`);
+        navigate(`/otp-verify?temp_token=${otpResult.temp_token}`);
       } else {
-        router.push('/dashboard');
+        navigate('/dashboard');
       }
     } catch {
       // error shown via loginError
@@ -107,7 +106,7 @@ export function LoginForm({ enabledProviders }: LoginFormProps) {
             error={errors.password?.message}
           />
           <div className="flex items-center justify-end">
-            <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+            <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -148,7 +147,7 @@ export function LoginForm({ enabledProviders }: LoginFormProps) {
 
           <p className="text-sm text-center text-gray-600">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-blue-600 hover:underline">
+            <Link to="/signup" className="text-blue-600 hover:underline">
               Sign up
             </Link>
           </p>

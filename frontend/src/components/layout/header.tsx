@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { Bell, User, LogOut, Settings, ChevronRight, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
@@ -130,7 +130,7 @@ export function Header() {
 
                 {/* Footer */}
                 <Link
-                  href="/notifications"
+                  to="/notifications"
                   onClick={() => setNotifOpen(false)}
                   className="flex items-center justify-center gap-1 px-4 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 border-t border-gray-100 transition-colors"
                 >
@@ -170,7 +170,7 @@ export function Header() {
                 {/* Menu items */}
                 <div className="py-1">
                   <Link
-                    href="/profile"
+                    to="/profile"
                     onClick={() => setUserOpen(false)}
                     className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
@@ -178,7 +178,7 @@ export function Header() {
                     Profile
                   </Link>
                   <Link
-                    href="/settings"
+                    to="/settings"
                     onClick={() => setUserOpen(false)}
                     className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import {
   useRoles,
   usePermissions,
@@ -30,7 +30,7 @@ function RoleRow({ role }: { role: Role }) {
       </td>
       <td className="px-4 py-3 text-right">
         <Link
-          href={`/admin/rbac/${role.id}`}
+          to={`/admin/rbac/${role.id}`}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
           title="Manage permissions"
         >

@@ -41,7 +41,7 @@ typecheck: ## Run TypeScript type checking
 	npx tsc --noEmit
 
 clean: ## Clean build artifacts
-	rm -rf .next out node_modules
+	rm -rf dist .vite node_modules
 
 # Docker commands
 docker-build: ## Build Docker image

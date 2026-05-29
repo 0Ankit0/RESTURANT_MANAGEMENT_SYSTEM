@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -205,7 +205,7 @@ export default function SecurityReviewPage() {
                     <p className="mt-2 text-sm text-gray-500">{selectedIncident.summary}</p>
                   </div>
                   <Link
-                    href={buildIncidentLogHref(selectedIncident)}
+                    to={buildIncidentLogHref(selectedIncident)}
                     className="inline-flex items-center rounded-full border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
                   >
                     Open linked logs

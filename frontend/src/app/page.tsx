@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Shield, Zap, Users } from 'lucide-react';
@@ -21,7 +20,7 @@ const features = [
   {
     icon: Zap,
     title: 'Fast & Modern',
-    description: 'Built with Next.js and Fastapi REST for optimal performance.',
+    description: 'Built with React and Vite on top of Fastapi REST for optimal performance.',
   },
   {
     icon: Users,
@@ -31,14 +30,14 @@ const features = [
 ];
 
 export default function Home() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard');
+      navigate('/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
@@ -47,10 +46,10 @@ export default function Home() {
           <div className="flex items-center justify-between h-16">
             <div className="text-xl font-bold text-blue-600">Fastapi Template</div>
             <div className="flex items-center gap-4">
-              <Link href="/login">
+              <Link to="/login">
                 <Button variant="ghost">Sign in</Button>
               </Link>
-              <Link href="/signup">
+              <Link to="/signup">
                 <Button>Get Started</Button>
               </Link>
             </div>
@@ -65,16 +64,16 @@ export default function Home() {
               Modern Fastapi Template Platform
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              A powerful, scalable Fastapi Template solution built with Next.js and Fastapi REST API.
+              A powerful, scalable Fastapi Template solution built with React, Vite, and Fastapi REST API.
               Multi-tenant, secure, and ready for production.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup">
+              <Link to="/signup">
                 <Button size="lg" className="w-full sm:w-auto">
                   Start Free Trial
                 </Button>
               </Link>
-              <Link href="/login">
+              <Link to="/login">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto">
                   Sign In
                 </Button>
@@ -111,7 +110,7 @@ export default function Home() {
             <p className="text-lg text-gray-600 mb-8">
               Join thousands of businesses already using our platform.
             </p>
-            <Link href="/signup">
+            <Link to="/signup">
               <Button size="lg">Create Your Account</Button>
             </Link>
           </div>

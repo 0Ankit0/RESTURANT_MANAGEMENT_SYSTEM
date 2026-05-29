@@ -5,7 +5,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { useTokens } from '@/hooks/use-tokens';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Bell, Shield, Key, AlertTriangle } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <Link key={stat.name} href={stat.href}>
+          <Link key={stat.name} to={stat.href}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -76,7 +76,7 @@ export default function DashboardPage() {
               <Bell className="h-5 w-5" />
               Recent Notifications
             </CardTitle>
-            <Link href="/notifications" className="text-sm text-blue-600 hover:underline">
+            <Link to="/notifications" className="text-sm text-blue-600 hover:underline">
               View all
             </Link>
           </CardHeader>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
               ].map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  to={item.href}
                   className="flex flex-col gap-2 p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
                 >
                   <item.icon className={`h-5 w-5 ${item.color}`} />
@@ -176,7 +176,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Link
-                href="/profile"
+                to="/profile"
                 className="text-sm font-medium text-orange-700 hover:text-orange-900 underline flex-shrink-0"
               >
                 Enable 2FA

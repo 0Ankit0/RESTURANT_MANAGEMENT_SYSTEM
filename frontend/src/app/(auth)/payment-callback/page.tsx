@@ -1,10 +1,9 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useVerifyPayment } from '@/hooks/use-finances';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import Link from 'next/link';
 import type { PaymentProvider } from '@/types';
 
 /**
@@ -15,8 +14,8 @@ import type { PaymentProvider } from '@/types';
  * Generic:                ?provider=stripe|paypal&transaction_id=...
  */
 function PaymentCallbackInner() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
@@ -45,7 +44,7 @@ function PaymentCallbackInner() {
           if (result.status === 'completed') {
             setStatus('success');
             setMessage(`Payment of ${result.amount ? result.amount / 100 : ''} completed successfully.`);
-            setTimeout(() => router.push('/finances'), 4000);
+            setTimeout(() => navigate('/finances'), 4000);
           } else if (result.status === 'initiated' || result.status === 'pending') {
             setStatus('success');
             setMessage(`Payment is ${result.status}. It will update automatically after provider reconciliation.`);
@@ -60,8 +59,7 @@ function PaymentCallbackInner() {
         },
       }
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate, searchParams, verifyPayment]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -80,7 +78,7 @@ function PaymentCallbackInner() {
             <CheckCircle className="h-14 w-14 text-green-500 mx-auto" />
             <p className="text-gray-700 font-medium">{message}</p>
             <p className="text-sm text-gray-400">Redirecting to payments…</p>
-            <Link href="/finances" className="text-sm text-blue-600 hover:underline">
+            <Link to="/finances" className="text-sm text-blue-600 hover:underline">
               Go to Payments
             </Link>
           </div>
@@ -91,10 +89,10 @@ function PaymentCallbackInner() {
             <XCircle className="h-14 w-14 text-red-500 mx-auto" />
             <p className="text-gray-700">{message}</p>
             <div className="flex flex-col gap-2">
-              <Link href="/finances" className="text-sm text-blue-600 hover:underline">
+              <Link to="/finances" className="text-sm text-blue-600 hover:underline">
                 View Payments
               </Link>
-              <Link href="/dashboard" className="text-sm text-gray-400 hover:underline">
+              <Link to="/dashboard" className="text-sm text-gray-400 hover:underline">
                 Go to Dashboard
               </Link>
             </div>

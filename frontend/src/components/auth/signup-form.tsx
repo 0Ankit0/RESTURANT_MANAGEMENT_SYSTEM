@@ -3,8 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +49,7 @@ interface SignupFormProps {
 }
 
 export function SignupForm({ enabledProviders }: SignupFormProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { signupAsync, isLoading, signupError } = useAuth();
 
   const {
@@ -64,7 +63,7 @@ export function SignupForm({ enabledProviders }: SignupFormProps) {
   const onSubmit = async (data: SignupFormData) => {
     try {
       await signupAsync(data);
-      router.push('/dashboard');
+      navigate('/dashboard');
     } catch {
       // error shown via signupError
     }
@@ -173,7 +172,7 @@ export function SignupForm({ enabledProviders }: SignupFormProps) {
 
           <p className="text-sm text-center text-gray-600">
             Already have an account?{' '}
-            <Link href="/login" className="text-blue-600 hover:underline">
+            <Link to="/login" className="text-blue-600 hover:underline">
               Sign in
             </Link>
           </p>

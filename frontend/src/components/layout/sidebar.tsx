@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
   Bell,
@@ -31,7 +30,7 @@ const mainNavigation = [
 ];
 
 export function Sidebar() {
-  const pathname = usePathname();
+  const pathname = useLocation().pathname;
   const { data: capabilities } = useSystemCapabilities();
   const user = useAuthStore((state) => state.user);
   const appName = process.env.NEXT_PUBLIC_APP_NAME ?? 'Project Template';
@@ -44,7 +43,7 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-10 w-64 bg-white border-r border-gray-200">
       <div className="flex h-16 items-center justify-center border-b border-gray-200">
-        <Link href="/dashboard" className="text-xl font-bold text-blue-600">
+        <Link to="/dashboard" className="text-xl font-bold text-blue-600">
           {appName}
         </Link>
       </div>
@@ -59,7 +58,7 @@ export function Sidebar() {
           return (
             <Link
               key={item.name}
-              href={item.href}
+              to={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-50 text-blue-600'
@@ -74,7 +73,7 @@ export function Sidebar() {
         {showAdminSwitch ? (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <Link
-              href="/admin/dashboard"
+              to="/admin/dashboard"
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
             >
               <ArrowRight className="h-5 w-5" />

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { analytics } from '@/lib/analytics';
 
 /**
@@ -14,8 +14,9 @@ import { analytics } from '@/lib/analytics';
  * Renders nothing — purely a side-effect component.
  */
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const location = useLocation();
+  const pathname = location.pathname;
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const isFirstRender = useRef(true);
 
   useEffect(() => {

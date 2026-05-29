@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { use } from 'react';
-import Link from 'next/link';
+import { Link, useParams } from 'react-router-dom';
 import {
   useRole,
   useRolePermissions,
@@ -22,12 +21,9 @@ import {
 } from 'lucide-react';
 import type { Permission } from '@/types';
 
-export default function RoleManagePage({
-  params,
-}: {
-  params: Promise<{ roleId: string }>;
-}) {
-  const { roleId } = use(params);
+export default function RoleManagePage() {
+  const routeParams = useParams();
+  const roleId = routeParams.roleId ?? '';
 
   const { data: role, isLoading: roleLoading } = useRole(roleId);
   const { data: rolePerms, isLoading: rolePermsLoading } = useRolePermissions(roleId);
@@ -68,7 +64,7 @@ export default function RoleManagePage({
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <ShieldCheck className="h-12 w-12 text-gray-300" />
         <p className="text-gray-500">Role not found.</p>
-        <Link href="/admin/rbac">
+        <Link to="/admin/rbac">
           <Button variant="outline" size="sm">Back to Roles</Button>
         </Link>
       </div>
@@ -80,7 +76,7 @@ export default function RoleManagePage({
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-4">
         <Link
-          href="/admin/rbac"
+          to="/admin/rbac"
           className="mt-1 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />

@@ -32,7 +32,7 @@ import {
   PaintBucket,
   Sparkles,
 } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 
 const TABS = [
   { id: 'account',       label: 'Account',       icon: Mail },
@@ -328,7 +328,7 @@ export default function SettingsPage() {
                   ))}
                   <p className="pt-1 text-xs text-gray-400">
                     Update your name and avatar on the{' '}
-                    <Link href="/profile" className="text-blue-600 hover:underline">
+                    <Link to="/profile" className="text-blue-600 hover:underline">
                       Profile page
                     </Link>
                     .
@@ -689,7 +689,7 @@ export default function SettingsPage() {
                     View all devices and locations where your account is currently signed in. Revoke
                     any session you don't recognise.
                   </p>
-                  <Link href="/tokens">
+                  <Link to="/tokens">
                     <Button variant="outline" size="sm">
                       <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                       Manage sessions
@@ -714,7 +714,7 @@ export default function SettingsPage() {
                         by contacting support.
                       </p>
                     </div>
-                    <Link href="/tokens">
+                    <Link to="/tokens">
                       <Button variant="destructive" size="sm">
                         Revoke all sessions
                       </Button>

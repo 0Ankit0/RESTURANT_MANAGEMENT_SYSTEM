@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { ExternalLink, Globe, MapPinned, Navigation, Satellite } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -188,7 +188,7 @@ export default function MapsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link href={externalUrl} target="_blank">
+              <Link to={externalUrl} target="_blank">
                 <Button variant="outline">
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Open externally

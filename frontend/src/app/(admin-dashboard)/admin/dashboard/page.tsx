@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth-store';
 import { useListUsers } from '@/hooks/use-users';
 import { useTokens } from '@/hooks/use-tokens';
@@ -128,7 +128,7 @@ export default function AdminDashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <Link key={stat.name} href={stat.href}>
+          <Link key={stat.name} to={stat.href}>
             <Card className="cursor-pointer transition-shadow hover:shadow-md">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -159,7 +159,7 @@ export default function AdminDashboardPage() {
               {quickActions.map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  to={item.href}
                   className="flex flex-col gap-2 rounded-lg border border-gray-200 p-4 transition-colors hover:border-blue-400 hover:bg-blue-50"
                 >
                   <item.icon className={`h-5 w-5 ${item.color}`} />
@@ -182,7 +182,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Link
-              href="/admin/users"
+              to="/admin/users"
               className="flex items-center justify-between rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
             >
               <div className="flex items-center gap-3">
@@ -192,7 +192,7 @@ export default function AdminDashboardPage() {
               <span className="text-xs text-gray-500">{activeUsers} accounts</span>
             </Link>
             <Link
-              href="/admin/users"
+              to="/admin/users"
               className="flex items-center justify-between rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
             >
               <div className="flex items-center gap-3">
@@ -202,7 +202,7 @@ export default function AdminDashboardPage() {
               <span className="text-xs text-gray-500">{superusers} elevated users</span>
             </Link>
             <Link
-              href="/admin/users"
+              to="/admin/users"
               className="flex items-center justify-between rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
             >
               <div className="flex items-center gap-3">
@@ -227,7 +227,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
               <Link
-                href="/admin/users"
+                to="/admin/users"
                 className="flex-shrink-0 text-sm font-medium text-yellow-700 underline hover:text-yellow-900"
               >
                 Review users

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -51,7 +51,7 @@ export function ForgotPasswordForm() {
           </CardDescription>
         </CardHeader>
         <CardFooter className="justify-center">
-          <Link href="/login" className="text-sm text-blue-600 hover:underline">
+          <Link to="/login" className="text-sm text-blue-600 hover:underline">
             Back to login
           </Link>
         </CardFooter>
@@ -87,7 +87,7 @@ export function ForgotPasswordForm() {
           <Button type="submit" className="w-full" isLoading={requestReset.isPending}>
             Send reset link
           </Button>
-          <Link href="/login" className="text-sm text-blue-600 hover:underline">
+          <Link to="/login" className="text-sm text-blue-600 hover:underline">
             Back to login
           </Link>
         </CardFooter>

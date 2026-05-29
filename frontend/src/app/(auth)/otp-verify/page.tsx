@@ -1,12 +1,12 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useVerifyOTP } from '@/hooks/use-auth';
 
 function OTPVerifyPageInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const tempToken = searchParams.get('temp_token') || '';
   const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
@@ -21,7 +21,7 @@ function OTPVerifyPageInner() {
       { otp_code: otpCode, temp_token: tempToken },
       {
         onSuccess: () => {
-          router.push('/dashboard');
+            navigate('/dashboard');
         },
         onError: (err: unknown) => {
           const axiosErr = err as { response?: { data?: { detail?: string } } };

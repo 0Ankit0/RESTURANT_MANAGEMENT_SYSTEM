@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,8 +34,8 @@ const resetPasswordSchema = z
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 export function ResetPasswordForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const token = searchParams.get('t') ?? '';
   const confirmReset = useConfirmPasswordReset();
 
@@ -50,7 +50,7 @@ export function ResetPasswordForm() {
   const onSubmit = (data: ResetPasswordFormData) => {
     confirmReset.mutate(
       { token, ...data },
-      { onSuccess: () => router.push('/login?reset=success') }
+      { onSuccess: () => navigate('/login?reset=success') }
     );
   };
 

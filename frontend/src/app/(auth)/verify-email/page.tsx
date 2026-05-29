@@ -1,14 +1,13 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useVerifyEmail, useResendVerification } from '@/hooks/use-auth';
 import { MailCheck, XCircle, Loader2, RefreshCw } from 'lucide-react';
 
 function VerifyEmailPageInner() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const token = searchParams.get('t');
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'no-token'>('loading');
   const [message, setMessage] = useState('');
@@ -26,15 +25,14 @@ function VerifyEmailPageInner() {
       onSuccess: () => {
         setStatus('success');
         setMessage('Your email has been verified successfully!');
-        setTimeout(() => router.push('/login'), 3000);
+        setTimeout(() => navigate('/login'), 3000);
       },
       onError: () => {
         setStatus('error');
         setMessage('The verification link is invalid or has expired.');
       },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [navigate, token, verifyEmail]);
 
   const handleResend = () => {
     resend.mutate(undefined, {
@@ -86,7 +84,7 @@ function VerifyEmailPageInner() {
               </button>
             )}
 
-            <Link href="/login" className="block text-sm text-gray-400 hover:underline">
+            <Link to="/login" className="block text-sm text-gray-400 hover:underline">
               Back to login
             </Link>
           </div>
