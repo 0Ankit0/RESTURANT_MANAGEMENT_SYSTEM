@@ -38,13 +38,14 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         user_module_prefix='sqlmodel.',
-        render_as_batch=True
     )
     with context.begin_transaction():
         context.run_migrations()
 
 def run_migrations_online() -> None:
-    database_url = config.get_main_option("sqlalchemy.url") or settings.SYNC_DATABASE_URL or "sqlite:///./test.db"
+    database_url = config.get_main_option("sqlalchemy.url") or settings.SYNC_DATABASE_URL
+    if not database_url:
+        raise RuntimeError("SYNC_DATABASE_URL must be configured for Alembic migrations.")
     connectable = create_engine(
         database_url,
         poolclass=pool.NullPool,
@@ -54,7 +55,6 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             user_module_prefix='sqlmodel.',
-            render_as_batch=True,     
         )
         with context.begin_transaction():
             context.run_migrations()

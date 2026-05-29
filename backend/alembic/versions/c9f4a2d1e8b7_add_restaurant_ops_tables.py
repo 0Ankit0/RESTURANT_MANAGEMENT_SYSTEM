@@ -27,7 +27,6 @@ def upgrade() -> None:
         sa.Column("name", sqlmodel.AutoString(length=120), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(["branch_id"], ["branch.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
     with op.batch_alter_table("servicezone", schema=None) as batch_op:
@@ -40,7 +39,6 @@ def upgrade() -> None:
         sa.Column("name", sqlmodel.AutoString(length=120), nullable=False),
         sa.Column("table_ids_csv", sqlmodel.AutoString(length=500), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(["branch_id"], ["branch.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
     with op.batch_alter_table("tablegroup", schema=None) as batch_op:
@@ -55,8 +53,6 @@ def upgrade() -> None:
         sa.Column("check_in_at", sa.DateTime(), nullable=False),
         sa.Column("check_out_at", sa.DateTime(), nullable=True),
         sa.Column("notes", sqlmodel.AutoString(length=300), nullable=True),
-        sa.ForeignKeyConstraint(["branch_id"], ["branch.id"]),
-        sa.ForeignKeyConstraint(["shift_id"], ["shift.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
     with op.batch_alter_table("attendancerecord", schema=None) as batch_op:
@@ -72,7 +68,6 @@ def upgrade() -> None:
         sa.Column("notes", sqlmodel.AutoString(length=500), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("closed_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["branch_id"], ["branch.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
     with op.batch_alter_table("dayclose", schema=None) as batch_op:
